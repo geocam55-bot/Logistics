@@ -1,0 +1,349 @@
+import React, { useState } from 'react';
+import { Branch } from '../types';
+import { Store, Plus, Edit2, Trash2, Shield, Info, MapPin, Building, CheckCircle } from 'lucide-react';
+
+interface StoresSetupProps {
+  branches: Branch[];
+  onAddBranch: (branch: Branch) => void;
+  onUpdateBranch: (branch: Branch) => void;
+  onDeleteBranch: (id: string) => void;
+  truckCountByBranch: Record<string, number>;
+}
+
+export default function StoresSetup({
+  branches,
+  onAddBranch,
+  onUpdateBranch,
+  onDeleteBranch,
+  truckCountByBranch
+}: StoresSetupProps) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
+
+  // Form Inputs
+  const [storeId, setStoreId] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [storeType, setStoreType] = useState<'STORE' | 'DC'>('STORE');
+  const [storeAddress, setStoreAddress] = useState('');
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const handleStartAdd = () => {
+    setStoreId(`STORE-${Math.floor(1000 + Math.random() * 9000)}`);
+    setStoreName('');
+    setStoreType('STORE');
+    setStoreAddress('');
+    setIsAdding(true);
+    setEditingBranchId(null);
+  };
+
+  const handleStartEdit = (branch: Branch) => {
+    setStoreId(branch.id);
+    setStoreName(branch.name);
+    setStoreType(branch.type);
+    setStoreAddress(branch.address);
+    setEditingBranchId(branch.id);
+    setIsAdding(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storeName.trim() || !storeAddress.trim()) {
+      alert('Please fill in both the Store Name and Address.');
+      return;
+    }
+
+    const payload: Branch = {
+      id: storeId,
+      name: storeName.trim(),
+      type: storeType,
+      address: storeAddress.trim()
+    };
+
+    if (editingBranchId) {
+      onUpdateBranch(payload);
+      setEditingBranchId(null);
+      showFeedback('Store information updated successfully.');
+    } else {
+      // Check if ID is unique
+      if (branches.some(b => b.id === storeId)) {
+        payload.id = `STORE-${Math.floor(10000 + Math.random() * 89999)}`;
+      }
+      onAddBranch(payload);
+      setIsAdding(false);
+      showFeedback('New store branch registered successfully.');
+    }
+
+    // Reset Form
+    setStoreName('');
+    setStoreAddress('');
+  };
+
+  const showFeedback = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    const activeTrucks = truckCountByBranch[id] || 0;
+    if (activeTrucks > 0) {
+      alert(`Cannot delete store "${name}" because it still has ${activeTrucks} truck(s) assigned to its fleet. Please re-assign or decommission the trucks first.`);
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete and permanently remove active store storefront: "${name}"?`)) {
+      onDeleteBranch(id);
+      showFeedback('Store branch discarded successfully.');
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in" id="stores-setup-view">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h4 className="font-sans font-bold text-gray-900 tracking-tight text-xl">Store Branches Management</h4>
+          <p className="text-xs text-gray-500">
+            Configure RONA physical retail store locations and bulk distributions within the regional dispatch ecosystem
+          </p>
+        </div>
+      </div>
+
+      {feedback && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3 rounded-xl flex items-center space-x-2 shadow-sm">
+          <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span className="font-medium">{feedback}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left column: Add/Edit Form */}
+        <div className="lg:col-span-4 space-y-4">
+          {(!isAdding && !editingBranchId) ? (
+            <div className="bg-white border border-slate-100 p-5 rounded-xl shadow-sm text-center space-y-4">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+                <Store className="h-6 w-6" />
+              </div>
+              <div>
+                <h5 className="text-sm font-bold text-gray-900">Add New Branch Location</h5>
+                <p className="text-xs text-gray-500 mt-1">
+                  Expand the logistics fleet coverage by appending retail stores or distribution nodes.
+                </p>
+              </div>
+              <button
+                onClick={handleStartAdd}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-4 rounded-lg flex items-center justify-center space-x-1.5 transition-colors shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Register Store</span>
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="bg-white border border-slate-100 p-5 rounded-xl shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider font-mono flex items-center">
+                  <Building className="h-4 w-4 mr-1 text-blue-600" />
+                  {editingBranchId ? 'Edit Store Details' : 'Register Store'}
+                </h5>
+                <button
+                  type="button"
+                  onClick={() => { setIsAdding(false); setEditingBranchId(null); }}
+                  className="text-gray-400 hover:text-gray-600 text-xs font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Store / DC Identifier</label>
+                  <input
+                    type="text"
+                    value={storeId}
+                    onChange={(e) => {
+                      if (!editingBranchId) {
+                        setStoreId(e.target.value.toUpperCase().replace(/\s+/g, '_'));
+                      }
+                    }}
+                    disabled={!!editingBranchId}
+                    required
+                    placeholder="e.g. 01080_SACKVILLE"
+                    className="w-full border bg-slate-50 border-slate-200 px-3 py-1.5 rounded text-xs font-mono text-gray-800 disabled:opacity-75 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  {!editingBranchId && (
+                    <span className="text-[9px] text-gray-400 mt-0.5 block">Unique database code (use uppercase & underscores)</span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Corporate Store Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 01080 - Lower Sackville RONA"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Logistics NodeType</label>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setStoreType('STORE')}
+                      className={`py-1.5 px-3 text-xs font-semibold rounded-lg border text-center transition-all ${
+                        storeType === 'STORE'
+                          ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm'
+                          : 'border-slate-200 hover:bg-slate-50 text-gray-600'
+                      }`}
+                    >
+                      🏪 Retail Store
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStoreType('DC')}
+                      className={`py-1.5 px-3 text-xs font-semibold rounded-lg border text-center transition-all ${
+                        storeType === 'DC'
+                          ? 'bg-red-50 border-red-600 text-red-900 font-bold shadow-sm'
+                          : 'border-slate-200 hover:bg-slate-50 text-gray-600'
+                      }`}
+                    >
+                      🏭 Bulk DC Hub
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Physical Postal Address</label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="e.g. 15 Cobequid Rd, Lower Sackville, NS B4C 2M9"
+                    value={storeAddress}
+                    onChange={(e) => setStoreAddress(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-2 pt-2 border-t border-slate-100">
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 rounded-lg text-center font-sans tracking-tight"
+                >
+                  {editingBranchId ? 'Update Store' : 'Register Location'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAdding(false); setEditingBranchId(null); }}
+                  className="px-3 bg-slate-100 hover:bg-slate-200 text-gray-600 text-xs font-medium rounded-lg"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-[11px] text-gray-500 space-y-2">
+            <p className="font-semibold flex items-center text-gray-800 text-xs">
+              <Info className="h-3.5 w-3.5 mr-1 text-blue-500" /> Operational Policies
+            </p>
+            <p>
+              Stores act as regional order hubs. Deleting a store requires all assigned delivery trucks to be reassigned to other branches or decommissioned first, protecting ongoing runs from data errors.
+            </p>
+          </div>
+        </div>
+
+        {/* Right column: Store list */}
+        <div className="lg:col-span-8 bg-white border border-slate-100 p-5 rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h4 className="font-sans font-bold text-gray-900 text-base">Registered Stores Registry</h4>
+                <p className="text-xs text-gray-500 font-medium">Currently servicing {branches.length} active terminals in Nova Scotia</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {branches.map(branch => {
+                const assignedTrucks = truckCountByBranch[branch.id] || 0;
+                const isDc = branch.type === 'DC';
+
+                return (
+                  <div
+                    key={branch.id}
+                    className="border border-slate-100 rounded-xl p-4 hover:border-slate-200 transition-all bg-white relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs"
+                  >
+                    <div className="flex items-start space-x-3.5">
+                      <div className={`p-2.5 rounded-lg border shrink-0 ${
+                        isDc 
+                          ? 'bg-red-50 text-red-600 border-red-100' 
+                          : 'bg-blue-50 text-blue-600 border-blue-100'
+                      }`}>
+                        {isDc ? <Building className="h-5 w-5" /> : <Store className="h-5 w-5" />}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <h5 className="font-sans font-bold text-gray-900 text-sm">{branch.name}</h5>
+                          <span className={`text-[8px] px-1.5 py-0.5 font-bold uppercase rounded leading-none ${
+                            isDc 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {isDc ? 'Bulk DC' : 'Retailer'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 font-medium font-mono text-[10px] bg-slate-50 px-1.5 py-0.5 rounded inline-block">
+                          ID: {branch.id}
+                        </p>
+                        <div className="flex items-center text-xs text-gray-500 space-x-1 pt-1">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-sm sm:max-w-md">{branch.address}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-0 border-slate-50">
+                      <span className={`text-[10px] font-mono px-2 py-1 rounded font-bold border ${
+                        assignedTrucks > 0
+                          ? 'bg-blue-50 text-blue-800 border-blue-100'
+                          : 'bg-slate-50 text-slate-400 border-slate-100'
+                      }`}>
+                        {assignedTrucks} {assignedTrucks === 1 ? 'Truck Assigned' : 'Trucks Assigned'}
+                      </span>
+
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={() => handleStartEdit(branch)}
+                          className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                          title="Edit Store"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(branch.id, branch.name)}
+                          className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
+                          title="Delete Store"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+            <span className="flex items-center">
+              <Shield className="h-3.5 w-3.5 mr-1 text-emerald-500" /> Authorized Storefront Access Role
+            </span>
+            <span>Total Operational Depots: <strong>{branches.length}</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,6 @@
+{
+  "name": "RONA Delivery Tracker",
+  "description": "An independent tracking application for RONA stores and delivery center, monitoring deliveries from order entry to picking and final delivery.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
