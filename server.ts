@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -28,15 +29,295 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
+// Supabase Lazy Initialization
+let supabaseClient: any = null;
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  
+  if (!url || !key || url.trim() === "" || key.trim() === "" || url.includes("PLACEHOLDER") || key.includes("PLACEHOLDER")) {
+    return null;
+  }
+  
+  if (!supabaseClient) {
+    try {
+      supabaseClient = createClient(url, key, {
+        auth: {
+          persistSession: false
+        }
+      });
+    } catch (e) {
+      console.error("Failed to initialize Supabase client:", e);
+      return null;
+    }
+  }
+  return supabaseClient;
+}
+
+const SH_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR RONA LOGISTICS PORTAL */
+
+-- 1. Create tenants table
+create table if not exists tenants (
+  id text primary key,
+  name text not null,
+  code text not null unique,
+  description text,
+  "logoBadge" text,
+  "regionalFocus" text,
+  "primaryColor" text default 'blue'
+);
+
+-- 2. Create branches table
+create table if not exists branches (
+  id text primary key,
+  "tenantId" text not null,
+  name text not null,
+  type text not null, -- 'DC' or 'STORE'
+  address text not null
+);
+
+-- 3. Create trucks/vehicles table
+create table if not exists trucks (
+  id text primary key,
+  "tenantId" text not null,
+  name text not null,
+  type text not null,
+  driver text not null,
+  "branchId" text not null
+);
+
+-- 4. Create users table
+create table if not exists users (
+  id text primary key,
+  "tenantId" text not null,
+  name text not null,
+  email text not null,
+  role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User'
+  phone text,
+  "associatedStoreId" text
+);
+
+-- 5. Create deliveries table
+create table if not exists deliveries (
+  id text primary key,
+  "tenantId" text not null,
+  "invoiceNumber" text not null,
+  "epicorSalesOrder" text not null,
+  "customerName" text not null,
+  "deliveryAddress" text not null,
+  phone text not null,
+  "originBranch" text not null,
+  "destinationNotes" text,
+  status text not null,
+  "registeredAt" text not null,
+  "pickedAt" text,
+  "deliveredAt" text,
+  "returnedAt" text,
+  "returnReason" text,
+  "assignedTruck" text,
+  "assignedDriver" text,
+  "customerSignature" text,
+  "deliveryPhoto" text,
+  history jsonb default '[]'::jsonb
+);
+
+-- Seed Initial Logistical Partners
+insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
+('atlantic-logistics', 'Atlantic Shipping & Logistics', 'ATL', 'Serving Nova Scotia regional stores & main Windmill Road DC hub.', '⚓', 'Nova Scotia (Dartmouth, Tantallon, Halifax)', 'blue'),
+('bay-of-fundy', 'Bay of Fundy Transport Ltd', 'BOF', 'Serving Annapolis Valley and New Brunswick logistics gateways.', '🌊', 'New Brunswick & Annapolis Valley (Kentville, Truro, Moncton)', 'emerald'),
+('cabot-trail', 'Cabot Trail Cargo & Hauling', 'CTC', 'Providing Cape Breton heavy industrial bulk distribution services.', '⛰️', 'Cape Breton (Sydney, Port Hawkesbury)', 'indigo')
+on conflict (id) do nothing;
+`;
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Let the server ingest larger base64 file packets for PDFs and high-res images
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // API Route for performing Real-Time, Multimodal OCR content extraction
+  // Supabase connection and configuration diagnostics endpoint
+  app.get("/api/supabase-status", async (req, res) => {
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({
+          configured: false,
+          connected: false,
+          error: "Supabase credentials are not specified in the workspace settings. Falling back to local offline mode.",
+          url: process.env.SUPABASE_URL || "",
+          schemaSql: SH_SQL
+        });
+      }
+
+      // Perform a ping / select test query against the database to check if schema is constructed
+      const { data, error } = await supabase.from("tenants").select("id").limit(1);
+
+      if (error) {
+        console.warn("Supabase connection is alive, but table query failed (schema probably missing):", error);
+        return res.json({
+          configured: true,
+          connected: false,
+          error: `Supabase database is connected, but the schema tables have not been created yet: "${error.message}". Go to your Supabase SQL Editor and run the provided SQL setup script below.`,
+          url: process.env.SUPABASE_URL,
+          schemaSql: SH_SQL
+        });
+      }
+
+      res.json({
+        configured: true,
+        connected: true,
+        error: null,
+        url: process.env.SUPABASE_URL,
+        schemaSql: SH_SQL
+      });
+    } catch (e: any) {
+      console.error("Diagnosis Exception:", e);
+      res.json({
+        configured: !!process.env.SUPABASE_URL,
+        connected: false,
+        error: e.message || "An unresolved error occurred diagnostic check.",
+        url: process.env.SUPABASE_URL || "",
+        schemaSql: SH_SQL
+      });
+    }
+  });
+
+  // Fetch full state for a specific tenant from Supabase (or return empty arrays so client can seed them)
+  app.get("/api/tenant/state", async (req, res) => {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) {
+        return res.status(400).json({ error: "tenantId parameter is required." });
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({
+          supabaseActive: false,
+          deliveries: [],
+          trucks: [],
+          branches: [],
+          users: []
+        });
+      }
+
+      // Fetch all tables in parallel to keep it blazingly fast
+      const [rBranches, rTrucks, rUsers, rDeliveries] = await Promise.all([
+        supabase.from("branches").select("*").eq("tenantId", tenantId),
+        supabase.from("trucks").select("*").eq("tenantId", tenantId),
+        supabase.from("users").select("*").eq("tenantId", tenantId),
+        supabase.from("deliveries").select("*").eq("tenantId", tenantId)
+      ]);
+
+      // If schema tables don't exist yet, it'll error.
+      if (rBranches.error || rTrucks.error || rUsers.error || rDeliveries.error) {
+        const primaryError = rBranches.error || rTrucks.error || rUsers.error || rDeliveries.error;
+        throw new Error(primaryError?.message || "Error pulling multi-tenant tables from Supabase.");
+      }
+
+      res.json({
+        supabaseActive: true,
+        branches: rBranches.data || [],
+        trucks: rTrucks.data || [],
+        users: rUsers.data || [],
+        deliveries: rDeliveries.data || []
+      });
+    } catch (err: any) {
+      console.error("Failed to read Supabase state:", err);
+      // Fallback response inside error boundaries to let client handle the offline recovery
+      res.json({
+        supabaseActive: false,
+        error: err.message,
+        deliveries: [],
+        trucks: [],
+        branches: [],
+        users: []
+      });
+    }
+  });
+
+  // Save/Upsert fully updated collection states for a specific tenant
+  app.post("/api/tenant/save-state", async (req, res) => {
+    try {
+      const { tenantId, deliveries, trucks, branches, users } = req.body;
+      if (!tenantId) {
+        return res.status(400).json({ error: "tenantId parameter is required." });
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ success: true, localOnly: true });
+      }
+
+      // Force-inject appropriate tenantIds into nested payloads to maintain strict database isolation
+      const sanitizedBranches = (branches || []).map((b: any) => ({ ...b, tenantId }));
+      const sanitizedTrucks = (trucks || []).map((t: any) => ({ ...t, tenantId }));
+      const sanitizedUsers = (users || []).map((u: any) => ({ ...u, tenantId }));
+      const sanitizedDeliveries = (deliveries || []).map((d: any) => ({ ...d, tenantId }));
+
+      // Execute upserts series to maintain reference integrity
+      // 1. Branches first (parent of trucks and deliveries)
+      if (sanitizedBranches.length > 0) {
+        const { error } = await supabase.from("branches").upsert(sanitizedBranches);
+        if (error) throw new Error(`Branches Sync Error: ${error.message}`);
+      }
+
+      // 2. Trucks
+      if (sanitizedTrucks.length > 0) {
+        const { error } = await supabase.from("trucks").upsert(sanitizedTrucks);
+        if (error) throw new Error(`Trucks Sync Error: ${error.message}`);
+      }
+
+      // 3. Users
+      if (sanitizedUsers.length > 0) {
+        const { error } = await supabase.from("users").upsert(sanitizedUsers);
+        if (error) throw new Error(`Users Sync Error: ${error.message}`);
+      }
+
+      // 4. Deliveries
+      if (sanitizedDeliveries.length > 0) {
+        const { error } = await supabase.from("deliveries").upsert(sanitizedDeliveries);
+        if (error) throw new Error(`Deliveries Sync Error: ${error.message}`);
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Supabase Save State Error:", err);
+      res.status(500).json({ error: err.message || "Unable to sync tenant state to Supabase." });
+    }
+  });
+
+  // Individual deletion endpoints to remove records from Supabase permanently when deleted on frontend
+  app.delete("/api/tenant/delete-record", async (req, res) => {
+    try {
+      const { table, id, tenantId } = req.query;
+      if (!table || !id || !tenantId) {
+        return res.status(400).json({ error: "Missing query properties table, id, or tenantId." });
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ success: true, localOnly: true });
+      }
+
+      // Ensure we only delete matching ids belonging to the authenticated tenant
+      const { error } = await supabase
+        .from(table as string)
+        .delete()
+        .eq("id", id)
+        .eq("tenantId", tenantId);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Permanent delete error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route for performing Real-Time OCR (Preserve current Gemini extraction logic untouched!)
   app.post("/api/ocr", async (req, res) => {
     try {
       const { fileData, docType, fieldsToExtract } = req.body;
@@ -45,7 +326,6 @@ async function startServer() {
         return res.status(400).json({ error: "No file data has been supplied." });
       }
 
-      // Base64 file extraction
       const parts = fileData.match(/^data:(.*);base64,(.*)$/);
       if (!parts) {
         return res.status(400).json({ error: "Format error: Provided data URI is malformed." });
@@ -58,7 +338,6 @@ async function startServer() {
         .map(([key, fObj]: [string, any]) => `- "${key}" (${fObj.label}): Extract the exact value found in the document.`)
         .join("\n");
 
-      // Robust system instruction to guide extraction precision
       const prompt = `You are a high-precision corporate logistics document OCR parser.
 Extract the exact values for the requested fields from this document.
 The document type is: ${docType}
@@ -68,7 +347,6 @@ ${fieldListPrompt}
 
 For any requested fields that are missing, unavailable, or cannot be parsed, reply with "N/A" rather than a blank or simulated value. Ensure all textual items match the document exactly without changing spelling or casing where editable. Return the structured results in the required JSON format.`;
 
-      // Build JSON schema dynamically corresponding to active elements
       const properties: Record<string, any> = {};
       const requiredFields: string[] = [];
 
@@ -102,7 +380,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
             properties,
             required: requiredFields
           },
-          temperature: 0.1 // Keep it deterministic for rigid data-extraction accuracy
+          temperature: 0.1
         }
       });
 

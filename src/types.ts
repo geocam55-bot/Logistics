@@ -61,3 +61,14 @@ export interface User {
   associatedStoreId?: string; // Links user to a dynamic store/branch
 }
 
+export interface Tenant {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  logoBadge: string;
+  regionalFocus: string;
+  primaryColor: 'blue' | 'emerald' | 'indigo' | 'slate';
+}
+
+
