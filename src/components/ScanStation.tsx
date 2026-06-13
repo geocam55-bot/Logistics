@@ -167,10 +167,10 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
         {
           status: DeliveryStatus.REGISTERED,
           timestamp: new Date().toISOString(),
-          location: BRANCHES.find(b => b.id === originBranch)?.name || 'RONA Store',
+          location: BRANCHES.find(b => b.id === originBranch)?.name || 'ProSpaces Store',
           operator: 'John (Counter Dispatcher)',
           notes: registerSelectedTruck 
-            ? `Sales Order registered under ${BRANCHES.find(b => b.id === originBranch)?.name || 'RONA Store'}. Pre-allocated to ${selectedTruckDetails?.name} (Driver: ${selectedTruckDetails?.driver || 'N/A'}).`
+            ? `Sales Order registered under ${BRANCHES.find(b => b.id === originBranch)?.name || 'ProSpaces Store'}. Pre-allocated to ${selectedTruckDetails?.name} (Driver: ${selectedTruckDetails?.driver || 'N/A'}).`
             : 'Sales Order details and shipping plan registered into tracking database.'
         }
       ]
@@ -572,7 +572,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                 <span className="mr-1.5">🚚</span> Logistics Fleet Pre-Allocation (Optional)
               </label>
               <p className="text-[10px] text-gray-500 leading-relaxed">
-                Appoint a RONA fleet boom or crane flatbed driver for this order now, or leave empty to assign from dispatch queue coordinate boards.
+                Appoint a ProSpaces fleet boom or crane flatbed driver for this order now, or leave empty to assign from dispatch queue coordinate boards.
               </p>
               <select
                 value={registerSelectedTruck}
@@ -743,7 +743,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                               const branchName = BRANCHES.find(b => b.id === t.branchId)?.name || 'Other Store';
                               return (
                                 <option key={t.id} value={t.id}>
-                                  🚚 {t.name} (Driver: {t.driver}) — {t.type} [{branchName.replace(' RONA', '')}]
+                                  🚚 {t.name} (Driver: {t.driver}) — {t.type} [{branchName.replace(' ProSpaces', '')}]
                                 </option>
                               );
                             })}
@@ -752,7 +752,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                       </select>
                       {eligibleTrucks.length === 0 && (
                         <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5 font-sans leading-relaxed">
-                          ⚠️ No dedicated trucks registered under <strong>{BRANCHES.find(b => b.id === scannedRecord?.originBranch)?.name}</strong>. Showing all RONA regional fleets for dynamic dispatch. Setup storefront fleets under the <strong>Fleet Setup</strong> tab.
+                          ⚠️ No dedicated trucks registered under <strong>{BRANCHES.find(b => b.id === scannedRecord?.originBranch)?.name}</strong>. Showing all ProSpaces regional fleets for dynamic dispatch. Setup storefront fleets under the <strong>Fleet Setup</strong> tab.
                         </div>
                       )}
                     </>
@@ -850,7 +850,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
 
                 <div className="p-3 bg-green-50 border border-green-100 rounded-lg text-[11px] text-green-800 space-y-1">
                   <strong className="block text-green-900">📍 Geo-Tagging Enabled</strong>
-                  <p>Completing this scan broadcasts real-time GPS coordinates to the RONA central dispatcher showing compliance with the drop address.</p>
+                  <p>Completing this scan broadcasts real-time GPS coordinates to the ProSpaces central dispatcher showing compliance with the drop address.</p>
                 </div>
               </div>
             ) : (

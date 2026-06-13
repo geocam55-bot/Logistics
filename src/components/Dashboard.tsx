@@ -47,10 +47,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
   // Real Driver profiles dataset
   const DRIVERS = [
     { id: 'driver-01', name: 'Dave MacNeil', truck: 'Truck-1 Crane Boom (NS-F01)', phone: '1 (902) 880-6011', lat: 44.6784, lng: -63.5857, store: 'Windmill Rd DC', status: 'At Delivery Site' },
-    { id: 'driver-02', name: 'Sarah Jenkins', truck: 'Truck-2 Flatbed (NS-F02)', phone: '1 (902) 880-6022', lat: 44.6534, lng: -63.6012, store: '01065 - Almon RONA (Halifax)', status: 'In Transit' },
-    { id: 'driver-03', name: 'Marc LeBlanc', truck: 'Truck-3 Fleet Pickup (NS-P03)', phone: '1 (902) 880-6033', lat: 44.6865, lng: -63.8710, store: '01075 - Tantallon RONA', status: 'At Yard' },
-    { id: 'driver-04', name: 'Robert Chiasson', truck: 'Truck-4 Curtain Flatbed (NS-C04)', phone: '1 (902) 880-6044', lat: 44.9750, lng: -63.5100, store: '01070 - Elmsdale RONA', status: 'Loading' },
-    { id: 'driver-05', name: 'John Miller', truck: 'Truck-1 Boom Truck (NS-F05)', phone: '1 (902) 880-6055', lat: 44.6400, lng: -63.6700, store: '01065 - Almon RONA (Halifax)', status: 'On Break' },
+    { id: 'driver-02', name: 'Sarah Jenkins', truck: 'Truck-2 Flatbed (NS-F02)', phone: '1 (902) 880-6022', lat: 44.6534, lng: -63.6012, store: '01065 - Almon ProSpaces (Halifax)', status: 'In Transit' },
+    { id: 'driver-03', name: 'Marc LeBlanc', truck: 'Truck-3 Fleet Pickup (NS-P03)', phone: '1 (902) 880-6033', lat: 44.6865, lng: -63.8710, store: '01075 - Tantallon ProSpaces', status: 'At Yard' },
+    { id: 'driver-04', name: 'Robert Chiasson', truck: 'Truck-4 Curtain Flatbed (NS-C04)', phone: '1 (902) 880-6044', lat: 44.9750, lng: -63.5100, store: '01070 - Elmsdale ProSpaces', status: 'Loading' },
+    { id: 'driver-05', name: 'John Miller', truck: 'Truck-1 Boom Truck (NS-F05)', phone: '1 (902) 880-6055', lat: 44.6400, lng: -63.6700, store: '01065 - Almon ProSpaces (Halifax)', status: 'On Break' },
     { id: 'driver-06', name: 'Clara Smith', truck: 'Truck-2 Box Truck (NS-B06)', phone: '1 (902) 880-6066', lat: 44.6950, lng: -63.6200, store: 'Windmill Rd DC', status: 'At Yard' }
   ];
 
@@ -382,15 +382,15 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
       .addTo(map);
 
     L.marker([44.6534, -63.6012], { icon: retailIcon })
-      .bindTooltip('🏪 <b>01065 - Almon (Halifax)</b><br><span style="font-size:10px;color:#ccc;">RONA Retail Store</span>', { className: 'custom-tooltip', direction: 'top' })
+      .bindTooltip('🏪 <b>01065 - Almon (Halifax)</b><br><span style="font-size:10px;color:#ccc;">ProSpaces Retail Store</span>', { className: 'custom-tooltip', direction: 'top' })
       .addTo(map);
 
     L.marker([44.6865, -63.8710], { icon: retailIcon })
-      .bindTooltip('🏪 <b>01075 - Tantallon</b><br><span style="font-size:10px;color:#ccc;">RONA Retail Store</span>', { className: 'custom-tooltip', direction: 'top' })
+      .bindTooltip('🏪 <b>01075 - Tantallon</b><br><span style="font-size:10px;color:#ccc;">ProSpaces Retail Store</span>', { className: 'custom-tooltip', direction: 'top' })
       .addTo(map);
 
     L.marker([44.9750, -63.5100], { icon: retailIcon })
-      .bindTooltip('🏪 <b>01070 - Elmsdale</b><br><span style="font-size:10px;color:#ccc;">RONA Retail Store</span>', { className: 'custom-tooltip', direction: 'top' })
+      .bindTooltip('🏪 <b>01070 - Elmsdale</b><br><span style="font-size:10px;color:#ccc;">ProSpaces Retail Store</span>', { className: 'custom-tooltip', direction: 'top' })
       .addTo(map);
 
     // Dynamic Active delivery vehicle marker
@@ -607,7 +607,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h4 className="font-sans font-semibold text-gray-900 tracking-tight text-lg">RONA Logistics Hub Map</h4>
+                <h4 className="font-sans font-semibold text-gray-900 tracking-tight text-lg">ProSpaces Delivery and Logistics Hub Map</h4>
                 <p className="text-xs text-gray-500">Live interactive fleet mapping & route monitoring</p>
               </div>
               <div className="flex items-center space-x-1.5">
@@ -627,8 +627,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
             <div ref={mapContainerRef} className="relative border border-slate-250/80 rounded-xl bg-slate-100 h-[385px] w-full overflow-hidden shadow-sm flex items-center justify-center">
               <iframe 
                 ref={iframeRef}
-                id="rona-gis-map-iframe"
-                title="RONA Logistics High-Fidelity Map"
+                id="prospaces-gis-map-iframe"
+                title="ProSpaces Delivery and Logistics High-Fidelity Map"
                 width="100%" 
                 height="100%" 
                 frameBorder="0" 
@@ -669,9 +669,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
                   {(() => {
                     const distances = [
                       { name: "Windmill Rd DC", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.6784, -63.5857) },
-                      { name: "Almon RONA", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.6534, -63.6012) },
-                      { name: "Tantallon RONA", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.6865, -63.8710) },
-                      { name: "Elmsdale RONA", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.9750, -63.5100) }
+                      { name: "Almon ProSpaces", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.6534, -63.6012) },
+                      { name: "Tantallon ProSpaces", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.6865, -63.8710) },
+                      { name: "Elmsdale ProSpaces", dist: getDistanceFromLatLonInKm(currentLat, currentLng, 44.9750, -63.5100) }
                     ];
                     distances.sort((a, b) => a.dist - b.dist);
                     const closest = distances[0];
@@ -795,7 +795,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
                   <div className="flex justify-between items-center text-[8.5px] text-slate-400 font-mono mb-2 px-2 pt-1 border-b border-slate-900 pb-1">
                     <div className="font-bold flex items-center space-x-1">
                       <span>12:26</span>
-                      <span className="text-[7px] text-blue-400">RONA Guest</span>
+                      <span className="text-[7px] text-blue-400">ProSpaces Guest</span>
                     </div>
                     <div className="flex items-center space-x-1.5">
                       <Wifi className="h-2.5 w-2.5 text-slate-400" />
@@ -992,7 +992,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
                 <div className="text-[10px] text-gray-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 leading-relaxed space-y-1">
                   <p className="font-bold text-gray-700">💡 How Mobile GPS Tracking Works:</p>
                   <p>
-                    1. RONA drivers load materials onto flatbed trucks and launch this Logistics Web Portal on their device.
+                    1. ProSpaces drivers load materials onto flatbed trucks and launch this Logistics Web Portal on their device.
                   </p>
                   <p>
                     2. Once they permit <strong>"🎯 Use Real iPhone GPS"</strong>, the application hooks their real-world GPS sensor.
@@ -1059,7 +1059,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, onAddOrUpda
                     </td>
                     <td className="py-2.5">
                       <span className="font-medium text-slate-600 text-[11px]">
-                        {activeBranches.find(b => b.id === delivery.originBranch)?.name.replace('RONA ', '') || delivery.originBranch}
+                        {activeBranches.find(b => b.id === delivery.originBranch)?.name.replace('ProSpaces ', '') || delivery.originBranch}
                       </span>
                     </td>
                     <td className="py-2.5">

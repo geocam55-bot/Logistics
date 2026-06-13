@@ -255,7 +255,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                     </div>
 
                     <div className="py-1 px-2.5 bg-slate-50 border border-slate-100 rounded text-[11px] text-slate-600">
-                      Depot: <strong className="text-slate-800">{BRANCHES.find(b => b.id === delivery.originBranch)?.name.replace('RONA ', '')}</strong>
+                      Depot: <strong className="text-slate-800">{BRANCHES.find(b => b.id === delivery.originBranch)?.name.replace('ProSpaces ', '')}</strong>
                     </div>
 
                     {(() => {
@@ -359,7 +359,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                             
                             <div className="space-y-2">
                               <p className="text-[10px] text-gray-500 font-sans leading-relaxed">
-                                Assign or re-route a flatbed truck crane under RONA fleet for this delivery ticket:
+                                Assign or re-route a flatbed truck crane under ProSpaces fleet for this delivery ticket:
                               </p>
                               
                               <select
@@ -378,7 +378,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                                   return (
                                     <>
                                       {localDepotTrucks.length > 0 && (
-                                        <optgroup label={`Local Store Fleet (${BRANCHES.find(b => b.id === delivery.originBranch)?.name.replace(' RONA', '')})`}>
+                                        <optgroup label={`Local Store Fleet (${BRANCHES.find(b => b.id === delivery.originBranch)?.name.replace(' ProSpaces', '')})`}>
                                           {localDepotTrucks.map(t => (
                                             <option key={t.id} value={t.id}>
                                               🚚 {t.name} (Driver: {t.driver}) — {t.type}
@@ -389,7 +389,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                                       {otherDepotTrucks.length > 0 && (
                                         <optgroup label="Other Regional Store Fleets">
                                           {otherDepotTrucks.map(t => {
-                                            const branchName = BRANCHES.find(b => b.id === t.branchId)?.name.replace(' RONA', '') || 'Other';
+                                            const branchName = BRANCHES.find(b => b.id === t.branchId)?.name.replace(' ProSpaces', '') || 'Other';
                                             return (
                                               <option key={t.id} value={t.id}>
                                                 🚚 {t.name} (Driver: {t.driver}) — [{branchName}]

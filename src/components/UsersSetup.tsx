@@ -201,7 +201,7 @@ export default function UsersSetup({
                   <input
                     type="email"
                     required
-                    placeholder="name@rona.ca"
+                    placeholder="name@prospaces.com"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
                     className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -235,7 +235,7 @@ export default function UsersSetup({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-700 block mb-1">Primary Linked RONA Branch</label>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Primary Linked ProSpaces Branch</label>
                   <select
                     value={associatedStoreId}
                     onChange={(e) => setAssociatedStoreId(e.target.value)}
@@ -329,7 +329,7 @@ export default function UsersSetup({
                         <div className="flex items-center space-x-2">
                           <Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                           <span className="truncate">
-                            {matchedBranch ? matchedBranch.name.replace(' RONA', '') : 'No Store Association'}
+                            {matchedBranch ? matchedBranch.name.replace(' ProSpaces', '') : 'No Store Association'}
                           </span>
                         </div>
                       </div>

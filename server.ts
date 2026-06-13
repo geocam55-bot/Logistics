@@ -55,7 +55,7 @@ function getSupabase() {
   return supabaseClient;
 }
 
-const SH_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR RONA LOGISTICS PORTAL */
+const SH_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR PROSPACES DELIVERY AND LOGISTICS PORTAL */
 
 -- 1. Create tenants table
 create table if not exists tenants (
@@ -181,6 +181,117 @@ async function startServer() {
         url: process.env.SUPABASE_URL || "",
         schemaSql: SH_SQL
       });
+    }
+  });
+
+  // Real-time Database Auth Lookups (No simulation)
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email query param is required." });
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({
+          supabaseActive: false,
+          found: false,
+          message: "Database sandbox inactive, using local credentials fallback"
+        });
+      }
+
+      // Query database table 'users' for email in a case-insensitive match
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .ilike("email", email.trim());
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data && data.length > 0) {
+        const user = data[0];
+        // Fetch matching tenant definition
+        const { data: tenantData } = await supabase
+          .from("tenants")
+          .select("*")
+          .eq("id", user.tenantId);
+
+        return res.json({
+          supabaseActive: true,
+          found: true,
+          user,
+          tenant: tenantData && tenantData.length > 0 ? tenantData[0] : null
+        });
+      }
+
+      return res.json({
+        supabaseActive: true,
+        found: false,
+        message: "No registered profile found matching this email address."
+      });
+    } catch (err: any) {
+      console.error("Supabase live auth error:", err);
+      res.json({
+        supabaseActive: false,
+        found: false,
+        error: err.message
+      });
+    }
+  });
+
+  // Direct User signup / placement into Supabase Users table
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { name, email, role, tenantId, associatedStoreId, phone } = req.body;
+      if (!email || !name || !role || !tenantId) {
+        return res.status(400).json({ error: "Missing required profile registration parameters." });
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({
+          supabaseActive: false,
+          success: false,
+          error: "Supabase connection not established yet."
+        });
+      }
+
+      const newUserId = `USR-${Math.floor(Math.random() * 90000) + 10000}`;
+      const newUserRecord = {
+        id: newUserId,
+        tenantId,
+        name,
+        email: email.trim().toLowerCase(),
+        role,
+        phone: phone || "",
+        associatedStoreId: associatedStoreId || ""
+      };
+
+      const { error } = await supabase
+        .from("users")
+        .insert([newUserRecord]);
+
+      if (error) {
+        throw error;
+      }
+
+      // Fetch corresponding tenant info
+      const { data: tenantData } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("id", tenantId);
+
+      res.json({
+        success: true,
+        user: newUserRecord,
+        tenant: tenantData && tenantData.length > 0 ? tenantData[0] : null
+      });
+    } catch (err: any) {
+      console.error("Failed to commit newly registered user to Supabase:", err);
+      res.status(500).json({ error: err.message });
     }
   });
 

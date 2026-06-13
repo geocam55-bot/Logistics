@@ -23,6 +23,7 @@ import {
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
   Database, RefreshCw
 } from 'lucide-react';
+import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
 
 const getThemeClasses = (color: string) => {
   // Always return the classic corporate blue styling to match previous design
@@ -44,11 +45,11 @@ const getThemeClasses = (color: string) => {
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
-    const cached = localStorage.getItem('rona_active_tenant');
+    const cached = localStorage.getItem('prospaces_active_tenant');
     return cached ? JSON.parse(cached) : null;
   });
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const cached = localStorage.getItem('rona_active_user');
+    const cached = localStorage.getItem('prospaces_active_user');
     return cached ? JSON.parse(cached) : null;
   });
 
@@ -62,15 +63,15 @@ export default function App() {
   const handleLoginSuccess = (tenant: Tenant, user: User) => {
     setCurrentTenant(tenant);
     setCurrentUser(user);
-    localStorage.setItem('rona_active_tenant', JSON.stringify(tenant));
-    localStorage.setItem('rona_active_user', JSON.stringify(user));
+    localStorage.setItem('prospaces_active_tenant', JSON.stringify(tenant));
+    localStorage.setItem('prospaces_active_user', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setCurrentTenant(null);
     setCurrentUser(null);
-    localStorage.removeItem('rona_active_tenant');
-    localStorage.removeItem('rona_active_user');
+    localStorage.removeItem('prospaces_active_tenant');
+    localStorage.removeItem('prospaces_active_user');
     setActiveTab('dashboard');
   };
 
@@ -170,10 +171,10 @@ export default function App() {
               setBranches(data.branches);
               setUsers(data.users);
 
-              localStorage.setItem(`rona_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries));
-              localStorage.setItem(`rona_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks));
-              localStorage.setItem(`rona_branches_tenant_${tenantId}`, JSON.stringify(data.branches));
-              localStorage.setItem(`rona_users_tenant_${tenantId}`, JSON.stringify(data.users));
+              localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries));
+              localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks));
+              localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(data.branches));
+              localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users));
               setLastSyncTime(new Date().toLocaleTimeString());
               return;
             } else {
@@ -205,36 +206,36 @@ export default function App() {
       }
 
       // Offline Sandbox Fallback to local storage
-      const cachedD = localStorage.getItem(`rona_deliveries_tenant_${tenantId}`);
+      const cachedD = localStorage.getItem(`prospaces_deliveries_tenant_${tenantId}`);
       if (cachedD) {
         try { setDeliveries(JSON.parse(cachedD)); } catch (e) { setDeliveries(defaultDeliveries); }
       } else {
         setDeliveries(defaultDeliveries);
-        localStorage.setItem(`rona_deliveries_tenant_${tenantId}`, JSON.stringify(defaultDeliveries));
+        localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(defaultDeliveries));
       }
 
-      const cachedT = localStorage.getItem(`rona_trucks_tenant_${tenantId}`);
+      const cachedT = localStorage.getItem(`prospaces_trucks_tenant_${tenantId}`);
       if (cachedT) {
         try { setTrucks(JSON.parse(cachedT)); } catch (e) { setTrucks(defaultTrucks); }
       } else {
         setTrucks(defaultTrucks);
-        localStorage.setItem(`rona_trucks_tenant_${tenantId}`, JSON.stringify(defaultTrucks));
+        localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(defaultTrucks));
       }
 
-      const cachedB = localStorage.getItem(`rona_branches_tenant_${tenantId}`);
+      const cachedB = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
       if (cachedB) {
         try { setBranches(JSON.parse(cachedB)); } catch (e) { setBranches(defaultBranches); }
       } else {
         setBranches(defaultBranches);
-        localStorage.setItem(`rona_branches_tenant_${tenantId}`, JSON.stringify(defaultBranches));
+        localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(defaultBranches));
       }
 
-      const cachedU = localStorage.getItem(`rona_users_tenant_${tenantId}`);
+      const cachedU = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
       if (cachedU) {
         try { setUsers(JSON.parse(cachedU)); } catch (e) { setUsers(defaultUsers); }
       } else {
         setUsers(defaultUsers);
-        localStorage.setItem(`rona_users_tenant_${tenantId}`, JSON.stringify(defaultUsers));
+        localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(defaultUsers));
       }
     };
 
@@ -252,7 +253,7 @@ export default function App() {
       updated.unshift(newRecord);
     }
     setDeliveries(updated);
-    localStorage.setItem(`rona_deliveries_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_deliveries_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
   };
 
@@ -261,7 +262,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = [...trucks, newTruck];
     setTrucks(updated);
-    localStorage.setItem(`rona_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
@@ -269,7 +270,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = trucks.map(t => t.id === updatedTruck.id ? updatedTruck : t);
     setTrucks(updated);
-    localStorage.setItem(`rona_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
@@ -277,7 +278,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = trucks.filter(t => t.id !== id);
     setTrucks(updated);
-    localStorage.setItem(`rona_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=trucks&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
@@ -288,7 +289,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = [...branches, newBranch];
     setBranches(updated);
-    localStorage.setItem(`rona_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
@@ -296,7 +297,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = branches.map(b => b.id === updatedBranch.id ? updatedBranch : b);
     setBranches(updated);
-    localStorage.setItem(`rona_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
@@ -304,7 +305,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = branches.filter(b => b.id !== id);
     setBranches(updated);
-    localStorage.setItem(`rona_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=branches&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
@@ -315,7 +316,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = [...users, newUser];
     setUsers(updated);
-    localStorage.setItem(`rona_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
@@ -323,7 +324,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = users.map(u => u.id === updatedUser.id ? updatedUser : u);
     setUsers(updated);
-    localStorage.setItem(`rona_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
@@ -331,7 +332,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = users.filter(u => u.id !== id);
     setUsers(updated);
-    localStorage.setItem(`rona_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=users&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
@@ -360,16 +361,16 @@ export default function App() {
       }
 
       setDeliveries(defaultDeliveries);
-      localStorage.setItem(`rona_deliveries_tenant_${tenantId}`, JSON.stringify(defaultDeliveries));
+      localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(defaultDeliveries));
       
       setTrucks(defaultTrucks);
-      localStorage.setItem(`rona_trucks_tenant_${tenantId}`, JSON.stringify(defaultTrucks));
+      localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(defaultTrucks));
       
       setBranches(defaultBranches);
-      localStorage.setItem(`rona_branches_tenant_${tenantId}`, JSON.stringify(defaultBranches));
+      localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(defaultBranches));
       
       setUsers(defaultUsers);
-      localStorage.setItem(`rona_users_tenant_${tenantId}`, JSON.stringify(defaultUsers));
+      localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(defaultUsers));
 
       // Trigger Database reset
       syncStateToSupabase(tenantId, defaultDeliveries, defaultTrucks, defaultBranches, defaultUsers);
@@ -387,17 +388,22 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-gray-800 antialiased selection:bg-blue-600 selection:text-white" id="main-app-container">
       
       {/* Enterprise Brand Header */}
-      <header className={`${theme.bg} text-white shadow-md border-b ${theme.border}`} id="rona-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <header className={`${theme.bg} text-white shadow-md border-b ${theme.border}`} id="prospaces-header">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
           
           {/* Logo & title context */}
           <div className="flex items-center space-x-3 text-center sm:text-left">
-            <div className="bg-white p-1.5 rounded-lg border-2 border-slate-100 shadow-sm shrink-0 flex items-center justify-center">
-              <span className={`font-extrabold ${theme.text} tracking-tighter text-sm px-1 font-sans`}>RONA</span>
+            <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm shrink-0 flex items-center justify-center max-w-[140px]">
+              <img 
+                src={prospacesLogo} 
+                alt="ProSpaces Logo" 
+                className="h-9 w-auto object-contain"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <div className="flex items-center justify-center sm:justify-start space-x-2">
-                <h1 className="font-sans font-extrabold text-lg tracking-tight leading-3">RONA</h1>
+                <h1 className="font-sans font-extrabold text-lg tracking-tight leading-3">ProSpaces</h1>
                 <span className="bg-white/20 text-white text-[9px] uppercase font-mono px-2 py-0.5 rounded font-bold border border-white/10 tracking-widest leading-none">
                   {currentTenant.code} Workspace
                 </span>
@@ -463,10 +469,10 @@ export default function App() {
       </header>
 
       {/* Main Core Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="rona-body">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="prospaces-body">
         
         {/* Navigation Tabs bar */}
-        <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-wrap gap-1 shadow-sm w-full" id="rona-nav">
+        <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-wrap gap-1 shadow-sm w-full" id="prospaces-nav">
           
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -655,11 +661,11 @@ export default function App() {
       </main>
 
       {/* Corporate Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-12" id="rona-footer">
+      <footer className="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-12" id="prospaces-footer">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
-          <p className="font-medium text-slate-300">{currentTenant.name} &bull; Mock-up Portal</p>
+          <p className="font-medium text-slate-300">{currentTenant.name} &bull; ProSpaces Portal</p>
           <p className="text-[10px] text-slate-500 font-mono">
-            Drafted for presentation regarding independent mobile routing platforms &bull; Affiliated with RONA.ca &bull; Workspace tenant: {currentTenant.code}
+            Drafted for presentation regarding independent mobile routing platforms &bull; Part of ProSpaces Delivery and Logistics &bull; Workspace tenant: {currentTenant.code}
           </p>
           <div className="flex items-center justify-center space-x-4 pt-1 text-[10px] text-slate-500">
             <span className="flex items-center">

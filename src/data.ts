@@ -32,9 +32,9 @@ export const TENANTS: Tenant[] = [
 
 export const BRANCHES: Branch[] = [
   { id: 'WINDMILL_DC', name: 'Windmill Road Delivery Center', type: 'DC', address: '121 Windmill Rd, Dartmouth, NS B3B 1B7' },
-  { id: '01075_TANTALLON', name: '01075 - Tantallon RONA', type: 'STORE', address: '5126 St Margarets Bay Rd, Upper Tantallon, NS B3Z 1E3' },
-  { id: '01065_ALMON', name: '01065 - Almon RONA', type: 'STORE', address: '6085 Almon St, Halifax, NS B3K 1T9' },
-  { id: '01070_ELMSDALE', name: '01070 - Elmsdale RONA', type: 'STORE', address: '269 Hwy 2, Elmsdale, NS B2S 1A6' }
+  { id: '01075_TANTALLON', name: '01075 - Tantallon ProSpaces', type: 'STORE', address: '5126 St Margarets Bay Rd, Upper Tantallon, NS B3Z 1E3' },
+  { id: '01065_ALMON', name: '01065 - Almon ProSpaces', type: 'STORE', address: '6085 Almon St, Halifax, NS B3K 1T9' },
+  { id: '01070_ELMSDALE', name: '01070 - Elmsdale ProSpaces', type: 'STORE', address: '269 Hwy 2, Elmsdale, NS B2S 1A6' }
 ];
 
 export const TRUCKS: Truck[] = [
@@ -138,8 +138,8 @@ export const INITIAL_DELIVERIES: DeliveryRecord[] = [
     assignedTruck: 'TRUCK-03',
     assignedDriver: 'Marc LeBlanc',
     history: [
-      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-10T08:00:00Z', location: '01065 - Almon RONA', operator: 'Marie (Store Dispatch)', notes: 'Registered at Almon Street store' },
-      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-10T09:40:00Z', location: '01065 - Almon RONA', operator: 'Marc LeBlanc (Driver)', notes: 'Picked from lumber yard, loaded into pickup truck bed.' }
+      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-10T08:00:00Z', location: '01065 - Almon ProSpaces', operator: 'Marie (Store Dispatch)', notes: 'Registered at Almon Street store' },
+      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-10T09:40:00Z', location: '01065 - Almon ProSpaces', operator: 'Marc LeBlanc (Driver)', notes: 'Picked from lumber yard, loaded into pickup truck bed.' }
     ]
   },
   {
@@ -159,29 +159,29 @@ export const INITIAL_DELIVERIES: DeliveryRecord[] = [
     assignedDriver: 'Sarah Jenkins',
     returnReason: 'School custodian refused shipment - Wrong size insulation ordered by purchasing.',
     history: [
-      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-10T06:00:00Z', location: '01070 - Elmsdale RONA', operator: 'Ken (Counter)', notes: 'Immediate dispatch request.' },
-      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-10T07:00:00Z', location: '01070 - Elmsdale RONA', operator: 'Sarah Jenkins (Driver)', notes: 'Loaded and marked green.' },
-      { status: DeliveryStatus.RETURNED, timestamp: '2026-06-10T09:15:00Z', location: '01070 - Elmsdale RONA', operator: 'Sarah Jenkins (Driver)', notes: 'Custodian refused insulation due to thickness error in buying. Drywall returned to store storage.' }
+      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-10T06:00:00Z', location: '01070 - Elmsdale ProSpaces', operator: 'Ken (Counter)', notes: 'Immediate dispatch request.' },
+      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-10T07:00:00Z', location: '01070 - Elmsdale ProSpaces', operator: 'Sarah Jenkins (Driver)', notes: 'Loaded and marked green.' },
+      { status: DeliveryStatus.RETURNED, timestamp: '2026-06-10T09:15:00Z', location: '01070 - Elmsdale ProSpaces', operator: 'Sarah Jenkins (Driver)', notes: 'Custodian refused insulation due to thickness error in buying. Drywall returned to store storage.' }
     ]
   }
 ];
 
 export const INITIAL_USERS: User[] = [
-  { id: 'USR-01', name: 'Dave MacNeil', email: 'dave.macneil@rona.ca', role: 'Driver', phone: '(902) 555-0101', associatedStoreId: 'WINDMILL_DC' },
-  { id: 'USR-02', name: 'Sarah Jenkins', email: 'sarah.jenkins@rona.ca', role: 'Driver', phone: '(902) 555-0102', associatedStoreId: '01075_TANTALLON' },
-  { id: 'USR-03', name: 'Marc LeBlanc', email: 'marc.leblanc@rona.ca', role: 'Driver', phone: '(902) 555-0103', associatedStoreId: '01065_ALMON' },
-  { id: 'USR-04', name: 'Clara Smith', email: 'clara.smith@rona.ca', role: 'Driver', phone: '(902) 555-0104', associatedStoreId: '01070_ELMSDALE' },
-  { id: 'USR-05', name: 'John Miller', email: 'john.miller@rona.ca', role: 'Driver', phone: '(902) 555-0105', associatedStoreId: '01075_TANTALLON' },
-  { id: 'USR-06', name: 'Allison Collins', email: 'allison.collins@rona.ca', role: 'Dispatcher', phone: '(902) 555-0201', associatedStoreId: 'WINDMILL_DC' },
-  { id: 'USR-07', name: 'Bob Thompson', email: 'bob.thompson@rona.ca', role: 'Admin', phone: '(902) 555-0301', associatedStoreId: 'WINDMILL_DC' },
-  { id: 'USR-08', name: 'Emily Vance', email: 'emily.vance@rona.ca', role: 'User', phone: '(902) 555-0401', associatedStoreId: '01065_ALMON' }
+  { id: 'USR-01', name: 'Dave MacNeil', email: 'dave.macneil@prospaces.com', role: 'Driver', phone: '(902) 555-0101', associatedStoreId: 'WINDMILL_DC' },
+  { id: 'USR-02', name: 'Sarah Jenkins', email: 'sarah.jenkins@prospaces.com', role: 'Driver', phone: '(902) 555-0102', associatedStoreId: '01075_TANTALLON' },
+  { id: 'USR-03', name: 'Marc LeBlanc', email: 'marc.leblanc@prospaces.com', role: 'Driver', phone: '(902) 555-0103', associatedStoreId: '01065_ALMON' },
+  { id: 'USR-04', name: 'Clara Smith', email: 'clara.smith@prospaces.com', role: 'Driver', phone: '(902) 555-0104', associatedStoreId: '01070_ELMSDALE' },
+  { id: 'USR-05', name: 'John Miller', email: 'john.miller@prospaces.com', role: 'Driver', phone: '(902) 555-0105', associatedStoreId: '01075_TANTALLON' },
+  { id: 'USR-06', name: 'Allison Collins', email: 'allison.collins@prospaces.com', role: 'Dispatcher', phone: '(902) 555-0201', associatedStoreId: 'WINDMILL_DC' },
+  { id: 'USR-07', name: 'Bob Thompson', email: 'bob.thompson@prospaces.com', role: 'Admin', phone: '(902) 555-0301', associatedStoreId: 'WINDMILL_DC' },
+  { id: 'USR-08', name: 'Emily Vance', email: 'emily.vance@prospaces.com', role: 'User', phone: '(902) 555-0401', associatedStoreId: '01065_ALMON' }
 ];
 
 // --- tenant 2: Bay of Fundy Transport (BOF) Seed Data ---
 export const BRANCHES_BOF: Branch[] = [
   { id: 'BOF_MONCTON_DC', name: 'Moncton Regional Bulk DC Hub', type: 'DC', address: '450 Salisbury Rd, Moncton, NB E1E 1A2' },
-  { id: 'BOF_KENTVILLE', name: '02081 - Kentville Valley RONA', type: 'STORE', address: '9009 Commercial St, Kentville, NS B4N 3V8' },
-  { id: 'BOF_TRURO', name: '02095 - Truro Junction RONA', type: 'STORE', address: '124 Robie St, Truro, NS B2N 1L2' }
+  { id: 'BOF_KENTVILLE', name: '02081 - Kentville Valley ProSpaces', type: 'STORE', address: '9009 Commercial St, Kentville, NS B4N 3V8' },
+  { id: 'BOF_TRURO', name: '02095 - Truro Junction ProSpaces', type: 'STORE', address: '124 Robie St, Truro, NS B2N 1L2' }
 ];
 
 export const TRUCKS_BOF: Truck[] = [
@@ -191,11 +191,11 @@ export const TRUCKS_BOF: Truck[] = [
 ];
 
 export const INITIAL_USERS_BOF: User[] = [
-  { id: 'USR-BOF-01', name: 'Jim Peterson', email: 'jim.peterson@rona.ca', role: 'Driver', phone: '(506) 555-2311', associatedStoreId: 'BOF_MONCTON_DC' },
-  { id: 'USR-BOF-02', name: 'Rita Comeau', email: 'rita.comeau@rona.ca', role: 'Driver', phone: '(506) 555-2312', associatedStoreId: 'BOF_KENTVILLE' },
-  { id: 'USR-BOF-03', name: 'Maurice LeBlanc', email: 'maurice.leblanc@rona.ca', role: 'Driver', phone: '(506) 555-2313', associatedStoreId: 'BOF_TRURO' },
-  { id: 'USR-BOF-04', name: 'Reginald Gentry', email: 'reg.gentry@rona.ca', role: 'Dispatcher', phone: '(506) 555-2314', associatedStoreId: 'BOF_MONCTON_DC' },
-  { id: 'USR-BOF-05', name: 'Leah Robichaud', email: 'leah.robin@rona.ca', role: 'Admin', phone: '(506) 555-2315', associatedStoreId: 'BOF_MONCTON_DC' }
+  { id: 'USR-BOF-01', name: 'Jim Peterson', email: 'jim.peterson@prospaces.com', role: 'Driver', phone: '(506) 555-2311', associatedStoreId: 'BOF_MONCTON_DC' },
+  { id: 'USR-BOF-02', name: 'Rita Comeau', email: 'rita.comeau@prospaces.com', role: 'Driver', phone: '(506) 555-2312', associatedStoreId: 'BOF_KENTVILLE' },
+  { id: 'USR-BOF-03', name: 'Maurice LeBlanc', email: 'maurice.leblanc@prospaces.com', role: 'Driver', phone: '(506) 555-2313', associatedStoreId: 'BOF_TRURO' },
+  { id: 'USR-BOF-04', name: 'Reginald Gentry', email: 'reg.gentry@prospaces.com', role: 'Dispatcher', phone: '(506) 555-2314', associatedStoreId: 'BOF_MONCTON_DC' },
+  { id: 'USR-BOF-05', name: 'Leah Robichaud', email: 'leah.robin@prospaces.com', role: 'Admin', phone: '(506) 555-2315', associatedStoreId: 'BOF_MONCTON_DC' }
 ];
 
 export const INITIAL_DELIVERIES_BOF: DeliveryRecord[] = [
@@ -216,8 +216,8 @@ export const INITIAL_DELIVERIES_BOF: DeliveryRecord[] = [
     assignedDriver: 'Rita Comeau',
     customerSignature: 'Signed by Estate Manager Pierre',
     history: [
-      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-11T09:00:00Z', location: '02081 - Kentville Valley RONA', operator: 'Reg Gentry (Dispatcher)', notes: 'Epicor System Uploaded.' },
-      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-11T10:30:00Z', location: '02081 - Kentville Valley RONA', operator: 'Rita Comeau (Driver)', notes: 'Loaded and block-cleared.' },
+      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-11T09:00:00Z', location: '02081 - Kentville Valley ProSpaces', operator: 'Reg Gentry (Dispatcher)', notes: 'Epicor System Uploaded.' },
+      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-11T10:30:00Z', location: '02081 - Kentville Valley ProSpaces', operator: 'Rita Comeau (Driver)', notes: 'Loaded and block-cleared.' },
       { status: DeliveryStatus.DELIVERED, timestamp: '2026-06-11T13:45:00Z', location: 'Wolfville Estate Vineyards', operator: 'Rita Comeau (Driver)', notes: 'Successfully stacked on vineyard gravel.' }
     ]
   },
@@ -236,15 +236,15 @@ export const INITIAL_DELIVERIES_BOF: DeliveryRecord[] = [
     assignedTruck: 'TRUCK-BOF-03',
     assignedDriver: 'Maurice LeBlanc',
     history: [
-      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-11T11:00:00Z', location: '02095 - Truro Junction RONA', operator: 'Reg Gentry (Dispatcher)', notes: 'Logged' },
-      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-11T12:15:00Z', location: '02095 - Truro Junction RONA', operator: 'Maurice LeBlanc (Driver)', notes: 'Loaded onto regional shuttle.' }
+      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-11T11:00:00Z', location: '02095 - Truro Junction ProSpaces', operator: 'Reg Gentry (Dispatcher)', notes: 'Logged' },
+      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-11T12:15:00Z', location: '02095 - Truro Junction ProSpaces', operator: 'Maurice LeBlanc (Driver)', notes: 'Loaded onto regional shuttle.' }
     ]
   }
 ];
 
 // --- tenant 3: Cabot Trail Cargo (CTC) Seed Data ---
 export const BRANCHES_CTC: Branch[] = [
-  { id: 'CTC_SYDNEY_STORE', name: '03055 - Sydney Tar Ponds RONA', type: 'STORE', address: '250 Keltic Dr, Sydney, NS B1S 1P5' },
+  { id: 'CTC_SYDNEY_STORE', name: '03055 - Sydney Tar Ponds ProSpaces', type: 'STORE', address: '250 Keltic Dr, Sydney, NS B1S 1P5' },
   { id: 'CTC_HAWKESBURY_DC', name: 'Port Hawkesbury Contractor Hub', type: 'DC', address: '49 Paint St, Port Hawkesbury, NS B9A 3J9' }
 ];
 
@@ -254,10 +254,10 @@ export const TRUCKS_CTC: Truck[] = [
 ];
 
 export const INITIAL_USERS_CTC: User[] = [
-  { id: 'USR-CTC-01', name: 'Angus McDonald', email: 'angus.mcd@rona.ca', role: 'Driver', phone: '(902) 555-9081', associatedStoreId: 'CTC_HAWKESBURY_DC' },
-  { id: 'USR-CTC-02', name: 'Liam Beaton', email: 'liam.beaton@rona.ca', role: 'Driver', phone: '(902) 555-9082', associatedStoreId: 'CTC_SYDNEY_STORE' },
-  { id: 'USR-CTC-03', name: 'Seamus O\'Neil', email: 'seamus.oneil@rona.ca', role: 'Dispatcher', phone: '(902) 555-9083', associatedStoreId: 'CTC_HAWKESBURY_DC' },
-  { id: 'USR-CTC-04', name: 'Mairi Chisholm', email: 'mairi.chisholm@rona.ca', role: 'Admin', phone: '(902) 555-9084', associatedStoreId: 'CTC_HAWKESBURY_DC' }
+  { id: 'USR-CTC-01', name: 'Angus McDonald', email: 'angus.mcd@prospaces.com', role: 'Driver', phone: '(902) 555-9081', associatedStoreId: 'CTC_HAWKESBURY_DC' },
+  { id: 'USR-CTC-02', name: 'Liam Beaton', email: 'liam.beaton@prospaces.com', role: 'Driver', phone: '(902) 555-9082', associatedStoreId: 'CTC_SYDNEY_STORE' },
+  { id: 'USR-CTC-03', name: 'Seamus O\'Neil', email: 'seamus.oneil@prospaces.com', role: 'Dispatcher', phone: '(902) 555-9083', associatedStoreId: 'CTC_HAWKESBURY_DC' },
+  { id: 'USR-CTC-04', name: 'Mairi Chisholm', email: 'mairi.chisholm@prospaces.com', role: 'Admin', phone: '(902) 555-9084', associatedStoreId: 'CTC_HAWKESBURY_DC' }
 ];
 
 export const INITIAL_DELIVERIES_CTC: DeliveryRecord[] = [
@@ -278,8 +278,8 @@ export const INITIAL_DELIVERIES_CTC: DeliveryRecord[] = [
     assignedDriver: 'Liam Beaton',
     customerSignature: 'Signed by Arena Foreman Mac',
     history: [
-      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-11T08:00:00Z', location: '03055 - Sydney Tar Ponds RONA', operator: 'Seamus O\'Neil (Dispatcher)', notes: 'Order created' },
-      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-11T09:15:00Z', location: '03055 - Sydney Tar Ponds RONA', operator: 'Liam Beaton (Driver)', notes: 'Loaded and tarped.' },
+      { status: DeliveryStatus.REGISTERED, timestamp: '2026-06-11T08:00:00Z', location: '03055 - Sydney Tar Ponds ProSpaces', operator: 'Seamus O\'Neil (Dispatcher)', notes: 'Order created' },
+      { status: DeliveryStatus.PICKED_AND_LOADED, timestamp: '2026-06-11T09:15:00Z', location: '03055 - Sydney Tar Ponds ProSpaces', operator: 'Liam Beaton (Driver)', notes: 'Loaded and tarped.' },
       { status: DeliveryStatus.DELIVERED, timestamp: '2026-06-11T11:50:00Z', location: 'Glace Bay Community Rink', operator: 'Liam Beaton (Driver)', notes: 'Dry and secured behind gates.' }
     ]
   },

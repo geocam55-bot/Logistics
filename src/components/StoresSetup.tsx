@@ -102,7 +102,7 @@ export default function StoresSetup({
         <div>
           <h4 className="font-sans font-bold text-gray-900 tracking-tight text-xl">Store Branches Management</h4>
           <p className="text-xs text-gray-500">
-            Configure RONA physical retail store locations and bulk distributions within the regional dispatch ecosystem
+            Configure ProSpaces physical retail store locations and bulk distributions within the regional dispatch ecosystem
           </p>
         </div>
       </div>
@@ -178,7 +178,7 @@ export default function StoresSetup({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 01080 - Lower Sackville RONA"
+                    placeholder="e.g. 01080 - Lower Sackville ProSpaces"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
                     className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"

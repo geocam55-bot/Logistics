@@ -199,18 +199,18 @@ export default function ArchitectureView({
 
   // Local Folder watch states stored in state & saved to localStorage
   const [localFolderPath, setLocalFolderPath] = useState<string>(() => {
-    return localStorage.getItem('rona_ocr_local_folder_path') || 'C:\\RonaLogistics\\Inbound_Fidelity_PDFs';
+    return localStorage.getItem('prospaces_ocr_local_folder_path') || 'C:\\ProSpacesLogistics\\Inbound_Fidelity_PDFs';
   });
   const [watchInterval, setWatchInterval] = useState<number>(() => {
-    return Number(localStorage.getItem('rona_ocr_watch_interval')) || 5;
+    return Number(localStorage.getItem('prospaces_ocr_watch_interval')) || 5;
   });
   const [isWatchEnabled, setIsWatchEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('rona_ocr_watch_enabled') !== 'false';
+    return localStorage.getItem('prospaces_ocr_watch_enabled') !== 'false';
   });
 
   // Simulated folder files list
   const [localFiles, setLocalFiles] = useState<LocalWatchFile[]>(() => {
-    const saved = localStorage.getItem('rona_ocr_local_files_list');
+    const saved = localStorage.getItem('prospaces_ocr_local_files_list');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -235,19 +235,19 @@ export default function ArchitectureView({
 
   // Sync settings with localStorage
   useEffect(() => {
-    localStorage.setItem('rona_ocr_local_folder_path', localFolderPath);
+    localStorage.setItem('prospaces_ocr_local_folder_path', localFolderPath);
   }, [localFolderPath]);
 
   useEffect(() => {
-    localStorage.setItem('rona_ocr_watch_interval', String(watchInterval));
+    localStorage.setItem('prospaces_ocr_watch_interval', String(watchInterval));
   }, [watchInterval]);
 
   useEffect(() => {
-    localStorage.setItem('rona_ocr_watch_enabled', String(isWatchEnabled));
+    localStorage.setItem('prospaces_ocr_watch_enabled', String(isWatchEnabled));
   }, [isWatchEnabled]);
 
   useEffect(() => {
-    localStorage.setItem('rona_ocr_local_files_list', JSON.stringify(localFiles));
+    localStorage.setItem('prospaces_ocr_local_files_list', JSON.stringify(localFiles));
   }, [localFiles]);
 
   // Keep key-value edited fields in sync with the live active template configuration when changing document types
@@ -264,7 +264,7 @@ export default function ArchitectureView({
 
   // Stateful templates initialized from localStorage or defaults
   const [activeTemplates, setActiveTemplates] = useState<Record<DocType, DocTemplate>>(() => {
-    const saved = localStorage.getItem('rona_ocr_coordinate_templates');
+    const saved = localStorage.getItem('prospaces_ocr_coordinate_templates');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -274,7 +274,7 @@ export default function ArchitectureView({
     }
     return {
       'Order': {
-        title: 'RONA SALES ORDER & DISPATCH INVOICE',
+        title: 'PROSPACES SALES ORDER & DISPATCH INVOICE',
         subtitle: 'RETAIL ORDER ENTRY DIRECT DEPOSIT',
         fields: {
           'Order #': { label: 'Order Number', value: 'ORD-94827-26', x: 500, y: 30, w: 125, h: 25 },
@@ -289,7 +289,7 @@ export default function ArchitectureView({
         ]
       },
       'Credit': {
-        title: 'RONA CASHIER CREDIT & ADJUSTMENT MEMO',
+        title: 'PROSPACES CASHIER CREDIT & ADJUSTMENT MEMO',
         subtitle: 'CUSTOMER MERCHANDISE RETURN RECEIPT',
         fields: {
           'Credit Note #': { label: 'Credit Note #', value: 'CR-88273-04', x: 500, y: 30, w: 125, h: 25 },
@@ -303,7 +303,7 @@ export default function ArchitectureView({
         ]
       },
       'Supplier Pickup': {
-        title: 'RONA REGIONAL SUPPLY PICKUP DISPATCH AUTHORIZATION',
+        title: 'PROSPACES REGIONAL SUPPLY PICKUP DISPATCH AUTHORIZATION',
         subtitle: 'WAREHOUSE LOGISTICS VENDOR FREIGHT CLAIMS',
         fields: {
           'Supplier Code': { label: 'Supplier Code', value: 'VND-MILWAUKEE-99', x: 500, y: 30, w: 125, h: 25 },
@@ -317,7 +317,7 @@ export default function ArchitectureView({
         ]
       },
       'RMA': {
-        title: 'RONA VENDOR RETURN MERCHANDISE AUTHORIZATION',
+        title: 'PROSPACES VENDOR RETURN MERCHANDISE AUTHORIZATION',
         subtitle: 'MANUFACTURER RMA WARRANTY DEFECT CLASSIFICATION',
         fields: {
           'RMA #': { label: 'RMA #', value: 'RMA-774812-C', x: 500, y: 30, w: 125, h: 25 },
@@ -334,7 +334,7 @@ export default function ArchitectureView({
 
   // Keep track of base64 uploaded files from local user PC (per document type template)
   const [uploadedFiles, setUploadedFiles] = useState<Record<DocType, string | null>>(() => {
-    const saved = localStorage.getItem('rona_ocr_uploaded_files');
+    const saved = localStorage.getItem('prospaces_ocr_uploaded_files');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -527,11 +527,11 @@ export default function ArchitectureView({
 
   // Sync stateful templates and files to localStorage
   useEffect(() => {
-    localStorage.setItem('rona_ocr_coordinate_templates', JSON.stringify(activeTemplates));
+    localStorage.setItem('prospaces_ocr_coordinate_templates', JSON.stringify(activeTemplates));
   }, [activeTemplates]);
 
   useEffect(() => {
-    localStorage.setItem('rona_ocr_uploaded_files', JSON.stringify(uploadedFiles));
+    localStorage.setItem('prospaces_ocr_uploaded_files', JSON.stringify(uploadedFiles));
   }, [uploadedFiles]);
 
   const activeTemplate = activeTemplates[selectedDocType];
@@ -681,10 +681,10 @@ export default function ArchitectureView({
           }
 
           if (key.includes('name') || key.includes('customer') || key.includes('manufacturer') || key.includes('recipient') || key.includes('location')) {
-            // Find lines that end with corporate suffixes and doesn't contain RONA or other noise
+            // Find lines that end with corporate suffixes and doesn't contain ProSpaces or other noise
             const suffixRegex = /([A-Z\d][a-zA-Z0-9\s-.&]+(?:Ltd|Co|Corp|Inc|LLC|Builders|Association|Group|Shop|Store|Supply|Logistics|Construction|Warehouse))\b/i;
             for (const line of lines) {
-              if (suffixRegex.test(line) && !line.toLowerCase().includes('rona') && !line.toLowerCase().includes('invoice') && !line.toLowerCase().includes('total')) {
+              if (suffixRegex.test(line) && !line.toLowerCase().includes('prospaces') && !line.toLowerCase().includes('invoice') && !line.toLowerCase().includes('total')) {
                 const matchName = line.match(suffixRegex);
                 if (matchName) return matchName[1].trim();
               }
@@ -1094,7 +1094,7 @@ export default function ArchitectureView({
     };
 
     setCreatedRecords([sessionRecord, ...createdRecords]);
-    alert(`Success: Instantiated and submitted a brand-new ${selectedDocType} (ID: ${recordId}) to your live Logistics & Dispatch stream! It has been successfully routed to RONA Store/Depot #${selectedBranchId}. You can find it on the main HQ Dashboard and Delivery Freight Board under "Registered" status ready for truck dispatch.`);
+    alert(`Success: Instantiated and submitted a brand-new ${selectedDocType} (ID: ${recordId}) to your live Logistics & Dispatch stream! It has been successfully routed to ProSpaces Store/Depot #${selectedBranchId}. You can find it on the main HQ Dashboard and Delivery Freight Board under "Registered" status ready for truck dispatch.`);
   };
 
   const getLiveValue = (key: string) => {
@@ -1494,7 +1494,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                   <span className="text-[9px] text-slate-400">PostgreSQL Compatibility v15+</span>
                 </div>
                 <pre className="p-4 bg-slate-950 text-yellow-100/80 overflow-x-auto max-h-[160px] select-all leading-normal text-xs font-mono font-medium">
-{supabaseStatus?.schemaSql || `-- MULTI-TENANT SCHEMA FOR RONA LOGISTICS PORTAL
+{supabaseStatus?.schemaSql || `-- MULTI-TENANT SCHEMA FOR PROSPACES DELIVERY AND LOGISTICS
 -- Connects dynamic frontend objects to live backend tables
 CREATE TABLE IF NOT EXISTS tenant_state (
   tenant_id TEXT PRIMARY KEY,
@@ -1567,7 +1567,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
                   onClick={() => {
-                    localStorage.setItem('rona_ocr_coordinate_templates', JSON.stringify(activeTemplates));
+                    localStorage.setItem('prospaces_ocr_coordinate_templates', JSON.stringify(activeTemplates));
                     setCustomFileFeedback(`✔ Template coordinates layout for ${selectedDocType} successfully saved!`);
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center space-x-1 border border-emerald-500 shadow-xs transition-colors"
@@ -1805,8 +1805,8 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                         <div className="border-b-2 border-slate-900/10 pb-3 flex justify-between items-start">
                           <div>
                             <div className="flex items-center space-x-1.5">
-                              <span className="bg-slate-700 w-4 h-4 rounded text-center leading-4 text-white font-black text-[8px]">R</span>
-                              <span className="font-mono font-black text-[9px] text-gray-800 uppercase tracking-widest">RONA CORE TRACING</span>
+                              <span className="bg-slate-700 w-4 h-4 rounded text-center leading-4 text-white font-black text-[8px]">P</span>
+                              <span className="font-mono font-black text-[9px] text-gray-800 uppercase tracking-widest">PROSPACES CORE TRACING</span>
                             </div>
                             <h5 className="font-sans font-black text-gray-800 text-[10px] mt-1.5 tracking-wide uppercase">{activeTemplate.title}</h5>
                             <p className="text-[8.5px] text-gray-400 font-mono mt-0.5">{activeTemplate.subtitle}</p>
@@ -2432,7 +2432,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                           >
                             {activeBranches.map(b => (
                               <option key={b.id} value={b.id}>
-                                {b.name.replace('RONA ', '')} ({b.type === 'DC' ? 'Bulk DC Hub' : 'Store'})
+                                {b.name.replace('ProSpaces ', '').replace('ProSpaces ', '')} ({b.type === 'DC' ? 'Bulk DC Hub' : 'Store'})
                               </option>
                             ))}
                           </select>
@@ -2493,7 +2493,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                           <div>
                             <span className="text-purple-400 font-bold">{`{`}</span>
                             <div className="pl-4">
-                              <span className="text-sky-300">"api_endpoint"</span>: <span className="text-yellow-200">"https://rona-logistics.cloud/api/ingest"</span>,<br />
+                              <span className="text-sky-300">"api_endpoint"</span>: <span className="text-yellow-200">"https://prospaces-logistics.cloud/api/ingest"</span>,<br />
                               <span className="text-sky-300">"document_metadata"</span>: <span className="text-purple-400">{`{`}</span>
                               <div className="pl-4">
                                 <span className="text-sky-300">"type"</span>: <span className="text-yellow-200">"{selectedDocType}"</span>,<br />
@@ -2599,7 +2599,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
               </div>
             </div>
             <p className="text-xs text-gray-600 leading-relaxed">
-              To bypass Cloud-hosted services (like OneDrive/SharePoint), you can connect the OCR Layout extraction system directly to a local file folder path on your computer. Whenever files enter this folder, a background worker scanner will execute layout extraction and forward structured results to your RONA dispatch board in seconds.
+              To bypass Cloud-hosted services (like OneDrive/SharePoint), you can connect the OCR Layout extraction system directly to a local file folder path on your computer. Whenever files enter this folder, a background worker scanner will execute layout extraction and forward structured results to your ProSpaces dispatch board in seconds.
             </p>
           </div>
 
@@ -2635,7 +2635,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                           type="text"
                           value={localFolderPath}
                           onChange={(e) => setLocalFolderPath(e.target.value)}
-                          placeholder="e.g. C:\RonaLogistics\Files"
+                          placeholder="e.g. C:\ProSpacesLogistics\Files"
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs font-semibold text-gray-800 focus:bg-white focus:border-blue-500 outline-none transition-all"
                         />
                         <span className="absolute right-2.5 top-2.5 text-gray-400">
@@ -2659,7 +2659,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                             
                             let finalPath = '';
                             if (navigator.platform.toUpperCase().indexOf('WIN') > -1) {
-                              finalPath = `C:\\RonaLogistics\\${folderName || 'Selected_Local_Folder'}`;
+                              finalPath = `C:\\ProSpacesLogistics\\${folderName || 'Selected_Local_Folder'}`;
                             } else {
                               finalPath = `/Users/george/Downloads/${folderName || 'Selected_Local_Folder'}`;
                             }
