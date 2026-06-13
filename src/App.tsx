@@ -18,6 +18,7 @@ import FleetSetup from './components/FleetSetup';
 import StoresSetup from './components/StoresSetup';
 import UsersSetup from './components/UsersSetup';
 import LoginScreen from './components/LoginScreen';
+import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
@@ -44,6 +45,18 @@ const getThemeClasses = (color: string) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [allTenants, setAllTenants] = useState<Tenant[]>(() => {
+    const cached = localStorage.getItem('prospaces_all_tenants');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        console.error("Failed parsing cached tenants list:", e);
+      }
+    }
+    return TENANTS;
+  });
+
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
     const cached = localStorage.getItem('prospaces_active_tenant');
     return cached ? JSON.parse(cached) : null;
@@ -242,6 +255,81 @@ export default function App() {
     loadState();
   }, [currentTenant]);
 
+  // Load corporate tenants on boot
+  useEffect(() => {
+    const loadTenants = async () => {
+      try {
+        const res = await fetch("/api/tenants");
+        const data = await res.json();
+        if (data.tenants && data.tenants.length > 0) {
+          setAllTenants(data.tenants);
+          localStorage.setItem('prospaces_all_tenants', JSON.stringify(data.tenants));
+        }
+      } catch (err) {
+        console.warn("Failed retrieving tenants from database on mount:", err);
+      }
+    };
+    loadTenants();
+  }, []);
+
+  const handleAddTenant = async (newTenant: Tenant) => {
+    try {
+      const res = await fetch("/api/tenants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant: newTenant })
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Could not register tenant on live server.");
+      }
+      const updated = [...allTenants, newTenant];
+      setAllTenants(updated);
+      localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  };
+
+  const handleUpdateTenant = async (updatedTenant: Tenant) => {
+    try {
+      const res = await fetch("/api/tenants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant: updatedTenant })
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Could not save tenant modifications on live server.");
+      }
+      const updated = allTenants.map(t => t.id === updatedTenant.id ? updatedTenant : t);
+      setAllTenants(updated);
+      localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  };
+
+  const handleDeleteTenant = async (id: string) => {
+    try {
+      const res = await fetch(`/api/tenants/${id}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Could not delete tenant on live server.");
+      }
+      const updated = allTenants.filter(t => t.id !== id);
+      setAllTenants(updated);
+      localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  };
+
   // Update localStorage and sync with Supabase when deliveries change
   const handleAddOrUpdateDelivery = (newRecord: DeliveryRecord) => {
     if (!currentTenant) return;
@@ -379,7 +467,98 @@ export default function App() {
 
 
   if (!currentTenant || !currentUser) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} tenantsList={allTenants} />;
+  }
+
+  // Check if logged in user is a SUPER_ADMIN
+  if (currentUser.role === 'SUPER_ADMIN') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col font-sans text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950 animate-fade-in" id="super-admin-layout">
+        
+        {/* Super Admin Top Header */}
+        <header className="bg-slate-950 text-white border-b border-amber-500/25 shadow-xl animate-slide-down" id="super-admin-header">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            {/* Branded Logo representation */}
+            <div className="flex items-center space-x-3 text-center sm:text-left">
+              <div className="shrink-0 flex items-center justify-center max-w-[130px]">
+                <img 
+                  src={prospacesLogo} 
+                  alt="ProSpaces Logo" 
+                  className="h-10 w-auto object-contain rounded-xl"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-center sm:justify-start space-x-2">
+                  <h2 className="font-sans font-black text-xl text-slate-100 tracking-tight leading-none m-0">ProSpaces</h2>
+                  <span className="bg-amber-500/15 text-amber-400 text-[9.5px] uppercase font-mono px-2 py-0.5 rounded font-black border border-amber-500/30 tracking-widest leading-none">
+                    Master Administrator
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs font-semibold mt-1.5 leading-none">
+                  Global Organizational Partition Controls & Ecosystem Tenant Provisioning
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Status Bar */}
+            <div className="flex items-center space-x-4">
+              <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-mono border leading-none ${
+                supabaseStatus?.connected 
+                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' 
+                  : 'bg-amber-950/40 border-amber-500/30 text-amber-300'
+              }`}>
+                <Database className="h-3.5 w-3.5 text-current shrink-0" />
+                <span>{supabaseStatus?.connected ? 'Live Database Sync Active' : 'Offline / Local Database Sync Mode'}</span>
+              </div>
+
+              {/* Identity & control */}
+              <div className="flex items-center space-x-2.5 border-l border-slate-800 pl-4 leading-none">
+                <div className="hidden lg:flex flex-col text-right">
+                  <span className="text-xs font-bold leading-none text-slate-200">{currentUser.name}</span>
+                  <span className="text-[9px] font-mono text-amber-400 leading-none mt-1 uppercase font-black tracking-wider">
+                    {currentUser.role}
+                  </span>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  title="Secure De-authorization and Logout"
+                  type="button"
+                  className="text-amber-500 hover:text-amber-400 p-2 bg-amber-500/10 hover:bg-amber-500/20 rounded-xl transition-all flex items-center justify-center border border-amber-500/20 shadow-inner cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </header>
+
+        {/* Core Screen */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col space-y-6">
+          <div className="bg-slate-800/40 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md" id="super-admin-content-card">
+            <SuperAdminTenantsView 
+              tenants={allTenants} 
+              onAddTenant={handleAddTenant}
+              onUpdateTenant={handleUpdateTenant}
+              onDeleteTenant={handleDeleteTenant}
+              supabaseStatus={supabaseStatus}
+            />
+          </div>
+        </main>
+
+        <footer className="bg-slate-950 text-slate-500 py-6 border-t border-slate-900 text-center text-xs" id="super-admin-footer">
+          <div className="max-w-7xl mx-auto px-4 space-y-1">
+            <p className="font-bold text-slate-400">ProSpaces Global Administration Node</p>
+            <p className="text-[10px] text-slate-600 font-mono">
+              Secured under master corporate administrative rules &bull; Full structural control over physical tenants.
+            </p>
+          </div>
+        </footer>
+
+      </div>
+    );
   }
 
   const theme = getThemeClasses(currentTenant.primaryColor);
@@ -393,11 +572,11 @@ export default function App() {
           
           {/* Logo & title context */}
           <div className="flex items-center space-x-3 text-center sm:text-left">
-            <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm shrink-0 flex items-center justify-center max-w-[140px]">
+            <div className="shrink-0 flex items-center justify-center max-w-[140px]">
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-9 w-auto object-contain"
+                className="h-9 w-auto object-contain rounded-lg"
                 referrerPolicy="no-referrer"
               />
             </div>

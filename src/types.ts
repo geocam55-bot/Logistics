@@ -50,7 +50,7 @@ export interface Truck {
   branchId: string; // Associated branch/DC (e.g. WINDMILL_DC or 01075_TANTALLON)
 }
 
-export type UserRole = 'Driver' | 'Dispatcher' | 'User' | 'Admin';
+export type UserRole = 'Driver' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';
 
 export interface User {
   id: string;

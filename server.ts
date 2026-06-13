@@ -31,15 +31,48 @@ function getGeminiClient(): GoogleGenAI {
 
 // Supabase Lazy Initialization
 let supabaseClient: any = null;
+let lastSupabaseUrl = "";
+let lastSupabaseKey = "";
 
 function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
+  let url = process.env.SUPABASE_URL;
+  let key = process.env.SUPABASE_ANON_KEY;
   
-  if (!url || !key || url.trim() === "" || key.trim() === "" || url.includes("PLACEHOLDER") || key.includes("PLACEHOLDER")) {
+  if (!url || !key) {
+    return null;
+  }
+
+  // Trim and strip surrounding quotes
+  url = url.trim().replace(/^['"]|['"]$/g, '');
+  key = key.trim().replace(/^['"]|['"]$/g, '');
+
+  // Strip trailing slashes and common suffix paths like "/rest/v1" or "/rest" that cause duplicate path errors in the client
+  url = url.replace(/\/rest\/v1\/?$/i, '');
+  url = url.replace(/\/rest\/?$/i, '');
+  url = url.replace(/\/+$/, '');
+
+  if (
+    url === "" || 
+    key === "" || 
+    url === "undefined" || 
+    key === "undefined" || 
+    url === "null" || 
+    key === "null" || 
+    url.includes("PLACEHOLDER") || 
+    key.includes("PLACEHOLDER")
+  ) {
+    return null;
+  }
+
+  // Ensure it starts with http:// or https://
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
     return null;
   }
   
+  if (url !== lastSupabaseUrl || key !== lastSupabaseKey) {
+    supabaseClient = null;
+  }
+
   if (!supabaseClient) {
     try {
       supabaseClient = createClient(url, key, {
@@ -47,12 +80,27 @@ function getSupabase() {
           persistSession: false
         }
       });
+      lastSupabaseUrl = url;
+      lastSupabaseKey = key;
     } catch (e) {
       console.error("Failed to initialize Supabase client:", e);
       return null;
     }
   }
   return supabaseClient;
+}
+
+function formatDatabaseError(err: any): string {
+  if (!err) return "An unknown database error occurred.";
+  const msg = err.message || String(err);
+  if (
+    msg.includes("Invalid path specified in request URL") ||
+    (msg.includes("relation") && msg.includes("does not exist")) ||
+    msg.includes("42P01")
+  ) {
+    return "Your Supabase database is connected, but the required database tables do not exist yet. Please go to the 'System Architecture' dashboard, copy the SQL setup schema script, and run it in the SQL Editor within your Supabase workspace to initialize the tables.";
+  }
+  return msg;
 }
 
 const SH_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR PROSPACES DELIVERY AND LOGISTICS PORTAL */
@@ -192,6 +240,30 @@ async function startServer() {
         return res.status(400).json({ error: "Email query param is required." });
       }
 
+      const normEmail = email.trim().toLowerCase();
+      if (normEmail === "superadmin@prospaces.com") {
+        return res.json({
+          supabaseActive: getSupabase() !== null,
+          found: true,
+          user: {
+            id: "USR-SUPER-ADMIN-01",
+            tenantId: "system-admin-tenant",
+            name: "ProSpaces Super Admin",
+            email: "superadmin@prospaces.com",
+            role: "SUPER_ADMIN"
+          },
+          tenant: {
+            id: "system-admin-tenant",
+            name: "System Control Space",
+            code: "SYS",
+            description: "Global Administration Management Space",
+            logoBadge: "⚙️",
+            regionalFocus: "Global Administration Management",
+            primaryColor: "slate"
+          }
+        });
+      }
+
       const supabase = getSupabase();
       if (!supabase) {
         return res.json({
@@ -233,7 +305,11 @@ async function startServer() {
         message: "No registered profile found matching this email address."
       });
     } catch (err: any) {
-      console.error("Supabase live auth error:", err);
+      if (err && err.message && (err.message.includes("relation") || err.message.includes("does not exist") || err.code === "42P01")) {
+        console.warn("Supabase 'users' table is not created yet during login request. Using local offline credentials.");
+      } else {
+        console.error("Supabase live auth error:", err);
+      }
       res.json({
         supabaseActive: false,
         found: false,
@@ -291,7 +367,7 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error("Failed to commit newly registered user to Supabase:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: formatDatabaseError(err) });
     }
   });
 
@@ -340,7 +416,7 @@ async function startServer() {
       // Fallback response inside error boundaries to let client handle the offline recovery
       res.json({
         supabaseActive: false,
-        error: err.message,
+        error: formatDatabaseError(err),
         deliveries: [],
         trucks: [],
         branches: [],
@@ -396,7 +472,7 @@ async function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       console.error("Supabase Save State Error:", err);
-      res.status(500).json({ error: err.message || "Unable to sync tenant state to Supabase." });
+      res.status(500).json({ error: formatDatabaseError(err) });
     }
   });
 
@@ -424,7 +500,7 @@ async function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       console.error("Permanent delete error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: formatDatabaseError(err) });
     }
   });
 
@@ -505,6 +581,97 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
     } catch (err: any) {
       console.error("OCR Extraction Error:", err);
       res.status(500).json({ error: err.message || "An exception occurred during real-time document parsing." });
+    }
+  });
+
+  // Tenant / Organization CRUD endpoint APIs for SUPER_ADMIN
+  app.get("/api/tenants", async (req, res) => {
+    const fallbackTenants = [
+      {
+        id: 'atlantic-logistics',
+        name: 'Atlantic Shipping & Logistics',
+        code: 'ATL',
+        description: 'Serving Nova Scotia regional stores & main Windmill Road DC hub.',
+        logoBadge: '⚓',
+        regionalFocus: 'Nova Scotia (Dartmouth, Tantallon, Halifax)',
+        primaryColor: 'blue'
+      },
+      {
+        id: 'bay-of-fundy',
+        name: 'Bay of Fundy Transport Ltd',
+        code: 'BOF',
+        description: 'Serving Annapolis Valley and New Brunswick logistics gateways.',
+        logoBadge: '🌊',
+        regionalFocus: 'New Brunswick & Annapolis Valley (Kentville, Truro, Moncton)',
+        primaryColor: 'emerald'
+      },
+      {
+        id: 'cabot-trail',
+        name: 'Cabot Trail Cargo & Hauling',
+        code: 'CTC',
+        description: 'Providing Cape Breton heavy industrial bulk distribution services.',
+        logoBadge: '⛰️',
+        regionalFocus: 'Cape Breton (Sydney, Port Hawkesbury)',
+        primaryColor: 'indigo'
+      }
+    ];
+
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ supabaseActive: false, tenants: fallbackTenants });
+      }
+      const { data, error } = await supabase.from("tenants").select("*");
+      if (error) throw error;
+      res.json({ supabaseActive: true, tenants: data && data.length > 0 ? data : fallbackTenants });
+    } catch (err: any) {
+      const formatted = formatDatabaseError(err);
+      console.warn("Failed to read core tenants from Supabase:", formatted);
+      res.json({ supabaseActive: false, error: formatted, tenants: fallbackTenants });
+    }
+  });
+
+  app.post("/api/tenants", async (req, res) => {
+    try {
+      const { tenant } = req.body;
+      if (!tenant || !tenant.id) {
+        return res.status(400).json({ error: "Tenant payload with a valid ID is required." });
+      }
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ success: true, localOnly: true });
+      }
+      const { error } = await supabase.from("tenants").upsert([tenant]);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Failed to upsert tenant to Supabase:", err);
+      res.status(500).json({ error: formatDatabaseError(err) });
+    }
+  });
+
+  app.delete("/api/tenants/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ success: true, localOnly: true });
+      }
+
+      // Safeguard: Cascade delete child tables to prevent orphaned records in our multi-tenant database
+      await Promise.all([
+        supabase.from("deliveries").delete().eq("tenantId", id),
+        supabase.from("users").delete().eq("tenantId", id),
+        supabase.from("trucks").delete().eq("tenantId", id),
+        supabase.from("branches").delete().eq("tenantId", id)
+      ]);
+
+      const { error } = await supabase.from("tenants").delete().eq("id", id);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Failed to delete tenant from Supabase:", err);
+      res.status(500).json({ error: formatDatabaseError(err) });
     }
   });
 
