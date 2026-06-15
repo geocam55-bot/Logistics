@@ -244,6 +244,21 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         <span className="text-gray-300">&bull;</span>
                         <span className="text-xs text-gray-500 truncate max-w-xs">{delivery.deliveryAddress}</span>
                       </div>
+
+                      {(delivery.weight || delivery.orderTotal) && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {delivery.weight && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              ⚖️ Weight: <span className="text-slate-800 ml-1">{delivery.weight}</span>
+                            </span>
+                          )}
+                          {delivery.orderTotal && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              💰 Total: <span className="text-emerald-900 ml-1 font-extrabold">{delivery.orderTotal}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -337,6 +352,26 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                             )}
                           </div>
                         </div>
+
+                        {(delivery.weight || delivery.orderTotal) && (
+                          <div>
+                            <h5 className="font-bold text-gray-900 mb-1 uppercase tracking-wider font-mono text-[10px]">Document-Mapped Balances</h5>
+                            <div className="bg-white border border-slate-100 rounded-xl p-3 grid grid-cols-2 gap-4 shadow-sm">
+                              {delivery.weight && (
+                                <div>
+                                  <p className="text-gray-400 text-[9px] font-mono uppercase font-bold">Gross Freight Weight</p>
+                                  <p className="text-sm font-black text-slate-800 font-mono mt-0.5">⚖️ {delivery.weight}</p>
+                                </div>
+                              )}
+                              {delivery.orderTotal && (
+                                <div>
+                                  <p className="text-gray-400 text-[9px] font-mono uppercase font-bold">Total Mapped Value</p>
+                                  <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">💰 {delivery.orderTotal}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Interactive Truck Selection & Confirmation Desk */}
                         {delivery.status !== DeliveryStatus.DELIVERED && (

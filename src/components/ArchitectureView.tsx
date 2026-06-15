@@ -15,6 +15,7 @@ import {
   Plus, 
   CheckCircle, 
   AlertCircle, 
+  ChevronLeft,
   ChevronRight, 
   ShieldCheck,
   Eye,
@@ -55,6 +56,7 @@ interface DocTemplate {
       y: number;
       w: number;
       h: number;
+      page?: number;
     }
   };
   sampleItems: { qty: string; desc: string; price: string }[];
@@ -191,8 +193,8 @@ export default function ArchitectureView({
   };
   const [selectedDocType, setSelectedDocType] = useState<DocType>('Order');
   const [mappedFields, setMappedFields] = useState<Record<DocType, string[]>>({
-    'Order': ['Order #', 'Date', 'Customer Name', 'Ship To'],
-    'Credit': ['Credit Note #', 'Date', 'Customer Name', 'Return Reason'],
+    'Order': ['Order #', 'Date', 'Customer Name', 'Ship To', 'Subtotal', 'Gross Weight'],
+    'Credit': ['Credit Note #', 'Date', 'Customer Name', 'Return Reason', 'Total Credit'],
     'Supplier Pickup': ['Supplier Code', 'Date', 'Warehouse Location', 'Item Specifications'],
     'RMA': ['RMA #', 'Date', 'Manufacturer', 'Status Defect Code']
   });
@@ -277,10 +279,12 @@ export default function ArchitectureView({
         title: 'PROSPACES SALES ORDER & DISPATCH INVOICE',
         subtitle: 'RETAIL ORDER ENTRY DIRECT DEPOSIT',
         fields: {
-          'Order #': { label: 'Order Number', value: 'ORD-94827-26', x: 500, y: 30, w: 125, h: 25 },
-          'Date': { label: 'Order Date', value: 'June 11, 2026', x: 500, y: 65, w: 125, h: 22 },
-          'Customer Name': { label: 'Customer Name', value: 'Highland Construction Ltd.', x: 40, y: 115, w: 220, h: 22 },
-          'Ship To': { label: 'Ship To Destination', value: '104 Bedford Hwy, Halifax, NS B2M 1G4', x: 40, y: 145, w: 250, h: 35 },
+          'Order #': { label: 'Order Number', value: 'ORD-94827-26', x: 500, y: 30, w: 125, h: 25, page: 1 },
+          'Date': { label: 'Order Date', value: 'June 11, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
+          'Customer Name': { label: 'Customer Name', value: 'Highland Construction Ltd.', x: 40, y: 115, w: 220, h: 22, page: 1 },
+          'Ship To': { label: 'Ship To Destination', value: '104 Bedford Hwy, Halifax, NS B2M 1G4', x: 40, y: 145, w: 250, h: 35, page: 1 },
+          'Subtotal': { label: 'Order Subtotals', value: '$1,227.30', x: 440, y: 615, w: 160, h: 25, page: 2 },
+          'Gross Weight': { label: 'Gross Weight', value: '4,850 lbs', x: 440, y: 660, w: 160, h: 25, page: 2 }
         },
         sampleItems: [
           { qty: '40', desc: 'Shoring Lumber 2x6x12 Pressure Treated Spruce', price: '$858.00' },
@@ -292,10 +296,11 @@ export default function ArchitectureView({
         title: 'PROSPACES CASHIER CREDIT & ADJUSTMENT MEMO',
         subtitle: 'CUSTOMER MERCHANDISE RETURN RECEIPT',
         fields: {
-          'Credit Note #': { label: 'Credit Note #', value: 'CR-88273-04', x: 500, y: 30, w: 125, h: 25 },
-          'Date': { label: 'Adjustment Date', value: 'June 10, 2026', x: 500, y: 65, w: 125, h: 22 },
-          'Customer Name': { label: 'Refund Recipient', value: 'Atlantic Deck Builders Co.', x: 40, y: 115, w: 220, h: 22 },
-          'Return Reason': { label: 'Return Reason', value: 'Cabinetry dimensions mismatch on-site', x: 40, y: 145, w: 250, h: 35 },
+          'Credit Note #': { label: 'Credit Note #', value: 'CR-88273-04', x: 500, y: 30, w: 125, h: 25, page: 1 },
+          'Date': { label: 'Adjustment Date', value: 'June 10, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
+          'Customer Name': { label: 'Refund Recipient', value: 'Atlantic Deck Builders Co.', x: 40, y: 115, w: 220, h: 22, page: 1 },
+          'Return Reason': { label: 'Return Reason', value: 'Cabinetry dimensions mismatch on-site', x: 40, y: 145, w: 250, h: 35, page: 1 },
+          'Total Credit': { label: 'Total Credit Refund', value: '$1,904.00', x: 440, y: 615, w: 160, h: 25, page: 2 }
         },
         sampleItems: [
           { qty: '-6', desc: 'Deco Custom Oak Cabinets 15" x 30" Upper', price: '- $1,860.00' },
@@ -359,7 +364,16 @@ export default function ArchitectureView({
   // New states for Drag-and-Drop and PDF rendering
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const [pdfRendering, setPdfRendering] = useState<boolean>(false);
+  const [pdfPageCount, setPdfPageCount] = useState<number>(1);
+  const [currentPdfPage, setCurrentPdfPage] = useState<number>(1);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Reset page navigation when switching document template or when a new file occupies the slot
+  useEffect(() => {
+    setCurrentPdfPage(1);
+    setIsDrawing(false);
+    setDrawStart(null);
+  }, [selectedDocType, uploadedFiles[selectedDocType]]);
 
   // Interactive drag-to-move and drag-to-resize state for template mapping fields
   const [dragState, setDragState] = useState<{
@@ -480,7 +494,12 @@ export default function ArchitectureView({
 
         if (isCancelled) return;
 
-        const page = await pdf.getPage(1);
+        // Save total page count
+        setPdfPageCount(pdf.numPages);
+
+        // Fetch selected page (guarantee in-bounds check)
+        const targetPageNum = Math.max(1, Math.min(currentPdfPage, pdf.numPages));
+        const page = await pdf.getPage(targetPageNum);
         if (isCancelled) return;
 
         const canvas = canvasRef.current;
@@ -523,7 +542,7 @@ export default function ArchitectureView({
     return () => {
       isCancelled = true;
     };
-  }, [uploadedFiles, selectedDocType]);
+  }, [uploadedFiles, selectedDocType, currentPdfPage]);
 
   // Sync stateful templates and files to localStorage
   useEffect(() => {
@@ -1056,6 +1075,8 @@ export default function ArchitectureView({
     const customerVal = editedFields['Customer Name'] || editedFields['Manufacturer'] || editedFields['Warehouse Location'] || 'Corporate Consignee';
     const addressVal = editedFields['Ship To'] || editedFields['Return Reason'] || editedFields['Item Specifications'] || 'No additional specifications provided';
     const dateVal = editedFields['Date'] || new Date().toLocaleString();
+    const weightVal = editedFields['Gross Weight'] || editedFields['Weight'] || '';
+    const orderTotalVal = editedFields['Subtotal'] || editedFields['Total Credit'] || '';
 
     // Instantiate a fully compliant DeliveryRecord
     const newRecord: DeliveryRecord = {
@@ -1066,6 +1087,8 @@ export default function ArchitectureView({
       deliveryAddress: addressVal,
       phone: '902-555-0199',
       originBranch: selectedBranchId,
+      weight: weightVal,
+      orderTotal: orderTotalVal,
       status: DeliveryStatus.REGISTERED,
       registeredAt: new Date().toLocaleString(),
       destinationNotes: `[Automated PDF Capture - Type: ${selectedDocType}] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: ${dateVal}.`,
@@ -1096,6 +1119,11 @@ export default function ArchitectureView({
     setCreatedRecords([sessionRecord, ...createdRecords]);
     alert(`Success: Instantiated and submitted a brand-new ${selectedDocType} (ID: ${recordId}) to your live Logistics & Dispatch stream! It has been successfully routed to ProSpaces Store/Depot #${selectedBranchId}. You can find it on the main HQ Dashboard and Delivery Freight Board under "Registered" status ready for truck dispatch.`);
   };
+
+  const maxTemplatePage = Math.max(1, ...Object.values(activeTemplate.fields).map(f => (f as any).page || 1));
+  const effectivePageCount = uploadedFiles[selectedDocType]?.startsWith('data:application/pdf') 
+    ? pdfPageCount 
+    : maxTemplatePage;
 
   const getLiveValue = (key: string) => {
     return editedFields[key] !== undefined ? editedFields[key] : activeTemplate.fields[key]?.value || '';
@@ -1700,7 +1728,8 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                             x,
                             y,
                             w,
-                            h
+                            h,
+                            page: currentPdfPage
                           };
                         }
                         return {
@@ -1753,6 +1782,47 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                     } ${isDraggingFile ? 'ring-4 ring-emerald-500 ring-offset-2' : ''}`}
                   >
 
+                    {/* Multipage Document Page Navigation HUD Controls */}
+                    {effectivePageCount > 1 && (
+                      <div className="absolute top-3 right-3 bg-slate-900/90 text-white backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-1.5 flex items-center space-x-3 shadow-lg z-40 transition-all select-none">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPdfPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPdfPage <= 1}
+                          className="p-1 rounded-full text-slate-350 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold outline-none"
+                          title="Previous Page"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        
+                        <span className="text-[11px] font-mono font-extrabold tracking-tight">
+                          Page <span className="text-emerald-400">{currentPdfPage}</span> <span className="opacity-40">/</span> {effectivePageCount}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPdfPage(prev => Math.min(effectivePageCount, prev + 1))}
+                          disabled={currentPdfPage >= effectivePageCount}
+                          className="p-1 rounded-full text-slate-350 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold outline-none"
+                          title="Next Page"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+
+                        <div className="h-3 w-[1px] bg-slate-700/80" />
+
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPdfPage(effectivePageCount)}
+                          disabled={currentPdfPage === effectivePageCount}
+                          className="text-[9.5px] font-mono tracking-wider font-extrabold text-slate-200 hover:text-emerald-405 disabled:opacity-35 disabled:hover:text-slate-350 disabled:cursor-not-allowed uppercase transition-colors outline-none"
+                          title="Jump straight to the last page"
+                        >
+                          Last Page
+                        </button>
+                      </div>
+                    )}
+
                     {/* Drag and Drop Active Overlay */}
                     {isDraggingFile && (
                       <div className="absolute inset-0 bg-emerald-500/10 border-4 border-dashed border-emerald-500 z-50 flex flex-col items-center justify-center pointer-events-none animate-pulse">
@@ -1793,115 +1863,196 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                       )
                     ) : (
                       /* Fallback vector tracer if no custom file uploaded */
-                      <div className="absolute inset-0 bg-slate-50/70 p-5 flex flex-col justify-between z-0 select-none font-sans opacity-70">
-                        {/* Rich alignment grid watermark lines */}
-                        <div className="absolute inset-0 grid grid-cols-12 grid-rows-8 pointer-events-none opacity-[0.02] border-slate-900 border-collapse">
-                          {Array.from({ length: 96 }).map((_, i) => (
-                            <div key={i} className="border border-dashed border-slate-950" />
-                          ))}
-                        </div>
-
-                        {/* Document Header */}
-                        <div className="border-b-2 border-slate-900/10 pb-3 flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center space-x-1.5">
-                              <span className="bg-slate-700 w-4 h-4 rounded text-center leading-4 text-white font-black text-[8px]">P</span>
-                              <span className="font-mono font-black text-[9px] text-gray-800 uppercase tracking-widest">PROSPACES CORE TRACING</span>
-                            </div>
-                            <h5 className="font-sans font-black text-gray-800 text-[10px] mt-1.5 tracking-wide uppercase">{activeTemplate.title}</h5>
-                            <p className="text-[8.5px] text-gray-400 font-mono mt-0.5">{activeTemplate.subtitle}</p>
+                      currentPdfPage === 2 ? (
+                        /* Page 2: Summary Page Mockup */
+                        <div className="absolute inset-0 bg-slate-50/70 p-5 flex flex-col justify-between z-0 select-none font-sans opacity-70">
+                          {/* Rich alignment grid watermark lines */}
+                          <div className="absolute inset-0 grid grid-cols-12 grid-rows-8 pointer-events-none opacity-[0.02] border-slate-900 border border-collapse">
+                            {Array.from({ length: 96 }).map((_, i) => (
+                              <div key={i} className="border border-dashed border-slate-950" />
+                            ))}
                           </div>
-                          <div className="text-right">
-                            <span className="bg-slate-100 text-slate-500 font-semibold font-mono text-[8px] px-1.5 py-0.5 rounded border border-slate-200">
-                              DEFAULT_LAYOUT_PRESET
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Fields simulation as realistic blocks */}
-                        <div className="flex-1 my-3.5 grid grid-cols-2 gap-5 text-[9.5px]">
-                          {/* Left Side Column */}
-                          <div className="space-y-2.5 pr-2 border-r border-dashed border-slate-200">
+                          {/* Page 2 Header */}
+                          <div className="border-b-2 border-slate-900/10 pb-3 flex justify-between items-start">
                             <div>
-                              <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
-                                RECIPIENT DISPATCH DETAIL
+                              <div className="flex items-center space-x-1.5">
+                                <span className="bg-slate-700 w-4 h-4 rounded text-center leading-4 text-white font-black text-[8px]">Σ</span>
+                                <span className="font-mono font-black text-[9px] text-gray-800 uppercase tracking-widest">PROSPACES CORE SUMMARY</span>
+                              </div>
+                              <h5 className="font-sans font-black text-gray-800 text-[10px] mt-1.5 tracking-wide uppercase">QUANTITY LOGISTICS & RECEIVABLE SUMMARY</h5>
+                              <p className="text-[8.5px] text-gray-400 font-mono mt-0.5">FINAL BALANCES, LOADING MANIFEST & WEIGHT CERTIFICATE</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-emerald-100 text-emerald-800 font-bold font-mono text-[8px] px-1.5 py-0.5 rounded border border-emerald-250">
+                                PAGE_2_TOTALS
                               </span>
-                              <div className="bg-slate-100/40 p-2 rounded-lg border border-slate-150 min-h-[44px] flex flex-col justify-center">
-                                <span className="font-bold text-slate-400">
-                                  {selectedDocType === 'Order' ? getLiveValue('Customer Name') : 
-                                   selectedDocType === 'Credit' ? getLiveValue('Customer Name') : 
-                                   selectedDocType === 'Supplier Pickup' ? getLiveValue('Warehouse Location') : 
-                                   getLiveValue('Manufacturer') || 'N/A'}
-                                </span>
+                            </div>
+                          </div>
+
+                          {/* Fields simulation as realistic blocks */}
+                          <div className="flex-1 my-3.5 grid grid-cols-2 gap-5 text-[9.5px]">
+                            {/* Left Side Column */}
+                            <div className="space-y-4 pr-2 border-r border-dashed border-slate-200 flex flex-col justify-center">
+                              <div className="border border-slate-200 rounded p-2 bg-white/50">
+                                <p className="text-[7.5px] font-mono font-bold text-gray-400 mb-1 uppercase">Total Shipment Items</p>
+                                <span className="text-[12px] font-bold text-slate-800">3 Core Items (54 Units Total)</span>
+                              </div>
+                              <div className="border border-slate-200 rounded p-2 bg-white/50">
+                                <p className="text-[7.5px] font-mono font-bold text-gray-400 mb-1 uppercase">Dispatch Freight Bay</p>
+                                <span className="text-[12px] font-bold text-slate-750">Terminal 4-A / Dock Door 12</span>
                               </div>
                             </div>
 
-                            <div>
-                              <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
-                                SECURE MEMO & LOGISTICS NOTE
-                              </span>
-                              <div className="bg-slate-100/40 p-2 rounded-lg border border-slate-150 min-h-[44px] flex flex-col justify-center">
-                                <span className="text-slate-400 italic">
-                                  {selectedDocType === 'Order' ? getLiveValue('Ship To') : 
-                                   selectedDocType === 'Credit' ? getLiveValue('Return Reason') : 
-                                   selectedDocType === 'Supplier Pickup' ? getLiveValue('Item Specifications') : 
-                                   getLiveValue('Status Defect Code') || 'N/A'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Right Side Column */}
-                          <div className="space-y-2.5 flex flex-col justify-between">
-                            <div className="space-y-2.5">
+                            {/* Right Side Column (Where Weight and subtotals are located!) */}
+                            <div className="space-y-4 flex flex-col justify-end">
                               <div>
                                 <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
-                                  MASTER UNIQUE IDENTIFIER
+                                  {selectedDocType === 'Order' ? 'ORDER COGNITIVE SUB-TOTAL' : 'TOTAL RETURN CREDIT VALUE'}
                                 </span>
-                                <div className="bg-slate-100/40 p-1.5 rounded-lg border border-slate-150">
-                                  <span className="font-mono font-bold text-slate-400 text-[9.5px]">
-                                    {selectedDocType === 'Order' ? getLiveValue('Order #') : 
-                                     selectedDocType === 'Credit' ? getLiveValue('Credit Note #') : 
-                                     selectedDocType === 'Supplier Pickup' ? getLiveValue('Supplier Code') : 
-                                     getLiveValue('RMA #') || 'N/A'}
+                                <div className="bg-emerald-50/50 p-2 rounded-lg border border-emerald-150 text-right">
+                                  <span className="font-mono font-black text-emerald-800 text-sm">
+                                    {selectedDocType === 'Order' ? getLiveValue('Subtotal') : getLiveValue('Total Credit') || '$1,227.30'}
                                   </span>
                                 </div>
                               </div>
 
                               <div>
                                 <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
-                                  DEPOSITED CHRONOLOGY
+                                  {selectedDocType === 'Order' ? 'GROSS FREIGHT WEIGHT' : 'LOGISTICS DISPENSATION'}
                                 </span>
-                                <div className="bg-slate-100/40 p-1.5 rounded-lg border border-slate-150">
-                                  <span className="font-mono font-bold text-slate-400">
-                                    {getLiveValue('Date') || 'June 11, 2026'}
+                                <div className="bg-slate-100/65 p-2 rounded-lg border border-slate-200 text-right">
+                                  <span className="font-mono font-bold text-slate-700">
+                                    {selectedDocType === 'Order' ? getLiveValue('Gross Weight') : 'Processed Offline'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Footer Info line */}
+                          <div className="text-center text-[8px] text-gray-300 font-mono mt-1.5 flex justify-between items-center bg-slate-100/20 p-1 rounded">
+                            <span>FACTORY TRACING PRESET</span>
+                            <span>PAGE 2 OF {effectivePageCount}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Page 1 (Default Mockup) */
+                        <div className="absolute inset-0 bg-slate-50/70 p-5 flex flex-col justify-between z-0 select-none font-sans opacity-70">
+                          {/* Rich alignment grid watermark lines */}
+                          <div className="absolute inset-0 grid grid-cols-12 grid-rows-8 pointer-events-none opacity-[0.02] border-slate-900 border-collapse">
+                            {Array.from({ length: 96 }).map((_, i) => (
+                              <div key={i} className="border border-dashed border-slate-950" />
+                            ))}
+                          </div>
+
+                          {/* Document Header */}
+                          <div className="border-b-2 border-slate-900/10 pb-3 flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center space-x-1.5">
+                                <span className="bg-slate-700 w-4 h-4 rounded text-center leading-4 text-white font-black text-[8px]">P</span>
+                                <span className="font-mono font-black text-[9px] text-gray-800 uppercase tracking-widest">PROSPACES CORE TRACING</span>
+                              </div>
+                              <h5 className="font-sans font-black text-gray-800 text-[10px] mt-1.5 tracking-wide uppercase">{activeTemplate.title}</h5>
+                              <p className="text-[8.5px] text-gray-400 font-mono mt-0.5">{activeTemplate.subtitle}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-slate-100 text-slate-500 font-semibold font-mono text-[8px] px-1.5 py-0.5 rounded border border-slate-200">
+                                DEFAULT_LAYOUT_PRESET
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Fields simulation as realistic blocks */}
+                          <div className="flex-1 my-3.5 grid grid-cols-2 gap-5 text-[9.5px]">
+                            {/* Left Side Column */}
+                            <div className="space-y-2.5 pr-2 border-r border-dashed border-slate-200">
+                              <div>
+                                <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
+                                  RECIPIENT DISPATCH DETAIL
+                                </span>
+                                <div className="bg-slate-100/40 p-2 rounded-lg border border-slate-150 min-h-[44px] flex flex-col justify-center">
+                                  <span className="font-bold text-slate-400">
+                                    {selectedDocType === 'Order' ? getLiveValue('Customer Name') : 
+                                     selectedDocType === 'Credit' ? getLiveValue('Customer Name') : 
+                                     selectedDocType === 'Supplier Pickup' ? getLiveValue('Warehouse Location') : 
+                                     getLiveValue('Manufacturer') || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
+                                  SECURE MEMO & LOGISTICS NOTE
+                                </span>
+                                <div className="bg-slate-100/40 p-2 rounded-lg border border-slate-150 min-h-[44px] flex flex-col justify-center">
+                                  <span className="text-slate-400 italic">
+                                    {selectedDocType === 'Order' ? getLiveValue('Ship To') : 
+                                     selectedDocType === 'Credit' ? getLiveValue('Return Reason') : 
+                                     selectedDocType === 'Supplier Pickup' ? getLiveValue('Item Specifications') : 
+                                     getLiveValue('Status Defect Code') || 'N/A'}
                                   </span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="text-right text-[7.5px] font-mono text-gray-300">
-                              <span>PRESIGNATURE WAITING</span>
-                              <p className="font-bold">PENDING SCAN</p>
+                            {/* Right Side Column */}
+                            <div className="space-y-2.5 flex flex-col justify-between">
+                              <div className="space-y-2.5">
+                                <div>
+                                  <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
+                                    MASTER UNIQUE IDENTIFIER
+                                  </span>
+                                  <div className="bg-slate-100/40 p-1.5 rounded-lg border border-slate-150">
+                                    <span className="font-mono font-bold text-slate-400 text-[9.5px]">
+                                      {selectedDocType === 'Order' ? getLiveValue('Order #') : 
+                                       selectedDocType === 'Credit' ? getLiveValue('Credit Note #') : 
+                                       selectedDocType === 'Supplier Pickup' ? getLiveValue('Supplier Code') : 
+                                       getLiveValue('RMA #') || 'N/A'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <span className="text-gray-300 font-mono text-[7.5px] uppercase font-bold tracking-wider block mb-0.5">
+                                    DEPOSITED CHRONOLOGY
+                                  </span>
+                                  <div className="bg-slate-100/40 p-1.5 rounded-lg border border-slate-150">
+                                    <span className="font-mono font-bold text-slate-400">
+                                      {getLiveValue('Date') || 'June 11, 2026'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right text-[7.5px] font-mono text-gray-300">
+                                <span>PRESIGNATURE WAITING</span>
+                                <p className="font-bold">PENDING SCAN</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Footer Info line */}
-                        <div className="text-center text-[8px] text-gray-300 font-mono mt-1.5 flex justify-between items-center bg-slate-100/20 p-1 rounded">
-                          <span>FACTORY TRACING PRESET</span>
-                          <span>PAGE 1 OF 1</span>
+                          {/* Footer Info line */}
+                          <div className="text-center text-[8px] text-gray-300 font-mono mt-1.5 flex justify-between items-center bg-slate-100/20 p-1 rounded">
+                            <span>FACTORY TRACING PRESET</span>
+                            <span>PAGE 1 OF {effectivePageCount}</span>
+                          </div>
                         </div>
-                      </div>
+                      )
                     )}
 
-                     {/* Interactive Absolute Coordinate Highlight Blocks Layer */}
-                     {Object.keys(activeTemplate.fields).map(fieldId => {
-                       const isMapped = mappedFields[selectedDocType].includes(fieldId);
-                       const field = activeTemplate.fields[fieldId];
-                       const isSelected = activeFieldToMap === fieldId;
+                      {/* Interactive Absolute Coordinate Highlight Blocks Layer */}
+                      {Object.keys(activeTemplate.fields).map(fieldId => {
+                        const isMapped = mappedFields[selectedDocType].includes(fieldId);
+                        const field = activeTemplate.fields[fieldId];
+                        const isSelected = activeFieldToMap === fieldId;
+                        const fieldPage = field.page || 1;
+
+                        if (fieldPage !== currentPdfPage) {
+                          return null;
+                        }
  
-                       return (
+                        return (
                          <div
                            key={fieldId}
                            onClick={(e) => {
@@ -2037,7 +2188,7 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                               </span>
                             </div>
                             <span className="text-[9.5px] text-gray-400 font-mono block mt-0.5 whitespace-nowrap">
-                              X:{details.x} Y:{details.y} &bull; Width:{details.w}px H:{details.h}px
+                              X:{details.x} Y:{details.y} &bull; Width:{details.w}px H:{details.h}px &bull; Page {details.page || 1}
                             </span>
                           </button>
                           
@@ -2252,6 +2403,36 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                           />
                         </div>
 
+                        {/* Target Page Selector Block */}
+                        <div>
+                          <div className="flex justify-between text-[10px] font-mono text-slate-505 leading-none mb-1.5 matches-page-indicator">
+                            <span className="font-semibold text-slate-500">Target Document Page:</span>
+                            <span className="font-bold text-emerald-700">Page {activeTemplate.fields[activeFieldToMap].page || 1}</span>
+                          </div>
+                          <select
+                            value={activeTemplate.fields[activeFieldToMap].page || 1}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setActiveTemplates(prev => {
+                                const parent = prev[selectedDocType];
+                                const sub = { ...parent.fields };
+                                if (sub[activeFieldToMap]) {
+                                  sub[activeFieldToMap] = { ...sub[activeFieldToMap], page: val };
+                                }
+                                return {
+                                  ...prev,
+                                  [selectedDocType]: { ...parent, fields: sub }
+                                };
+                              });
+                            }}
+                            className="w-full text-xs font-semibold bg-white border border-slate-250 rounded-md px-2 py-1.5 focus:border-emerald-500 outline-none text-slate-800"
+                          >
+                            {Array.from({ length: pdfPageCount || 1 }, (_, index) => (
+                              <option key={index + 1} value={index + 1}>Page {index + 1}</option>
+                            ))}
+                          </select>
+                        </div>
+
                       </div>
                     </div>
                   )}
@@ -2276,7 +2457,8 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                             x: 150,
                             y: 150,
                             w: 120,
-                            h: 24
+                            h: 24,
+                            page: currentPdfPage
                           };
                           return {
                             ...prev,

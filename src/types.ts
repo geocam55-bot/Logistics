@@ -13,6 +13,8 @@ export interface DeliveryRecord {
   deliveryAddress: string;
   phone: string;
   originBranch: string; // WINDMILL_DC or specific Store
+  weight?: string;
+  orderTotal?: string;
   destinationNotes?: string;
   status: DeliveryStatus;
   registeredAt: string;
