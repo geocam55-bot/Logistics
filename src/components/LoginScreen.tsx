@@ -41,8 +41,34 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       };
     }
 
+    const defaultTenant: Tenant = {
+      id: "standby-tenant",
+      name: "Standby Space",
+      code: "STB",
+      description: "Default Standby Space",
+      logoBadge: "🏢",
+      regionalFocus: "Standby Region",
+      primaryColor: 'blue'
+    };
+
+    // 1. Prioritize full/exact tenant ID match (e.g. "ronaatlantic" in "george.campbell@ronaatlantic.ca")
     for (const t of list) {
-      if (norm.includes(t.code.toLowerCase()) || norm.includes(t.id.toLowerCase())) {
+      if (norm.includes(t.id.toLowerCase())) {
+        return t;
+      }
+    }
+
+    // 2. Match tenant code to isolated boundary domains (e.g., "atl" in "george@atl.com")
+    for (const t of list) {
+      const codeLower = t.code.toLowerCase();
+      if (norm.includes('@' + codeLower) || norm.includes('.' + codeLower) || norm.includes('-' + codeLower)) {
+        return t;
+      }
+    }
+
+    // 3. Fallback to general code match
+    for (const t of list) {
+      if (norm.includes(t.code.toLowerCase())) {
         return t;
       }
     }
@@ -56,7 +82,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       norm.includes('gentry') ||
       norm.includes('leah')
     ) {
-      return list.find(t => t.id === 'bay-of-fundy') || list[1] || list[0];
+      return list.find(t => t.id === 'bay-of-fundy') || list[1] || list[0] || defaultTenant;
     } else if (
       norm.includes('cabot') || 
       norm.includes('ctc') || 
@@ -65,16 +91,25 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       norm.includes('oneil') || 
       norm.includes('chisholm')
     ) {
-      return list.find(t => t.id === 'cabot-trail') || list[2] || list[0];
+      return list.find(t => t.id === 'cabot-trail') || list[2] || list[0] || defaultTenant;
     } else {
-      return list[0];
+      return list[0] || defaultTenant;
     }
   };
 
   // Get active tenant state based on the typed email
   const [detectedTenant, setDetectedTenant] = useState<Tenant>(() => {
     const list = tenantsList || TENANTS;
-    return list[0];
+    const defaultTenant: Tenant = {
+      id: "standby-tenant",
+      name: "Standby Space",
+      code: "STB",
+      description: "Default Standby Space",
+      logoBadge: "🏢",
+      regionalFocus: "Standby Region",
+      primaryColor: 'blue'
+    };
+    return list[0] || defaultTenant;
   });
 
   useEffect(() => {
@@ -101,17 +136,29 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
     const resolvedTenant = determineTenantFromEmail(email);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: email.trim() })
-      });
+      let result: any = null;
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+        if (response.ok) {
+          result = await response.json();
+        } else {
+          console.warn(`Server authentication returned non-ok status: ${response.status}`);
+        }
+      } catch (fetchErr: any) {
+        console.warn("Backend auth fetch exception, falling back to client mode:", fetchErr);
+      }
 
-      const result = await response.json();
-
-      if (result.supabaseActive) {
+      if (result && result.supabaseActive) {
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
         if (result.found) {
           // Real user found in live Supabase Database!
           onLoginSuccess(result.tenant || resolvedTenant, result.user);
@@ -121,9 +168,19 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           setError("No active employee profile matched this address in the Supabase connected live database. Register below to create a direct database record now.");
         }
       } else {
-        // Fallback for offline sandbox mode
+        // Fallback for offline sandbox mode or database timeout query fallback
         let matchedUser: User | undefined;
-        if (resolvedTenant.id === 'bay-of-fundy') {
+        
+        // Special case for offline superadmin
+        if (email.toLowerCase().trim() === 'superadmin@prospaces.com') {
+          matchedUser = {
+            id: "USR-SUPER-ADMIN-01",
+            name: "ProSpaces Super Admin",
+            email: "superadmin@prospaces.com",
+            role: "SUPER_ADMIN" as any,
+            associatedStoreId: "WINDMILL_DC"
+          };
+        } else if (resolvedTenant.id === 'bay-of-fundy') {
           matchedUser = INITIAL_USERS_BOF.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
         } else if (resolvedTenant.id === 'cabot-trail') {
           matchedUser = INITIAL_USERS_CTC.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
@@ -148,7 +205,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       }
     } catch (err: any) {
       console.error(err);
-      setError("An operational error occurred while contacting the authentication backend. Verification timed out.");
+      setError(`An unexpected operational error occurred: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -179,7 +236,8 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           role: customRole,
           tenantId: resolvedTenant.id,
           associatedStoreId: storeHub,
-          phone: customPhone.trim() || '(902) 555-0199'
+          phone: customPhone.trim() || '(902) 555-0199',
+          password: password && password !== '•••••••••' ? password : '123456'
         })
       });
 

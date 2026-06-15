@@ -59,6 +59,8 @@ export interface User {
   role: UserRole;
   phone?: string;
   associatedStoreId?: string; // Links user to a dynamic store/branch
+  password?: string;
+  status?: 'Active' | 'Inactive';
 }
 
 export interface Tenant {

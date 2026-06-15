@@ -90,6 +90,22 @@ function getSupabase() {
   return supabaseClient;
 }
 
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 3000): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error("Database query timed out (timeout threshold reached)"));
+    }, ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise).then((res) => {
+      clearTimeout(timer);
+      return res;
+    }),
+    timeoutPromise
+  ]);
+}
+
 function formatDatabaseError(err: any): string {
   if (!err) return "An unknown database error occurred.";
   const msg = err.message || String(err);
@@ -101,6 +117,44 @@ function formatDatabaseError(err: any): string {
     return "Your Supabase database is connected, but the required database tables do not exist yet. Please go to the 'System Architecture' dashboard, copy the SQL setup schema script, and run it in the SQL Editor within your Supabase workspace to initialize the tables.";
   }
   return msg;
+}
+
+function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined): string {
+  const basePhone = (phone || "").trim();
+  let res = basePhone;
+  if (password) {
+    res += ` ||pw:${password}`;
+  }
+  if (status) {
+    res += ` ||status:${status}`;
+  }
+  return res;
+}
+
+function deserializeFromPhone(user: any): any {
+  if (!user) return user;
+  const phone = user.phone || "";
+  let cleanPhone = phone;
+  let password = user.password || "123456";
+  let status = user.status || "Active";
+
+  const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
+  if (pwMatch) {
+    password = pwMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|pw:[^\s|]+/, "");
+  }
+  const statusMatch = phone.match(/\|\|status:([^\s|]+)/);
+  if (statusMatch) {
+    status = statusMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|status:[^\s|]+/, "");
+  }
+
+  return {
+    ...user,
+    phone: cleanPhone.trim(),
+    password,
+    status
+  };
 }
 
 const SH_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR PROSPACES DELIVERY AND LOGISTICS PORTAL */
@@ -143,7 +197,9 @@ create table if not exists users (
   email text not null,
   role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User'
   phone text,
-  "associatedStoreId" text
+  "associatedStoreId" text,
+  password text default '123456',
+  status text default 'Active'
 );
 
 -- 5. Create deliveries table
@@ -235,13 +291,20 @@ async function startServer() {
   // Real-time Database Auth Lookups (No simulation)
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, password } = req.body;
       if (!email) {
-        return res.status(400).json({ error: "Email query param is required." });
+        return res.status(400).json({ error: "Email param is required." });
       }
 
       const normEmail = email.trim().toLowerCase();
       if (normEmail === "superadmin@prospaces.com") {
+        if (password && password !== "•••••••••" && password !== "admin" && password !== "123456") {
+          return res.json({
+            supabaseActive: getSupabase() !== null,
+            found: true,
+            error: "Invalid SuperAdmin password entry."
+          });
+        }
         return res.json({
           supabaseActive: getSupabase() !== null,
           found: true,
@@ -274,22 +337,49 @@ async function startServer() {
       }
 
       // Query database table 'users' for email in a case-insensitive match
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .ilike("email", email.trim());
+      const { data, error } = (await withTimeout(
+        supabase
+          .from("users")
+          .select("*")
+          .ilike("email", email.trim()),
+        3000
+      )) as any;
 
       if (error) {
         throw new Error(error.message);
       }
 
       if (data && data.length > 0) {
-        const user = data[0];
+        const user = deserializeFromPhone(data[0]);
+
+        // Validate Status
+        const uStatus = user.status || "Active";
+        if (uStatus === "Inactive") {
+          return res.json({
+            supabaseActive: true,
+            found: true,
+            error: "This account has been marked as Inactive. Access is denied."
+          });
+        }
+
+        // Validate Password
+        const dbPassword = user.password || "123456";
+        if (password && password !== "•••••••••" && password !== dbPassword) {
+          return res.json({
+            supabaseActive: true,
+            found: true,
+            error: "Invalid login credentials password."
+          });
+        }
+
         // Fetch matching tenant definition
-        const { data: tenantData } = await supabase
-          .from("tenants")
-          .select("*")
-          .eq("id", user.tenantId);
+        const { data: tenantData } = (await withTimeout(
+          supabase
+            .from("tenants")
+            .select("*")
+            .eq("id", user.tenantId),
+          3000
+        )) as any;
 
         return res.json({
           supabaseActive: true,
@@ -321,7 +411,7 @@ async function startServer() {
   // Direct User signup / placement into Supabase Users table
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { name, email, role, tenantId, associatedStoreId, phone } = req.body;
+      const { name, email, role, tenantId, associatedStoreId, phone, password, status } = req.body;
       if (!email || !name || !role || !tenantId) {
         return res.status(400).json({ error: "Missing required profile registration parameters." });
       }
@@ -343,15 +433,36 @@ async function startServer() {
         email: email.trim().toLowerCase(),
         role,
         phone: phone || "",
-        associatedStoreId: associatedStoreId || ""
+        associatedStoreId: associatedStoreId || "",
+        password: password || "123456",
+        status: status || "Active"
       };
 
-      const { error } = await supabase
-        .from("users")
-        .insert([newUserRecord]);
+      let insertError;
+      try {
+        const { error } = await supabase
+          .from("users")
+          .insert([newUserRecord]);
+        if (error) throw error;
+      } catch (dbErr: any) {
+        const errMsg = dbErr.message || String(dbErr);
+        if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("42703"))) {
+          console.warn("Supabase users table is missing 'password' or 'status' columns. Retrying registration insert without these columns...");
+          const { password, status, ...strippedRecord } = newUserRecord;
+          (strippedRecord as any).phone = serializeToPhone(newUserRecord.phone, newUserRecord.password, newUserRecord.status);
+          const { error: retryErr } = await supabase
+            .from("users")
+            .insert([strippedRecord]);
+          if (retryErr) {
+            insertError = retryErr;
+          }
+        } else {
+          insertError = dbErr;
+        }
+      }
 
-      if (error) {
-        throw error;
+      if (insertError) {
+        throw insertError;
       }
 
       // Fetch corresponding tenant info
@@ -404,11 +515,13 @@ async function startServer() {
         throw new Error(primaryError?.message || "Error pulling multi-tenant tables from Supabase.");
       }
 
+      const deserializedUsers = (rUsers.data || []).map((u: any) => deserializeFromPhone(u));
+
       res.json({
         supabaseActive: true,
         branches: rBranches.data || [],
         trucks: rTrucks.data || [],
-        users: rUsers.data || [],
+        users: deserializedUsers,
         deliveries: rDeliveries.data || []
       });
     } catch (err: any) {
@@ -459,8 +572,24 @@ async function startServer() {
 
       // 3. Users
       if (sanitizedUsers.length > 0) {
-        const { error } = await supabase.from("users").upsert(sanitizedUsers);
-        if (error) throw new Error(`Users Sync Error: ${error.message}`);
+        try {
+          const { error } = await supabase.from("users").upsert(sanitizedUsers);
+          if (error) throw error;
+        } catch (dbErr: any) {
+          const errMsg = dbErr.message || String(dbErr);
+          if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("42703"))) {
+            console.warn("Supabase users table is missing 'password' or 'status' columns. Retrying upsert without these columns...");
+            const strippedUsers = sanitizedUsers.map((u: any) => {
+              const { password, status, ...rest } = u;
+              (rest as any).phone = serializeToPhone(u.phone, u.password, u.status);
+              return rest;
+            });
+            const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);
+            if (retryErr) throw new Error(`Users Sync Retry Error: ${retryErr.message}`);
+          } else {
+            throw new Error(`Users Sync Error: ${dbErr.message}`);
+          }
+        }
       }
 
       // 4. Deliveries
@@ -500,6 +629,51 @@ async function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       console.error("Permanent delete error:", err);
+      res.status(500).json({ error: formatDatabaseError(err) });
+    }
+  });
+
+  // Clear all operational data for a specific tenant except the active logged-in user
+  app.post("/api/tenant/clear-all", async (req, res) => {
+    try {
+      const { tenantId, keepUserEmail } = req.body;
+      if (!tenantId) {
+        return res.status(400).json({ error: "tenantId parameter is required." });
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ success: true, localOnly: true });
+      }
+
+      // 1. Delete all deliveries
+      await supabase.from("deliveries").delete().eq("tenantId", tenantId);
+
+      // 2. Delete all trucks
+      await supabase.from("trucks").delete().eq("tenantId", tenantId);
+
+      // 3. Delete all branches
+      await supabase.from("branches").delete().eq("tenantId", tenantId);
+
+      // 4. Delete all users except the active logged-in profile to preserve their session
+      if (keepUserEmail) {
+        const { error } = await supabase
+          .from("users")
+          .delete()
+          .eq("tenantId", tenantId)
+          .not("email", "ilike", keepUserEmail.trim());
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("users")
+          .delete()
+          .eq("tenantId", tenantId);
+        if (error) throw error;
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Clear all tenant state error:", err);
       res.status(500).json({ error: formatDatabaseError(err) });
     }
   });
@@ -586,35 +760,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
 
   // Tenant / Organization CRUD endpoint APIs for SUPER_ADMIN
   app.get("/api/tenants", async (req, res) => {
-    const fallbackTenants = [
-      {
-        id: 'atlantic-logistics',
-        name: 'Atlantic Shipping & Logistics',
-        code: 'ATL',
-        description: 'Serving Nova Scotia regional stores & main Windmill Road DC hub.',
-        logoBadge: '⚓',
-        regionalFocus: 'Nova Scotia (Dartmouth, Tantallon, Halifax)',
-        primaryColor: 'blue'
-      },
-      {
-        id: 'bay-of-fundy',
-        name: 'Bay of Fundy Transport Ltd',
-        code: 'BOF',
-        description: 'Serving Annapolis Valley and New Brunswick logistics gateways.',
-        logoBadge: '🌊',
-        regionalFocus: 'New Brunswick & Annapolis Valley (Kentville, Truro, Moncton)',
-        primaryColor: 'emerald'
-      },
-      {
-        id: 'cabot-trail',
-        name: 'Cabot Trail Cargo & Hauling',
-        code: 'CTC',
-        description: 'Providing Cape Breton heavy industrial bulk distribution services.',
-        logoBadge: '⛰️',
-        regionalFocus: 'Cape Breton (Sydney, Port Hawkesbury)',
-        primaryColor: 'indigo'
-      }
-    ];
+    const fallbackTenants: any[] = [];
 
     try {
       const supabase = getSupabase();
@@ -690,8 +836,35 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Express server running on http://0.0.0.0:${PORT}`);
+    
+    // Database Diagnostic helper
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        const [rUsers, rTenants] = await Promise.all([
+          supabase.from("users").select("*"),
+          supabase.from("tenants").select("*")
+        ]);
+        const fs = await import("fs");
+        fs.writeFileSync(
+          path.join(process.cwd(), "debug-database-diagnostic.json"),
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            users: rUsers.data || [],
+            tenants: rTenants.data || [],
+            usersError: rUsers.error,
+            tenantsError: rTenants.error
+          }, null, 2)
+        );
+        console.log("Database diagnosis dump complete: debug-database-diagnostic.json successfully created.");
+      } else {
+        console.log("Database diagnosis skipped: Supabase not configured.");
+      }
+    } catch (err) {
+      console.error("Database diagnosis block error:", err);
+    }
   });
 }
 

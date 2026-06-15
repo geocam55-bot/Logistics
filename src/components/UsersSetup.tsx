@@ -27,6 +27,7 @@ export default function UsersSetup({
   const [userRole, setUserRole] = useState<UserRole>('User');
   const [userPhone, setUserPhone] = useState('');
   const [associatedStoreId, setAssociatedStoreId] = useState('');
+  const [userPassword, setUserPassword] = useState('123456');
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const ROLES: UserRole[] = ['Driver', 'Dispatcher', 'User', 'Admin'];
@@ -52,6 +53,7 @@ export default function UsersSetup({
     setUserRole('User');
     setUserPhone('');
     setAssociatedStoreId(branches[0]?.id || '');
+    setUserPassword('123456');
     setIsAdding(true);
     setEditingUserId(null);
   };
@@ -63,6 +65,7 @@ export default function UsersSetup({
     setUserRole(user.role);
     setUserPhone(user.phone || '');
     setAssociatedStoreId(user.associatedStoreId || '');
+    setUserPassword(user.password || '123456');
     setEditingUserId(user.id);
     setIsAdding(false);
   };
@@ -80,7 +83,8 @@ export default function UsersSetup({
       email: userEmail.trim(),
       role: userRole,
       phone: userPhone.trim() || undefined,
-      associatedStoreId: associatedStoreId || undefined
+      associatedStoreId: associatedStoreId || undefined,
+      password: userPassword || '123456'
     };
 
     if (editingUserId) {
@@ -101,6 +105,7 @@ export default function UsersSetup({
     setUserName('');
     setUserEmail('');
     setUserPhone('');
+    setUserPassword('123456');
   };
 
   const showFeedback = (msg: string) => {
@@ -247,6 +252,19 @@ export default function UsersSetup({
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Account Login Password</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter login password (e.g. 123456)"
+                    value={userPassword}
+                    onChange={(e) => setUserPassword(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <span className="text-[9px] text-slate-400 font-serif mt-0.5 block">Use this password to authenticate when logging into this profile.</span>
+                </div>
               </div>
 
               <div className="flex space-x-2 pt-2 border-t border-slate-100">
@@ -331,6 +349,10 @@ export default function UsersSetup({
                           <span className="truncate">
                             {matchedBranch ? matchedBranch.name.replace(' ProSpaces', '') : 'No Store Association'}
                           </span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-slate-600">
+                          <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span>Passcode: <strong className="font-mono bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded text-[10px]">{user.password || '123456'}</strong></span>
                         </div>
                       </div>
                     </div>

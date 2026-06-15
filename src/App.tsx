@@ -261,7 +261,7 @@ export default function App() {
       try {
         const res = await fetch("/api/tenants");
         const data = await res.json();
-        if (data.tenants && data.tenants.length > 0) {
+        if (data.tenants) {
           setAllTenants(data.tenants);
           localStorage.setItem('prospaces_all_tenants', JSON.stringify(data.tenants));
         }
@@ -410,7 +410,7 @@ export default function App() {
 
   const handleUpdateUser = (updatedUser: User) => {
     if (!currentTenant) return;
-    const updated = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    const updated = users.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u);
     setUsers(updated);
     localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
@@ -426,42 +426,59 @@ export default function App() {
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
-  // Reset demo data to initial slate
-  const handleResetDemoData = () => {
-    if (!currentTenant) return;
-    if (window.confirm(`Do you want to restore the default sample deliveries, stores, fleets, and users for ${currentTenant.name}?`)) {
+  // Purge / Clear all operational data for the current tenant to start totally fresh
+  const handleClearAllData = async () => {
+    if (!currentTenant || !currentUser) return;
+    
+    const confirmMessage = `Are you absolutely sure you want to remove all operational test data (Deliveries, Stores, Trucks, and other custom users) for ${currentTenant.name}?\n\nThis will permanently empty all tables in the live database, but your active administrator profile (${currentUser.email}) will be kept so you stay logged in.`;
+    
+    if (window.confirm(confirmMessage)) {
       const tenantId = currentTenant.id;
-      let defaultDeliveries = INITIAL_DELIVERIES;
-      let defaultTrucks = TRUCKS;
-      let defaultBranches = BRANCHES;
-      let defaultUsers = INITIAL_USERS;
-
-      if (tenantId === 'bay-of-fundy') {
-        defaultDeliveries = INITIAL_DELIVERIES_BOF;
-        defaultTrucks = TRUCKS_BOF;
-        defaultBranches = BRANCHES_BOF;
-        defaultUsers = INITIAL_USERS_BOF;
-      } else if (tenantId === 'cabot-trail') {
-        defaultDeliveries = INITIAL_DELIVERIES_CTC;
-        defaultTrucks = TRUCKS_CTC;
-        defaultBranches = BRANCHES_CTC;
-        defaultUsers = INITIAL_USERS_CTC;
+      
+      const emptyDeliveries: DeliveryRecord[] = [];
+      const emptyTrucks: Truck[] = [];
+      const emptyBranches: Branch[] = [];
+      const preservedUsers: User[] = [currentUser];
+      
+      // Update local state and localStorage
+      setDeliveries(emptyDeliveries);
+      localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(emptyDeliveries));
+      
+      setTrucks(emptyTrucks);
+      localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(emptyTrucks));
+      
+      setBranches(emptyBranches);
+      localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(emptyBranches));
+      
+      setUsers(preservedUsers);
+      localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(preservedUsers));
+      
+      // Call the live API to wipe database records permanently
+      setSyncStatus('SYNCING');
+      try {
+        const res = await fetch("/api/tenant/clear-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenantId,
+            keepUserEmail: currentUser.email
+          })
+        });
+        
+        if (res.ok) {
+          setSyncStatus('SUCCESS');
+          setLastSyncTime(new Date().toLocaleTimeString());
+          alert("All operational and test data has been successfully deleted from the live system!");
+        } else {
+          throw new Error("API returned failed response");
+        }
+      } catch (err) {
+        console.error("Failed to delete live records via API, fallback to manual syncing:", err);
+        // Fallback: sync state consisting of empty arrays + preserved admin
+        await syncStateToSupabase(tenantId, emptyDeliveries, emptyTrucks, emptyBranches, preservedUsers);
+        setSyncStatus('SUCCESS');
+        alert("Wiped local cache. Remote database has been queued for synchronization.");
       }
-
-      setDeliveries(defaultDeliveries);
-      localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(defaultDeliveries));
-      
-      setTrucks(defaultTrucks);
-      localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(defaultTrucks));
-      
-      setBranches(defaultBranches);
-      localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(defaultBranches));
-      
-      setUsers(defaultUsers);
-      localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(defaultUsers));
-
-      // Trigger Database reset
-      syncStateToSupabase(tenantId, defaultDeliveries, defaultTrucks, defaultBranches, defaultUsers);
     }
   };
 
@@ -544,6 +561,7 @@ export default function App() {
               onUpdateTenant={handleUpdateTenant}
               onDeleteTenant={handleDeleteTenant}
               supabaseStatus={supabaseStatus}
+              currentUser={currentUser}
             />
           </div>
         </main>
@@ -619,11 +637,11 @@ export default function App() {
             </div>
 
             <button 
-              onClick={handleResetDemoData}
-              title="Reset current tenant's database tables to initial values"
-              className="text-[10px] bg-black/25 hover:bg-black/45 px-2.5 py-1.5 rounded border border-white/10 font-mono text-white/90 font-medium transition-colors"
+              onClick={handleClearAllData}
+              title="Delete all test data (Deliveries, Stores, Trucks, and other profiles) while keeping your session"
+              className="text-[10px] bg-red-600 hover:bg-red-700 px-2.5 py-1.5 rounded border border-red-500/30 font-mono text-white font-semibold transition-colors flex items-center space-x-1 shadow-sm cursor-pointer"
             >
-              🔄 Reset Board
+              <span>🗑️ Purge Test Data</span>
             </button>
 
             {/* Authenticated User Badge & Logout Switcher */}
