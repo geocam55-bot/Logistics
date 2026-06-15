@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import Tesseract from "tesseract.js";
 
 dotenv.config();
 
@@ -675,6 +676,34 @@ async function startServer() {
     } catch (err: any) {
       console.error("Clear all tenant state error:", err);
       res.status(500).json({ error: formatDatabaseError(err) });
+    }
+  });
+
+  // API Route for performing local Tesseract OCR on the server side (immune to standard browser sandbox issues)
+  app.post("/api/ocr-tesseract", async (req, res) => {
+    try {
+      const { fileData } = req.body;
+      if (!fileData) {
+        return res.status(400).json({ error: "No file data has been supplied." });
+      }
+
+      const parts = fileData.match(/^data:(.*);base64,(.*)$/);
+      if (!parts) {
+        return res.status(400).json({ error: "Format error: Provided data URI is malformed." });
+      }
+
+      const base64Data = parts[2];
+      const buffer = Buffer.from(base64Data, "base64");
+
+      console.log("Server OCR: Initiating Tesseract engine processing...");
+      const result = await Tesseract.recognize(buffer, "eng");
+      
+      const dataObj = result.data as any;
+      console.log(`Server OCR: Tesseract successfully recognized text. Length: ${dataObj.text.length}`);
+      res.json({ success: true, text: dataObj.text, words: dataObj.words || [] });
+    } catch (err: any) {
+      console.error("Server Tesseract OCR Error:", err);
+      res.status(500).json({ error: err.message || "An exception occurred during server-side Tesseract OCR." });
     }
   });
 
