@@ -345,6 +345,16 @@ export default function App() {
     syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
   };
 
+  const handleDeleteDelivery = (id: string) => {
+    if (!currentTenant) return;
+    const updated = deliveries.filter(d => d.id !== id);
+    setDeliveries(updated);
+    localStorage.setItem(`prospaces_deliveries_tenant_${currentTenant.id}`, JSON.stringify(updated));
+    // Trigger remote deletion
+    fetch(`/api/tenant/delete-record?table=deliveries&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
+    syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
+  };
+
   // Fleet handlers
   const handleAddTruck = (newTruck: Truck) => {
     if (!currentTenant) return;
@@ -810,6 +820,7 @@ export default function App() {
               deliveries={deliveries} 
               trucks={trucks}
               onAddOrUpdateDelivery={handleAddOrUpdateDelivery}
+              onDeleteDelivery={handleDeleteDelivery}
               branches={branches}
             />
           )}

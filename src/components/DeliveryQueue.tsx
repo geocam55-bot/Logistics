@@ -1,21 +1,210 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
 import { BRANCHES as STATIC_BRANCHES } from '../data';
-import { Search, MapPin, Eye, Clock, User, Phone, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, FileText, Truck as TruckIcon } from 'lucide-react';
+import { 
+  Search, MapPin, Eye, Clock, User, Phone, CheckCircle2, 
+  AlertTriangle, ChevronDown, ChevronUp, FileText, 
+  Truck as TruckIcon, MoreVertical, Edit, Trash2, Plus, X 
+} from 'lucide-react';
 
 interface DeliveryQueueProps {
   deliveries: DeliveryRecord[];
   trucks: Truck[];
   onAddOrUpdateDelivery: (record: DeliveryRecord) => void;
+  onDeleteDelivery: (id: string) => void;
   branches?: Branch[];
 }
 
-export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, branches }: DeliveryQueueProps) {
+export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches }: DeliveryQueueProps) {
   const BRANCHES = branches && branches.length > 0 ? branches : STATIC_BRANCHES;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | DeliveryStatus>('ALL');
+
+  // Action Menu & Modal States
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<DeliveryRecord | null>(null);
+
+  // Form Field States
+  const [formId, setFormId] = useState('');
+  const [formInvoiceNumber, setFormInvoiceNumber] = useState('');
+  const [formSalesOrder, setFormSalesOrder] = useState('');
+  const [formCustomerName, setFormCustomerName] = useState('');
+  const [formAddress, setFormAddress] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formOriginBranch, setFormOriginBranch] = useState('');
+  const [formWeight, setFormWeight] = useState('');
+  const [formOrderTotal, setFormOrderTotal] = useState('');
+  const [formNotes, setFormNotes] = useState('');
+  const [formStatus, setFormStatus] = useState<DeliveryStatus>(DeliveryStatus.REGISTERED);
+  const [formAssignedTruck, setFormAssignedTruck] = useState('');
+  const [formReturnReason, setFormReturnReason] = useState('');
+  const [formSignature, setFormSignature] = useState('');
+  const [formPhoto, setFormPhoto] = useState('');
+
+  const handleOpenAddModal = () => {
+    const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
+    const randomSalesOrder = Math.floor(1000000 + Math.random() * 9000000);
+    const randomInvoiceNum = Math.floor(4000 + Math.random() * 5999);
+    
+    setEditingRecord(null);
+    setFormId(`SO-${randomTicketNum}-A`);
+    setFormInvoiceNumber(`INV-${randomInvoiceNum}-B`);
+    setFormSalesOrder(String(randomSalesOrder));
+    setFormCustomerName('');
+    setFormAddress('');
+    setFormPhone('');
+    setFormOriginBranch(BRANCHES[0]?.id || 'WINDMILL_DC');
+    setFormWeight('');
+    setFormOrderTotal('');
+    setFormNotes('');
+    setFormStatus(DeliveryStatus.REGISTERED);
+    setFormAssignedTruck('');
+    setFormReturnReason('');
+    setFormSignature('');
+    setFormPhoto('');
+    
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (record: DeliveryRecord) => {
+    setEditingRecord(record);
+    setFormId(record.id);
+    setFormInvoiceNumber(record.invoiceNumber || '');
+    setFormSalesOrder(record.epicorSalesOrder || '');
+    setFormCustomerName(record.customerName || '');
+    setFormAddress(record.deliveryAddress || '');
+    setFormPhone(record.phone || '');
+    setFormOriginBranch(record.originBranch || BRANCHES[0]?.id || 'WINDMILL_DC');
+    setFormWeight(record.weight || '');
+    setFormOrderTotal(record.orderTotal || '');
+    setFormNotes(record.destinationNotes || '');
+    setFormStatus(record.status || DeliveryStatus.REGISTERED);
+    setFormAssignedTruck(record.assignedTruck || '');
+    setFormReturnReason(record.returnReason || '');
+    setFormSignature(record.customerSignature || '');
+    setFormPhoto(record.deliveryPhoto || '');
+    
+    setIsModalOpen(true);
+  };
+
+  const handleSaveDelivery = (e: FormEvent) => {
+    e.preventDefault();
+    if (!formId.trim() || !formCustomerName.trim() || !formAddress.trim()) {
+      alert("Please enter a valid ticket reference ID, customer name, and customer address.");
+      return;
+    }
+
+    const matchedTruck = trucks.find(t => t.id === formAssignedTruck);
+    const originStoreName = BRANCHES.find(b => b.id === formOriginBranch)?.name || 'Local Store';
+
+    if (editingRecord) {
+      // Edit Mode
+      const isStatusChanged = editingRecord.status !== formStatus;
+      const isTruckChanged = editingRecord.assignedTruck !== formAssignedTruck;
+      
+      let newHistory = [...editingRecord.history];
+      
+      if (isStatusChanged) {
+        newHistory.push({
+          status: formStatus,
+          timestamp: new Date().toISOString(),
+          location: originStoreName,
+          operator: 'Logistics Board Coordinator',
+          notes: `Status manually updated from ${editingRecord.status} to ${formStatus} via Action form.`
+        });
+      }
+      
+      if (isTruckChanged && formAssignedTruck) {
+        newHistory.push({
+          status: formStatus,
+          timestamp: new Date().toISOString(),
+          location: originStoreName,
+          operator: 'Logistics Board Coordinator',
+          notes: `Manually re-allocated delivery path to flatbed: ${matchedTruck?.name || formAssignedTruck} (Driver: ${matchedTruck?.driver || 'N/A'}).`
+        });
+      } else if (isTruckChanged && !formAssignedTruck) {
+        newHistory.push({
+          status: formStatus,
+          timestamp: new Date().toISOString(),
+          location: originStoreName,
+          operator: 'Logistics Board Coordinator',
+          notes: `Deallocated truck assignments.`
+        });
+      }
+
+      const updatedRecord: DeliveryRecord = {
+        ...editingRecord,
+        id: formId,
+        invoiceNumber: formInvoiceNumber,
+        epicorSalesOrder: formSalesOrder,
+        customerName: formCustomerName,
+        deliveryAddress: formAddress,
+        phone: formPhone,
+        originBranch: formOriginBranch,
+        weight: formWeight || undefined,
+        orderTotal: formOrderTotal || undefined,
+        destinationNotes: formNotes || undefined,
+        status: formStatus,
+        assignedTruck: formAssignedTruck || undefined,
+        assignedDriver: matchedTruck?.driver || undefined,
+        returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
+        customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || editingRecord.customerSignature || 'Physical Signoff Done') : undefined,
+        deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || editingRecord.deliveryPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
+        history: newHistory
+      };
+
+      onAddOrUpdateDelivery(updatedRecord);
+    } else {
+      // Add Mode
+      const newHistory = [
+        {
+          status: formStatus,
+          timestamp: new Date().toISOString(),
+          location: originStoreName,
+          operator: 'Logistics Board Coordinator',
+          notes: 'Ticket manually registered to Lumber depot freight ledger.'
+        }
+      ];
+
+      if (formAssignedTruck) {
+        newHistory.push({
+          status: formStatus,
+          timestamp: new Date().toISOString(),
+          location: originStoreName,
+          operator: 'Logistics Board Coordinator',
+          notes: `Allocated truck to delivery path on creation: ${matchedTruck?.name || formAssignedTruck} (Driver: ${matchedTruck?.driver || 'N/A'}).`
+        });
+      }
+
+      const newRecord: DeliveryRecord = {
+        id: formId,
+        invoiceNumber: formInvoiceNumber,
+        epicorSalesOrder: formSalesOrder,
+        customerName: formCustomerName,
+        deliveryAddress: formAddress,
+        phone: formPhone,
+        originBranch: formOriginBranch,
+        weight: formWeight || undefined,
+        orderTotal: formOrderTotal || undefined,
+        destinationNotes: formNotes || undefined,
+        status: formStatus,
+        registeredAt: new Date().toISOString(),
+        assignedTruck: formAssignedTruck || undefined,
+        assignedDriver: matchedTruck?.driver || undefined,
+        returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
+        customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || 'Physical Handoff Validated') : undefined,
+        deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
+        history: newHistory
+      };
+
+      onAddOrUpdateDelivery(newRecord);
+    }
+
+    setIsModalOpen(false);
+  };
 
   const handleAssignTruck = (deliveryId: string, truckId: string) => {
     const delivery = deliveries.find(d => d.id === deliveryId);
@@ -135,7 +324,17 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         </div>
 
         {/* Filter selections */}
-        <div className="flex flex-col sm:flex-row gap-2 max-w-xl w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 max-w-xl w-full md:w-auto items-stretch sm:items-center">
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="flex items-center justify-center space-x-1 bg-blue-850 hover:bg-blue-900 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm cursor-pointer shrink-0"
+            id="add-delivery-ticket-btn"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Delivery</span>
+          </button>
+
           {/* Search box */}
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -152,7 +351,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
           <select
             value={selectedBranchFilter}
             onChange={(e) => setSelectedBranchFilter(e.target.value)}
-            className="border border-slate-200 px-3 py-2 text-xs rounded-lg bg-white text-gray-800"
+            className="border border-slate-200 px-3 py-2 text-xs rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="ALL">All Depot Stations</option>
             {BRANCHES.map(b => (
@@ -210,7 +409,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
             return (
               <div 
                 key={delivery.id} 
-                className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md ${
+                className={`relative bg-white border rounded-xl shadow-sm transition-all hover:shadow-md ${
                   delivery.status === DeliveryStatus.REGISTERED ? 'border-orange-100 hover:border-orange-200' :
                   delivery.status === DeliveryStatus.PICKED_AND_LOADED ? 'border-amber-100 hover:border-amber-200' :
                   delivery.status === DeliveryStatus.DELIVERED ? 'border-green-100 hover:border-green-200' :
@@ -324,8 +523,68 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                       </span>
                     )}
 
-                    <div>
-                      {isExpanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                    <div className="flex items-center space-x-2 relative" onClick={(e) => e.stopPropagation()}>
+                      {/* Action Menu dropdown trigger */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveDropdownId(activeDropdownId === delivery.id ? null : delivery.id);
+                        }}
+                        className="p-1 px-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors focus:outline-none"
+                        title="Delivery Actions Menu"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                      
+                      {/* Dropdown element */}
+                      {activeDropdownId === delivery.id && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-40" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdownId(null);
+                            }}
+                          />
+                          <div 
+                            className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden py-1"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleOpenEditModal(delivery);
+                                setActiveDropdownId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center space-x-2 font-semibold transition-colors border-b border-slate-50"
+                            >
+                              <Edit className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Edit Ticket</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to permanently delete delivery ticket ${delivery.id}?`)) {
+                                  onDeleteDelivery(delivery.id);
+                                }
+                                setActiveDropdownId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center space-x-2 font-semibold transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              <span>Delete Ticket</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(delivery.id)}
+                        className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                      </button>
                     </div>
                   </div>
 
@@ -513,6 +772,277 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
           })
         )}
       </div>
+
+      {/* Add / Edit Delivery Ticket Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-55 backdrop-blur-xs overflow-y-auto">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setIsModalOpen(false)}
+          />
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative z-10 animate-in fade-in zoom-in duration-150">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+              <div>
+                <h4 className="font-sans font-extrabold text-slate-900 text-lg animate-fade-in">
+                  {editingRecord ? '📝 Edit Delivery Ticket' : '➕ Register New Delivery'}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  {editingRecord ? `Modify tracking profiles for order ${editingRecord.id}` : 'Create a fresh customer freight ticket manual entry'}
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 px-2 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                title="Close Modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Form Content */}
+            <form onSubmit={handleSaveDelivery} className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* ID Barcode Reference */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Barcode / Ticket ID *</label>
+                  <input 
+                    type="text"
+                    required
+                    disabled={!!editingRecord}
+                    value={formId}
+                    onChange={(e) => setFormId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2 text-xs rounded-lg disabled:text-gray-500 disabled:bg-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="SO-83941-A"
+                  />
+                  {!editingRecord && (
+                    <span className="text-[10px] text-gray-400 mt-0.5 block">Autogenerated reference pattern</span>
+                  )}
+                </div>
+
+                {/* Epicor Sales Order Ref */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Epicor Sales Order Ref *</label>
+                  <input 
+                    type="text"
+                    required
+                    value={formSalesOrder}
+                    onChange={(e) => setFormSalesOrder(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="7284910"
+                  />
+                </div>
+
+                {/* Invoice Reference Number */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Invoice Number *</label>
+                  <input 
+                    type="text"
+                    required
+                    value={formInvoiceNumber}
+                    onChange={(e) => setFormInvoiceNumber(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="INV-3920-B"
+                  />
+                </div>
+
+                {/* Store Depot Station Selection */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Lumber Depot Origin Station *</label>
+                  <select
+                    value={formOriginBranch}
+                    onChange={(e) => setFormOriginBranch(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg text-gray-800 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {BRANCHES.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Customer Contact Name */}
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Customer Recipient Name *</label>
+                  <div className="relative">
+                    <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input 
+                      type="text"
+                      required
+                      value={formCustomerName}
+                      onChange={(e) => setFormCustomerName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 pl-8 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Builders Alliance Inc."
+                    />
+                  </div>
+                </div>
+
+                {/* Recipient Address */}
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Delivery Project Site Address *</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input 
+                      type="text"
+                      required
+                      value={formAddress}
+                      onChange={(e) => setFormAddress(e.target.value)}
+                      className="w-full bg-white border border-slate-200 pl-8 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="1820 NW 54th Ave, Vancouver, WA"
+                    />
+                  </div>
+                </div>
+
+                {/* Customer Phone Contact */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Contact Phone Number</label>
+                  <div className="relative">
+                    <Phone className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input 
+                      type="text"
+                      value={formPhone}
+                      onChange={(e) => setFormPhone(e.target.value)}
+                      className="w-full bg-white border border-slate-200 pl-8 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      placeholder="360-555-0144"
+                    />
+                  </div>
+                </div>
+
+                {/* Transport truck assignment */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Allocate Truck & Driver</label>
+                  <select
+                    value={formAssignedTruck}
+                    onChange={(e) => setFormAssignedTruck(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">-- No flatbed assigned --</option>
+                    {trucks.map(t => {
+                      const dynamicBranch = BRANCHES.find(b => b.id === t.branchId)?.name.replace(' ProSpaces', '') || 'Other';
+                      return (
+                        <option key={t.id} value={t.id}>
+                          🚚 {t.name} ({t.driver}) — [{dynamicBranch}]
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Freight weight */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Freight Cargo Gross Weight</label>
+                  <input 
+                    type="text"
+                    value={formWeight}
+                    onChange={(e) => setFormWeight(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="3,150 lbs"
+                  />
+                </div>
+
+                {/* Value amount order total */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Order Value Total</label>
+                  <input 
+                    type="text"
+                    value={formOrderTotal}
+                    onChange={(e) => setFormOrderTotal(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="$1,450.00"
+                  />
+                </div>
+
+                {/* Route sequence simulation state */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Tracking Lifecycle Stage *</label>
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as DeliveryStatus)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value={DeliveryStatus.REGISTERED}>1️⃣ Registered / Queued</option>
+                    <option value={DeliveryStatus.PICKED_AND_LOADED}>2️⃣ Picked & Loaded on Flatbed</option>
+                    <option value={DeliveryStatus.DELIVERED}>3️⃣ Completed & Delivered</option>
+                    <option value={DeliveryStatus.RETURNED}>⚠️ Blocked / Returned Exception</option>
+                  </select>
+                </div>
+
+                {/* Return reason if exception is chosen */}
+                {formStatus === DeliveryStatus.RETURNED && (
+                  <div>
+                    <label className="block text-red-600 font-bold mb-1 font-mono uppercase text-[10px]">Driver Exception Note/Reason *</label>
+                    <input 
+                      type="text"
+                      required
+                      value={formReturnReason}
+                      onChange={(e) => setFormReturnReason(e.target.value)}
+                      className="w-full bg-red-50 border border-red-200 p-2 text-xs rounded-lg text-red-900 font-medium focus:outline-none focus:ring-1 focus:ring-red-500"
+                      placeholder="Customer refused, wrong size framing studs ordered"
+                    />
+                  </div>
+                )}
+
+                {/* Sign-off properties if Delivered */}
+                {formStatus === DeliveryStatus.DELIVERED && (
+                  <>
+                    <div>
+                      <label className="block text-indigo-600 font-bold mb-1 font-mono uppercase text-[10px]">Recipient Handover File Signature</label>
+                      <input 
+                        type="text"
+                        value={formSignature}
+                        onChange={(e) => setFormSignature(e.target.value)}
+                        className="w-full bg-indigo-50/50 border border-indigo-100 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="John Doe (Verified via Handoff Pin)"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-indigo-600 font-bold mb-1 font-mono uppercase text-[10px]">Dropoff Proof Photo URL</label>
+                      <input 
+                        type="text"
+                        value={formPhoto}
+                        onChange={(e) => setFormPhoto(e.target.value)}
+                        className="w-full bg-indigo-50/50 border border-indigo-100 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="https://images.unsplash.com/..."
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Destination notes */}
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Recipient Instructions & Driver Dispatch Notes</label>
+                  <textarea 
+                    value={formNotes}
+                    onChange={(e) => setFormNotes(e.target.value)}
+                    rows={2}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Unload by crane on NW gravel side pathway. Avoid wet front grass area."
+                  />
+                </div>
+
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 rounded-lg text-gray-700 hover:bg-slate-200 transition-colors font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 shadow-sm transition-colors font-bold cursor-pointer"
+                >
+                  Confirm and Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
