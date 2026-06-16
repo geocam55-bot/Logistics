@@ -8,6 +8,7 @@ interface StoresSetupProps {
   onUpdateBranch: (branch: Branch) => void;
   onDeleteBranch: (id: string) => void;
   truckCountByBranch: Record<string, number>;
+  readOnly?: boolean;
 }
 
 export default function StoresSetup({
@@ -15,7 +16,8 @@ export default function StoresSetup({
   onAddBranch,
   onUpdateBranch,
   onDeleteBranch,
-  truckCountByBranch
+  truckCountByBranch,
+  readOnly
 }: StoresSetupProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
@@ -117,7 +119,19 @@ export default function StoresSetup({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Add/Edit Form */}
         <div className="lg:col-span-4 space-y-4">
-          {(!isAdding && !editingBranchId) ? (
+          {readOnly ? (
+            <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-xl text-center space-y-4">
+              <div className="w-12 h-12 bg-slate-150/80 text-slate-400 rounded-full flex items-center justify-center mx-auto border border-slate-200/40">
+                <Info className="h-6 w-6" />
+              </div>
+              <div>
+                <h5 className="text-sm font-bold text-slate-700">View Only Mode</h5>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  As a Dispatcher, you have authorization rules to observe depots and storefront locations, but modifying them is restricted.
+                </p>
+              </div>
+            </div>
+          ) : (!isAdding && !editingBranchId) ? (
             <div className="bg-white border border-slate-100 p-5 rounded-xl shadow-sm text-center space-y-4">
               <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
                 <Store className="h-6 w-6" />
@@ -313,22 +327,24 @@ export default function StoresSetup({
                         {assignedTrucks} {assignedTrucks === 1 ? 'Truck Assigned' : 'Trucks Assigned'}
                       </span>
 
-                      <div className="flex items-center space-x-1 shrink-0">
-                        <button
-                          onClick={() => handleStartEdit(branch)}
-                          className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
-                          title="Edit Store"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(branch.id, branch.name)}
-                          className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
-                          title="Delete Store"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      {!readOnly && (
+                        <div className="flex items-center space-x-1 shrink-0">
+                          <button
+                            onClick={() => handleStartEdit(branch)}
+                            className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                            title="Edit Store"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(branch.id, branch.name)}
+                            className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
+                            title="Delete Store"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

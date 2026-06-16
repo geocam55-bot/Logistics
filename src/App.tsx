@@ -22,7 +22,7 @@ import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
-  Database, RefreshCw
+  Database, RefreshCw, FileDown
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
 
@@ -71,6 +71,21 @@ export default function App() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isFleetDropdownOpen, setIsFleetDropdownOpen] = useState(false);
+
+  // Fallback state redirect for restricted role views
+  useEffect(() => {
+    if (!currentUser) return;
+    const role = currentUser.role;
+    if (role === 'Driver') {
+      if (!['dashboard', 'queue', 'scanner'].includes(activeTab)) {
+        setActiveTab('dashboard');
+      }
+    } else if (role === 'User') {
+      if (!['dashboard', 'queue'].includes(activeTab)) {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [currentUser, activeTab]);
 
   // Trigger login session handlers
   const handleLoginSuccess = (tenant: Tenant, user: User) => {
@@ -508,11 +523,11 @@ export default function App() {
             
             {/* Branded Logo representation */}
             <div className="flex items-center space-x-3 text-center sm:text-left">
-              <div className="shrink-0 flex items-center justify-center max-w-[130px]">
+              <div className="shrink-0 flex items-center justify-center bg-white p-1 rounded-lg border border-amber-500/10 shadow-sm">
                 <img 
                   src={prospacesLogo} 
                   alt="ProSpaces Logo" 
-                  className="h-10 w-auto object-contain rounded-xl"
+                  className="h-10 w-auto object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
@@ -595,48 +610,50 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-gray-800 antialiased selection:bg-blue-600 selection:text-white" id="main-app-container">
       
       {/* Enterprise Brand Header */}
-      <header className={`${theme.bg} text-white shadow-md border-b ${theme.border}`} id="prospaces-header">
+      <header className="bg-white text-slate-800 shadow-sm border-b border-slate-200/80" id="prospaces-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
           
           {/* Logo & title context */}
-          <div className="flex items-center space-x-3 text-center sm:text-left">
-            <div className="shrink-0 flex items-center justify-center max-w-[140px]">
+          <div className="flex items-center space-x-4 text-center sm:text-left">
+            <div className="shrink-0 flex items-center justify-center">
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-10 w-auto object-contain rounded-lg"
+                className="h-16 sm:h-20 w-auto object-contain animate-fade-in"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
-              <h1 className="font-sans font-extrabold text-xs sm:text-sm uppercase tracking-wider text-white leading-tight">
-                {currentTenant.regionalFocus} Logistics Portal
-              </h1>
-              <p className="text-white/80 text-[10px] sm:text-xs font-medium mt-0.5 leading-none">
+              <h1 className="font-sans font-black text-slate-900 text-base sm:text-lg tracking-tight leading-tight">
                 {currentTenant.name}
+              </h1>
+              <p className="text-slate-500 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mt-0.5 leading-none flex items-center justify-center sm:justify-start gap-2">
+                <span>Enterprise Logistics Portal</span>
+                <span className="opacity-40">&bull;</span>
+                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold">{currentTenant.code}</span>
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Logged-In User Profile context */}
           <div className="flex items-center space-x-3">
-            <div className={`flex items-center space-x-2 ${theme.bannerBg} px-3 py-1.5 rounded-lg text-xs font-mono text-white`}>
-              <Store className="h-3.5 w-3.5 text-white/80" />
+            <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200/85 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-600">
+              <Store className="h-3.5 w-3.5 text-slate-400" />
               <span>{branches.length} Registers &bull; {trucks.length} Vehicles</span>
             </div>
 
             {/* Authenticated User Badge & Logout Switcher */}
-            <div className="flex items-center space-x-2.5 border-l border-white/20 pl-3">
+            <div className="flex items-center space-x-2.5 border-l border-slate-200 pl-3">
               <div className="hidden lg:flex flex-col text-right">
-                <span className="text-xs font-black leading-none text-white">{currentUser.name}</span>
-                <span className="text-[9px] font-mono text-white/70 leading-none mt-1 uppercase font-bold tracking-wider">
+                <span className="text-xs font-black leading-none text-slate-800">{currentUser.name}</span>
+                <span className="text-[9px] font-mono text-slate-500 leading-none mt-1 uppercase font-bold tracking-wider">
                   {currentUser.role}
                 </span>
               </div>
               <button 
                 onClick={handleLogout}
                 title="Logout & Switch Logistical Tenant"
-                className="text-white/80 hover:text-white p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all flex items-center justify-center border border-white/10"
+                className="text-slate-500 hover:text-slate-800 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center border border-slate-200"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -664,17 +681,19 @@ export default function App() {
             <span>HQ Dashboard</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('scanner')}
-            className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
-              activeTab === 'scanner' 
-                ? theme.activeBtn
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <Scan className="h-4 w-4" />
-            <span>Scanning Station</span>
-          </button>
+          {['Admin', 'Dispatcher', 'Driver'].includes(currentUser?.role || '') && (
+            <button
+              onClick={() => setActiveTab('scanner')}
+              className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                activeTab === 'scanner' 
+                  ? theme.activeBtn
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Scan className="h-4 w-4" />
+              <span>Scanning Station</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('queue')}
@@ -688,82 +707,98 @@ export default function App() {
             <span>Delivery Freight Board</span>
           </button>
 
-          {/* Interactive Fleet Setup Dropdown trigger */}
-          <div className="relative flex-1 sm:flex-initial">
+          {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
             <button
-              onClick={() => setIsFleetDropdownOpen(!isFleetDropdownOpen)}
-              className={`w-full py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
-                ['stores', 'trucks', 'users', 'architecture'].includes(activeTab)
+              onClick={() => setActiveTab('document-import')}
+              className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                activeTab === 'document-import' 
                   ? theme.activeBtn
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <TruckIcon className="h-4 w-4" />
-              <span>Fleet Setup</span>
-              <ChevronDown className="h-3 w-3 opacity-80" />
+              <FileDown className="h-4 w-4" />
+              <span>Document Import</span>
             </button>
-            {isFleetDropdownOpen && (
-              <>
-                <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setIsFleetDropdownOpen(false)}
-                />
-                <div className="absolute left-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden py-1">
-                  <div className="px-3 py-1.5 border-b border-slate-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">
-                    Registries Setup
+          )}
+
+          {/* Interactive Fleet Setup Dropdown trigger */}
+          {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+            <div className="relative flex-1 sm:flex-initial">
+              <button
+                onClick={() => setIsFleetDropdownOpen(!isFleetDropdownOpen)}
+                className={`w-full py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                  ['stores', 'trucks', 'users', 'architecture'].includes(activeTab)
+                    ? theme.activeBtn
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <TruckIcon className="h-4 w-4" />
+                <span>Fleet Setup</span>
+                <ChevronDown className="h-3 w-3 opacity-80" />
+              </button>
+              {isFleetDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setIsFleetDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden py-1">
+                    <div className="px-3 py-1.5 border-b border-slate-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">
+                      Registries Setup
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab('stores');
+                        setIsFleetDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
+                        activeTab === 'stores' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Store className="h-3.5 w-3.5 text-blue-600" />
+                      <span>Stores</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('trucks');
+                        setIsFleetDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
+                        activeTab === 'trucks' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <TruckIcon className="h-3.5 w-3.5 text-blue-600" />
+                      <span>Trucks</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('users');
+                        setIsFleetDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
+                        activeTab === 'users' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Users className="h-3.5 w-3.5 text-blue-600" />
+                      <span>Users</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('architecture');
+                        setIsFleetDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
+                        activeTab === 'architecture' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Layers3 className="h-3.5 w-3.5 text-blue-600" />
+                      <span>Overall Architecture</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setActiveTab('stores');
-                      setIsFleetDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                      activeTab === 'stores' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Store className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Stores</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('trucks');
-                      setIsFleetDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                      activeTab === 'trucks' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <TruckIcon className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Trucks</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('users');
-                      setIsFleetDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                      activeTab === 'users' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Users className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Users</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('architecture');
-                      setIsFleetDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                      activeTab === 'architecture' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Layers3 className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Overall Architecture</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
 
         </div>
 
@@ -805,6 +840,7 @@ export default function App() {
                 acc[b.id] = trucks.filter(t => t.branchId === b.id).length;
                 return acc;
               }, {} as Record<string, number>)}
+              readOnly={currentUser?.role === 'Dispatcher'}
             />
           )}
           {activeTab === 'trucks' && (
@@ -814,6 +850,7 @@ export default function App() {
               onAddTruck={handleAddTruck} 
               onUpdateTruck={handleUpdateTruck} 
               onDeleteTruck={handleDeleteTruck} 
+              readOnly={currentUser?.role === 'Dispatcher'}
             />
           )}
           {activeTab === 'users' && (
@@ -823,6 +860,19 @@ export default function App() {
               onAddUser={handleAddUser}
               onUpdateUser={handleUpdateUser}
               onDeleteUser={handleDeleteUser}
+              readOnly={currentUser?.role === 'Dispatcher'}
+            />
+          )}
+          {activeTab === 'document-import' && (
+            <ArchitectureView 
+              branches={branches}
+              onAddOrUpdateDelivery={handleAddOrUpdateDelivery}
+              supabaseStatus={supabaseStatus}
+              syncStatus={syncStatus}
+              lastSyncTime={lastSyncTime}
+              onRefreshStatus={checkSupabaseStatus}
+              defaultSegment="mapping-ui"
+              allowedSegments={['mapping-ui', 'local-folder']}
             />
           )}
           {activeTab === 'architecture' && (
@@ -833,6 +883,8 @@ export default function App() {
               syncStatus={syncStatus}
               lastSyncTime={lastSyncTime}
               onRefreshStatus={checkSupabaseStatus}
+              defaultSegment="blueprint"
+              allowedSegments={['blueprint', 'supabase-db']}
             />
           )}
         </div>

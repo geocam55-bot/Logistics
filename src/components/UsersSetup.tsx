@@ -8,6 +8,7 @@ interface UsersSetupProps {
   onAddUser: (user: User) => void;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (id: string) => void;
+  readOnly?: boolean;
 }
 
 export default function UsersSetup({
@@ -15,7 +16,8 @@ export default function UsersSetup({
   branches,
   onAddUser,
   onUpdateUser,
-  onDeleteUser
+  onDeleteUser,
+  readOnly
 }: UsersSetupProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -142,7 +144,19 @@ export default function UsersSetup({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Add/Edit form */}
         <div className="lg:col-span-4 space-y-4">
-          {(!isAdding && !editingUserId) ? (
+          {readOnly ? (
+            <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-xl text-center space-y-4">
+              <div className="w-12 h-12 bg-slate-150/80 text-slate-400 rounded-full flex items-center justify-center mx-auto border border-slate-200/40">
+                <Info className="h-6 w-6" />
+              </div>
+              <div>
+                <h5 className="text-sm font-bold text-slate-700">View Only Mode</h5>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  As a Dispatcher, you have permissions to view system authorization profiles, but provisioning or altering user roles is restricted.
+                </p>
+              </div>
+            </div>
+          ) : (!isAdding && !editingUserId) ? (
             <div className="bg-white border border-slate-100 p-5 rounded-xl shadow-sm text-center space-y-4">
               <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
                 <Users className="h-6 w-6" />
@@ -357,22 +371,24 @@ export default function UsersSetup({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end space-x-1 border-t border-slate-100/60 mt-3 pt-2">
-                      <button
-                        onClick={() => handleStartEdit(user)}
-                        className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
-                        title="Edit User profile"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.id, user.name)}
-                        className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
-                        title="Disable Account"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex items-center justify-end space-x-1 border-t border-slate-100/60 mt-3 pt-2">
+                        <button
+                          onClick={() => handleStartEdit(user)}
+                          className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                          title="Edit User profile"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user.id, user.name)}
+                          className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
+                          title="Disable Account"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

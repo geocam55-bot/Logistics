@@ -334,7 +334,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
             <img 
               src={prospacesLogo} 
               alt="ProSpaces Logo" 
-              className="h-16 w-auto object-contain mx-auto"
+              className="h-28 w-auto object-contain mx-auto"
               referrerPolicy="no-referrer"
             />
           </div>
@@ -547,22 +547,6 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
 
         {/* Bottom Navigation Links & Active Lookup helper drawer */}
         <div className="mt-8 text-center text-xs space-y-4 shrink-0 transition-all">
-          <p className="text-slate-500">
-            Need design tools?{' '}
-            <button 
-              type="button" 
-              onClick={() => setShowMemberLookup(!showMemberLookup)} 
-              className="text-blue-650 font-bold hover:underline"
-            >
-              Open Corporate Directory
-            </button>{' '}
-            ·{' '}
-            <span className="text-emerald-600 font-semibold inline-flex items-center space-x-1">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse mr-1"></span>
-              Live Database Connected
-            </span>
-          </p>
-
           {showMemberLookup && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left max-w-md mx-auto max-h-[220px] overflow-y-auto space-y-3.5 shadow-inner transition-all">
               <p className="text-[10px] text-slate-500 font-medium leading-normal">

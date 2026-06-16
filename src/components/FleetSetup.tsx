@@ -8,6 +8,7 @@ interface FleetSetupProps {
   onAddTruck: (truck: Truck) => void;
   onUpdateTruck: (truck: Truck) => void;
   onDeleteTruck: (id: string) => void;
+  readOnly?: boolean;
 }
 
 export default function FleetSetup({
@@ -15,7 +16,8 @@ export default function FleetSetup({
   branches,
   onAddTruck,
   onUpdateTruck,
-  onDeleteTruck
+  onDeleteTruck,
+  readOnly
 }: FleetSetupProps) {
   // Gracefully default to the first available branch
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
@@ -200,7 +202,7 @@ export default function FleetSetup({
                 </p>
               </div>
               
-              {!isAdding && !editingTruckId && (
+              {!isAdding && !editingTruckId && !readOnly && (
                 <button
                   onClick={handleStartAdd}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-3 rounded-lg flex items-center space-x-1 transition-colors"
@@ -210,6 +212,13 @@ export default function FleetSetup({
                 </button>
               )}
             </div>
+
+            {readOnly && (
+              <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs text-slate-500 mb-4 flex items-center space-x-2">
+                <Info className="h-4 w-4 text-slate-400 shrink-0" />
+                <span>As a Dispatcher, you have view-only access to physical transportation models. Registering or altering vehicles is restricted.</span>
+              </div>
+            )}
 
             {/* Display Mode: Either Form or Truck Card List */}
             {(isAdding || editingTruckId) ? (
@@ -321,13 +330,15 @@ export default function FleetSetup({
                     <p className="text-xs font-bold text-gray-700">No trucks assigned to this branch storefront</p>
                     <p className="text-[11px]">Deploy flatbeds, boom cranes, or trucks to this storefront to facilitate dispatching.</p>
                   </div>
-                  <button
-                    onClick={handleStartAdd}
-                    className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center justify-center space-x-0.5 mx-auto"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Deploy first vehicle now</span>
-                  </button>
+                  {!readOnly && (
+                    <button
+                      onClick={handleStartAdd}
+                      className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center justify-center space-x-0.5 mx-auto"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Deploy first vehicle now</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredTrucks.map(truck => (
@@ -359,22 +370,24 @@ export default function FleetSetup({
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center space-x-1 shrink-0">
-                      <button
-                        onClick={() => handleStartEdit(truck)}
-                        aria-label="Edit truck"
-                        className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(truck.id)}
-                        aria-label="Delete truck"
-                        className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={() => handleStartEdit(truck)}
+                          aria-label="Edit truck"
+                          className="p-1.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(truck.id)}
+                          aria-label="Delete truck"
+                          className="p-1.5 hover:bg-red-50 border border-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

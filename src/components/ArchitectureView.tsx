@@ -83,6 +83,8 @@ interface ArchitectureViewProps {
   syncStatus?: 'IDLE' | 'SYNCING' | 'ERROR';
   lastSyncTime?: string | null;
   onRefreshStatus?: () => Promise<any>;
+  defaultSegment?: 'blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db';
+  allowedSegments?: ('blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db')[];
 }
 
 const WATCH_FILES_PRESETS: Record<string, Record<string, string>> = {
@@ -178,11 +180,21 @@ export default function ArchitectureView({
   supabaseStatus,
   syncStatus,
   lastSyncTime,
-  onRefreshStatus
+  onRefreshStatus,
+  defaultSegment,
+  allowedSegments
 }: ArchitectureViewProps) {
   const activeBranches = branches && branches.length > 0 ? branches : STATIC_BRANCHES;
   const [selectedBranchId, setSelectedBranchId] = useState<string>(activeBranches[0]?.id || 'WINDMILL_DC');
-  const [activeSegment, setActiveSegment] = useState<'blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db'>('blueprint');
+  const [activeSegment, setActiveSegment] = useState<'blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db'>(
+    defaultSegment || 'blueprint'
+  );
+
+  useEffect(() => {
+    if (defaultSegment) {
+      setActiveSegment(defaultSegment);
+    }
+  }, [defaultSegment]);
   const [copiedSql, setCopiedSql] = useState(false);
   const handleCopySql = (sql: string) => {
     navigator.clipboard.writeText(sql);
@@ -1571,50 +1583,58 @@ export default function ArchitectureView({
 
       {/* Selector Tabs */}
       <div className="flex flex-wrap gap-1.5 border-b border-gray-100 bg-white p-1 rounded-xl shadow-xs self-start shrink-0 w-fit">
-        <button
-          onClick={() => setActiveSegment('blueprint')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
-            activeSegment === 'blueprint'
-              ? 'bg-blue-900 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-slate-50'
-          }`}
-        >
-          <Layers className="h-4 w-4" />
-          <span>Pipeline Blueprint</span>
-        </button>
-        <button
-          onClick={() => setActiveSegment('mapping-ui')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
-            activeSegment === 'mapping-ui'
-              ? 'bg-blue-900 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-slate-50'
-          }`}
-        >
-          <Sparkles className="h-4 w-4" />
-          <span>Interactive Document Mapper Sandbox</span>
-        </button>
-        <button
-          onClick={() => setActiveSegment('local-folder')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
-            activeSegment === 'local-folder'
-              ? 'bg-blue-900 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-slate-50'
-          }`}
-        >
-          <HardDrive className="h-4 w-4" />
-          <span>Local Folder Integrator</span>
-        </button>
-        <button
-          onClick={() => setActiveSegment('supabase-db')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
-            activeSegment === 'supabase-db'
-              ? 'bg-blue-900 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-slate-50'
-          }`}
-        >
-          <Database className="h-4 w-4" />
-          <span>Supabase Cloud Integration</span>
-        </button>
+        {(!allowedSegments || allowedSegments.includes('blueprint')) && (
+          <button
+            onClick={() => setActiveSegment('blueprint')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
+              activeSegment === 'blueprint'
+                ? 'bg-blue-900 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-slate-50'
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            <span>Pipeline Blueprint</span>
+          </button>
+        )}
+        {(!allowedSegments || allowedSegments.includes('mapping-ui')) && (
+          <button
+            onClick={() => setActiveSegment('mapping-ui')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
+              activeSegment === 'mapping-ui'
+                ? 'bg-blue-900 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-slate-50'
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>Interactive Document Mapper Sandbox</span>
+          </button>
+        )}
+        {(!allowedSegments || allowedSegments.includes('local-folder')) && (
+          <button
+            onClick={() => setActiveSegment('local-folder')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
+              activeSegment === 'local-folder'
+                ? 'bg-blue-900 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-slate-50'
+            }`}
+          >
+            <HardDrive className="h-4 w-4" />
+            <span>Local Folder Integrator</span>
+          </button>
+        )}
+        {(!allowedSegments || allowedSegments.includes('supabase-db')) && (
+          <button
+            onClick={() => setActiveSegment('supabase-db')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-2 transition-all ${
+              activeSegment === 'supabase-db'
+                ? 'bg-blue-900 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-slate-50'
+            }`}
+          >
+            <Database className="h-4 w-4" />
+            <span>Supabase Cloud Integration</span>
+          </button>
+        )}
       </div>
 
       {activeSegment === 'blueprint' && (
