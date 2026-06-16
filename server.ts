@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -241,6 +242,13 @@ async function startServer() {
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Ensure and serve static uploads directory for PDFs link creation
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
 
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
@@ -676,6 +684,45 @@ async function startServer() {
     } catch (err: any) {
       console.error("Clear all tenant state error:", err);
       res.status(500).json({ error: formatDatabaseError(err) });
+    }
+  });
+
+  // API Route for saving uploaded PDFs safely to the local uploads directory
+  app.post("/api/save-pdf", async (req, res) => {
+    try {
+      const { fileData, fileName } = req.body;
+      if (!fileData || !fileName) {
+        return res.status(400).json({ error: "Missing fileData or fileName specifications." });
+      }
+
+      // Identify base64 format and isolate raw payloads
+      const parts = fileData.match(/^data:(.*);base64,(.*)$/);
+      let base64Data = fileData;
+      if (parts) {
+        base64Data = parts[2];
+      }
+
+      const buffer = Buffer.from(base64Data, "base64");
+
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Restrict character scope to keep paths entirely safe from injection attacks
+      const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const filePath = path.join(uploadsDir, safeName);
+
+      fs.writeFileSync(filePath, buffer);
+      console.log(`Saved physical PDF on express server disk at: ${filePath}`);
+
+      res.json({ 
+        success: true, 
+        pdfUrl: `/uploads/${safeName}` 
+      });
+    } catch (err: any) {
+      console.error("Express save PDF error:", err);
+      res.status(500).json({ error: err.message || "Failed to persist physical PDF to server." });
     }
   });
 

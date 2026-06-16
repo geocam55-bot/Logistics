@@ -43,6 +43,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
   const [formReturnReason, setFormReturnReason] = useState('');
   const [formSignature, setFormSignature] = useState('');
   const [formPhoto, setFormPhoto] = useState('');
+  const [formPdfUrl, setFormPdfUrl] = useState('');
 
   const handleOpenAddModal = () => {
     const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
@@ -65,6 +66,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     setFormReturnReason('');
     setFormSignature('');
     setFormPhoto('');
+    setFormPdfUrl('');
     
     setIsModalOpen(true);
   };
@@ -86,6 +88,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     setFormReturnReason(record.returnReason || '');
     setFormSignature(record.customerSignature || '');
     setFormPhoto(record.deliveryPhoto || '');
+    setFormPdfUrl(record.pdfUrl || '');
     
     setIsModalOpen(true);
   };
@@ -153,6 +156,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
         customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || editingRecord.customerSignature || 'Physical Signoff Done') : undefined,
         deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || editingRecord.deliveryPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
+        pdfUrl: formPdfUrl || undefined,
         history: newHistory
       };
 
@@ -197,6 +201,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
         customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || 'Physical Handoff Validated') : undefined,
         deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
+        pdfUrl: formPdfUrl || undefined,
         history: newHistory
       };
 
@@ -435,6 +440,22 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         <span className="font-mono font-extrabold text-blue-600 text-sm tracking-tight">{delivery.id}</span>
                         <span className="text-xs text-gray-400">|</span>
                         <span className="text-[10px] font-mono text-slate-500 font-semibold uppercase">Inv: {delivery.invoiceNumber}</span>
+                        {delivery.pdfUrl && (
+                          <>
+                            <span className="text-xs text-slate-300">|</span>
+                            <a
+                              href={delivery.pdfUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
+                              title="View server archived PDF document source"
+                            >
+                              <FileText className="h-3 w-3 mr-1 text-indigo-600 animate-pulse" />
+                              PDF Source
+                            </a>
+                          </>
+                        )}
                       </div>
 
                       <div className="flex items-center space-x-2 mt-1">
@@ -599,6 +620,32 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                       
                       {/* Shipping detail cards */}
                       <div className="grid grid-cols-1 gap-4">
+                        {delivery.pdfUrl && (
+                          <div>
+                            <h5 className="font-bold text-gray-900 mb-1 uppercase tracking-wider font-mono text-[10px]">Physical Document Archive</h5>
+                            <div className="bg-gradient-to-br from-indigo-50/50 to-blue-50/50 border border-indigo-100 rounded-xl p-3.5 shadow-xs flex items-center justify-between">
+                              <div className="flex items-center space-x-2.5">
+                                <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                                  <FileText className="h-4 w-4" />
+                                </div>
+                                <div className="text-[11px]">
+                                  <p className="font-bold text-slate-800 font-mono">{delivery.id}_physical.pdf</p>
+                                  <p className="text-slate-500">Inbound OCR digitized physical copy archived on server</p>
+                                </div>
+                              </div>
+                              <a
+                                href={delivery.pdfUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold shadow-xs hover:shadow-sm transition-all flex items-center space-x-1 cursor-pointer"
+                              >
+                                <span>Open PDF</span>
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
                         <div>
                           <h5 className="font-bold text-gray-900 mb-1 uppercase tracking-wider font-mono text-[10px]">Recipient Instructions</h5>
                           <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-1.5 shadow-sm">
@@ -1008,6 +1055,18 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                     </div>
                   </>
                 )}
+
+                {/* Server-side PDF archive path */}
+                <div className="sm:col-span-2">
+                  <label className="block text-indigo-600 font-bold mb-1 font-mono uppercase text-[10px]">Server Archived PDF/Image Source URL</label>
+                  <input 
+                    type="text"
+                    value={formPdfUrl}
+                    onChange={(e) => setFormPdfUrl(e.target.value)}
+                    className="w-full bg-indigo-50/30 border border-indigo-100 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    placeholder="/uploads/SO-98471-A_source.pdf"
+                  />
+                </div>
 
                 {/* Destination notes */}
                 <div className="sm:col-span-2">

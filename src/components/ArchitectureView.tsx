@@ -1452,7 +1452,7 @@ export default function ArchitectureView({
     }
   };
 
-  const createRecordFromExtracted = () => {
+  const createRecordFromExtracted = async () => {
     if (!extractionResult) return;
     
     // Pick the custom barcoded ID or make one
@@ -1465,6 +1465,38 @@ export default function ArchitectureView({
     const dateVal = editedFields['Date'] || new Date().toLocaleString();
     const weightVal = editedFields['Gross Weight'] || editedFields['Weight'] || '';
     const orderTotalVal = editedFields['Subtotal'] || editedFields['Total Credit'] || '';
+
+    let physicalPdfLink: string | undefined = undefined;
+    const fileUri = uploadedFiles[selectedDocType];
+
+    if (fileUri) {
+      try {
+        setIsProcessing(true);
+        // Clean name to prevent any issues
+        const safeRecordId = recordId.replace(/[^a-zA-Z0-9_\-]/g, "_");
+        const isPdf = fileUri.startsWith('data:application/pdf');
+        const fileExt = isPdf ? '.pdf' : '.png';
+        const rawFileName = `${safeRecordId}_source${fileExt}`;
+
+        const saveResp = await fetch('/api/save-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileData: fileUri, fileName: rawFileName })
+        });
+
+        if (saveResp.ok) {
+          const respData = await saveResp.json();
+          if (respData.success) {
+            physicalPdfLink = respData.pdfUrl;
+            console.log("Successfully saved physical file to server. Path:", physicalPdfLink);
+          }
+        }
+      } catch (uploadErr) {
+        console.error("Failed to upload physical document source to server:", uploadErr);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
 
     // Instantiate a fully compliant DeliveryRecord
     const newRecord: DeliveryRecord = {
@@ -1479,14 +1511,15 @@ export default function ArchitectureView({
       orderTotal: orderTotalVal,
       status: DeliveryStatus.REGISTERED,
       registeredAt: new Date().toLocaleString(),
-      destinationNotes: `[Automated PDF Capture - Type: ${selectedDocType}] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: ${dateVal}.`,
+      pdfUrl: physicalPdfLink,
+      destinationNotes: `[Automated PDF Capture - Type: ${selectedDocType}] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: ${dateVal}.${physicalPdfLink ? ` Physical Document stored: ${physicalPdfLink}` : ''}`,
       history: [
         {
           status: DeliveryStatus.REGISTERED,
           timestamp: new Date().toLocaleString(),
           location: activeBranches.find(b => b.id === selectedBranchId)?.name || 'Central Logistics Depot',
           operator: 'Azure OCR Automate Stream',
-          notes: `Ingested automatically into logistics. Ready for truck pre-allocation or dispatch.`
+          notes: `Ingested automatically into logistics. Ready for truck pre-allocation or dispatch.${physicalPdfLink ? ` Physical copy archived on server.` : ''}`
         }
       ]
     };

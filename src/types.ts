@@ -26,6 +26,7 @@ export interface DeliveryRecord {
   assignedDriver?: string;
   customerSignature?: string; // Base64 or mock SVG
   deliveryPhoto?: string; // Mock image description or actual mock URL
+  pdfUrl?: string; // Link to the uploaded physical invoice/receipt PDF
   history: HistoryEvent[];
 }
 
