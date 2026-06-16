@@ -214,6 +214,9 @@ create table if not exists deliveries (
   "deliveryAddress" text not null,
   phone text not null,
   "originBranch" text not null,
+  "weight" text,
+  "orderTotal" text,
+  "pdfUrl" text,
   "destinationNotes" text,
   status text not null,
   "registeredAt" text not null,
@@ -601,10 +604,55 @@ async function startServer() {
         }
       }
 
-      // 4. Deliveries
+      // 4. Deliveries with auto-columns stripping fallback for schema mismatch
       if (sanitizedDeliveries.length > 0) {
-        const { error } = await supabase.from("deliveries").upsert(sanitizedDeliveries);
-        if (error) throw new Error(`Deliveries Sync Error: ${error.message}`);
+        let deliveriesToUpsert = [...sanitizedDeliveries];
+        let success = false;
+        let attempts = 0;
+        while (!success && attempts < 5) {
+          try {
+            const { error } = await supabase.from("deliveries").upsert(deliveriesToUpsert);
+            if (error) throw error;
+            success = true;
+          } catch (dbErr: any) {
+            attempts++;
+            const errMsg = dbErr.message || String(dbErr);
+            console.warn(`Deliveries sync failed (attempt ${attempts}):`, errMsg);
+            
+            // Check for missing column error, e.g., 'column "pdfUrl" of relation "deliveries" does not exist' or error code "42703"
+            if (errMsg.includes("column") || errMsg.includes("42703") || dbErr.code === "42703") {
+              const match = errMsg.match(/column "([^"]+)"|column ([^\s]+) of relation/);
+              let colToStrip = match ? (match[1] || match[2]) : null;
+              
+              if (!colToStrip) {
+                // If we couldn't match the column name, look for known new columns in errMsg
+                if (errMsg.includes("pdfUrl")) colToStrip = "pdfUrl";
+                else if (errMsg.includes("weight")) colToStrip = "weight";
+                else if (errMsg.includes("orderTotal")) colToStrip = "orderTotal";
+              }
+              
+              if (colToStrip) {
+                console.log(`Stripping missing column '${colToStrip}' from deliveries payload to bypass schema mismatch and retrying...`);
+                deliveriesToUpsert = deliveriesToUpsert.map(d => {
+                  const copy = { ...d };
+                  delete copy[colToStrip];
+                  return copy;
+                });
+              } else {
+                console.log("Stripping all potential new columns (pdfUrl, weight, orderTotal) due to unidentified column error.");
+                deliveriesToUpsert = deliveriesToUpsert.map(d => {
+                  const { pdfUrl, weight, orderTotal, ...rest } = d;
+                  return rest;
+                });
+              }
+            } else {
+              throw new Error(`Deliveries Sync Error: ${errMsg}`);
+            }
+          }
+        }
+        if (!success) {
+          throw new Error("Deliveries Sync failed after maximum retries due to persistent schema mismatch.");
+        }
       }
 
       res.json({ success: true });
