@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, UserRole, Branch } from '../types';
-import { Users, UserPlus, Edit2, Trash2, Shield, Info, CheckCircle, Mail, Phone, Building } from 'lucide-react';
+import { Users, UserPlus, Edit2, Trash2, Shield, Info, CheckCircle, Mail, Phone, Building, AlertTriangle } from 'lucide-react';
 
 interface UsersSetupProps {
   users: User[];
@@ -31,6 +31,7 @@ export default function UsersSetup({
   const [associatedStoreId, setAssociatedStoreId] = useState('');
   const [userPassword, setUserPassword] = useState('123456');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
 
   const ROLES: UserRole[] = ['Driver', 'Dispatcher', 'User', 'Admin'];
 
@@ -116,10 +117,7 @@ export default function UsersSetup({
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to permanently disable and delete user account: "${name}"?`)) {
-      onDeleteUser(id);
-      showFeedback('User database record decommissioned.');
-    }
+    setShowDeleteConfirm({ id, name });
   };
 
   return (
@@ -403,6 +401,52 @@ export default function UsersSetup({
           </div>
         </div>
       </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-55 backdrop-blur-xs font-sans">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setShowDeleteConfirm(null)}
+          />
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full relative z-10 animate-in fade-in zoom-in duration-150 p-6">
+            <div className="flex items-center space-x-3 text-red-600 mb-4">
+              <div className="p-2 bg-red-50 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h4 className="font-sans font-bold text-slate-900 text-lg">
+                Decomission User Account
+              </h4>
+            </div>
+            
+            <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+              Are you sure you want to permanently disable and delete user account: <strong className="text-slate-900 font-semibold">{showDeleteConfirm.name}</strong> ({showDeleteConfirm.id})? This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(null)}
+                className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition-colors font-semibold cursor-pointer text-xs"
+              >
+                Cancel, Keep User
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteUser(showDeleteConfirm.id);
+                  showFeedback('User database record decommissioned.');
+                  setShowDeleteConfirm(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-sm transition-colors font-bold cursor-pointer text-xs flex items-center space-x-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete User</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

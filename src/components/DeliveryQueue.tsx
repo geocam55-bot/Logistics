@@ -26,6 +26,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<DeliveryRecord | null>(null);
+  const [showDeleteConfirmId, setShowDeleteConfirmId] = useState<string | null>(null);
 
   // Form Field States
   const [formId, setFormId] = useState('');
@@ -585,9 +586,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(`Are you sure you want to permanently delete delivery ticket ${delivery.id}?`)) {
-                                  onDeleteDelivery(delivery.id);
-                                }
+                                setShowDeleteConfirmId(delivery.id);
                                 setActiveDropdownId(null);
                               }}
                               className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center space-x-2 font-semibold transition-colors"
@@ -1099,6 +1098,51 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmId && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-55 backdrop-blur-xs">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setShowDeleteConfirmId(null)}
+          />
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full relative z-10 animate-in fade-in zoom-in duration-150 p-6">
+            <div className="flex items-center space-x-3 text-red-600 mb-4">
+              <div className="p-2 bg-red-50 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h4 className="font-sans font-bold text-slate-900 text-lg">
+                Confirm Deletion
+              </h4>
+            </div>
+            
+            <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+              Are you sure you want to permanently delete delivery ticket <strong className="text-slate-900 font-semibold">{showDeleteConfirmId}</strong>? This action cannot be undone and will remove the item from all dashboards.
+            </p>
+
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirmId(null)}
+                className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition-colors font-semibold cursor-pointer text-xs"
+              >
+                Cancel, Keep Ticket
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteDelivery(showDeleteConfirmId);
+                  setShowDeleteConfirmId(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-sm transition-colors font-bold cursor-pointer text-xs flex items-center space-x-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Confirm Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

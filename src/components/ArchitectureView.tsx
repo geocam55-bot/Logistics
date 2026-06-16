@@ -1550,6 +1550,15 @@ export default function ArchitectureView({
     };
 
     setCreatedRecords([sessionRecord, ...createdRecords]);
+    
+    // Clear the active document from upload state/screen so the user can import a new one
+    setUploadedFiles(prev => ({
+      ...prev,
+      [selectedDocType]: null
+    }));
+    // Clear the OCR extraction view result
+    setExtractionResult(null);
+
     alert(`Success: Instantiated and submitted a brand-new ${selectedDocType} (ID: ${recordId}) to your live Logistics & Dispatch stream! It has been successfully routed to ProSpaces Store/Depot #${selectedBranchId}. You can find it on the main HQ Dashboard and Delivery Freight Board under "Registered" status ready for truck dispatch.`);
   };
 

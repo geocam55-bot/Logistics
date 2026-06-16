@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Branch } from '../types';
-import { Store, Plus, Edit2, Trash2, Shield, Info, MapPin, Building, CheckCircle } from 'lucide-react';
+import { Store, Plus, Edit2, Trash2, Shield, Info, MapPin, Building, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface StoresSetupProps {
   branches: Branch[];
@@ -28,6 +28,7 @@ export default function StoresSetup({
   const [storeType, setStoreType] = useState<'STORE' | 'DC'>('STORE');
   const [storeAddress, setStoreAddress] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
 
   const handleStartAdd = () => {
     setStoreId(`STORE-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -91,10 +92,7 @@ export default function StoresSetup({
       alert(`Cannot delete store "${name}" because it still has ${activeTrucks} truck(s) assigned to its fleet. Please re-assign or decommission the trucks first.`);
       return;
     }
-    if (window.confirm(`Are you sure you want to delete and permanently remove active store storefront: "${name}"?`)) {
-      onDeleteBranch(id);
-      showFeedback('Store branch discarded successfully.');
-    }
+    setShowDeleteConfirm({ id, name });
   };
 
   return (
@@ -360,6 +358,52 @@ export default function StoresSetup({
           </div>
         </div>
       </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-55 backdrop-blur-xs">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setShowDeleteConfirm(null)}
+          />
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full relative z-10 animate-in fade-in zoom-in duration-150 p-6">
+            <div className="flex items-center space-x-3 text-red-600 mb-4">
+              <div className="p-2 bg-red-50 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h4 className="font-sans font-bold text-slate-900 text-lg">
+                Remove Store Depot
+              </h4>
+            </div>
+            
+            <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+              Are you sure you want to delete and permanently remove active store storefront: <strong className="text-slate-900 font-semibold">{showDeleteConfirm.name}</strong> ({showDeleteConfirm.id})? This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(null)}
+                className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition-colors font-semibold cursor-pointer text-xs"
+              >
+                Cancel, Keep Store
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteBranch(showDeleteConfirm.id);
+                  showFeedback('Store branch discarded successfully.');
+                  setShowDeleteConfirm(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-sm transition-colors font-bold cursor-pointer text-xs flex items-center space-x-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Store</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

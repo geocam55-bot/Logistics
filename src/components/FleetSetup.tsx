@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, Branch } from '../types';
-import { Truck as TruckIcon, Plus, Trash2, Edit2, Shield, Info, ChevronRight, FileCheck } from 'lucide-react';
+import { Truck as TruckIcon, Plus, Trash2, Edit2, Shield, Info, ChevronRight, FileCheck, AlertTriangle } from 'lucide-react';
 
 interface FleetSetupProps {
   trucks: Truck[];
@@ -32,6 +32,7 @@ export default function FleetSetup({
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingTruckId, setEditingTruckId] = useState<string | null>(null);
+  const [showDeleteConfirmId, setShowDeleteConfirmId] = useState<string | null>(null);
 
   // Form Inputs
   const [truckId, setTruckId] = useState('');
@@ -107,9 +108,7 @@ export default function FleetSetup({
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to decommission this truck from this store’s fleet?')) {
-      onDeleteTruck(id);
-    }
+    setShowDeleteConfirmId(id);
   };
 
   if (branches.length === 0) {
@@ -405,6 +404,51 @@ export default function FleetSetup({
         </div>
 
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmId && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-55 backdrop-blur-xs">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setShowDeleteConfirmId(null)}
+          />
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full relative z-10 animate-in fade-in zoom-in duration-150 p-6">
+            <div className="flex items-center space-x-3 text-red-600 mb-4">
+              <div className="p-2 bg-red-50 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h4 className="font-sans font-bold text-slate-900 text-lg">
+                Decommission Vehicle
+              </h4>
+            </div>
+            
+            <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+              Are you sure you want to permanently decommission vehicle <strong className="text-slate-900 font-semibold">{showDeleteConfirmId}</strong>? This action cannot be undone and will remove the vehicle from active fleets.
+            </p>
+
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirmId(null)}
+                className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition-colors font-semibold cursor-pointer text-xs"
+              >
+                Cancel, Keep Vehicle
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteTruck(showDeleteConfirmId);
+                  setShowDeleteConfirmId(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-sm transition-colors font-bold cursor-pointer text-xs flex items-center space-x-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Decommission</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

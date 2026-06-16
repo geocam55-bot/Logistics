@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck as TruckType } from '../types';
 import { BRANCHES } from '../data';
 import { 
@@ -6,8 +7,142 @@ import {
   CheckCircle2, 
   RefreshCw, 
   FileCheck, 
-  Package
+  Package,
+  Map as MapIcon,
+  Compass,
+  Navigation,
+  MapPin,
+  Radio,
+  Info,
+  Activity,
+  User,
+  ExternalLink,
+  Locate,
+  AlertTriangle,
+  Play,
+  Pause,
+  Zap,
+  Globe
 } from 'lucide-react';
+
+const getPercentCoordsFromGps = (lat: number, lng: number): { x: number; y: number } => {
+  // Let's use a standard bounding box representing regional Nova Scotia
+  // West edge (Bridgewater region): long = -64.65 -> x = 15%
+  // East edge (Dartmouth region): long = -63.45 -> x = 85%
+  // North edge (Windmill / Bedford): lat = 44.75 -> y = 20%
+  // South edge (Bridgewater south): lat = 44.25 -> y = 80%
+
+  const latMin = 44.25;
+  const latMax = 44.75;
+  const lngMin = -64.65;
+  const lngMax = -63.45;
+
+  // Linear scaling
+  const latFactor = Math.min(Math.max((lat - latMin) / (latMax - latMin), 0), 1);
+  const lngFactor = Math.min(Math.max((lng - lngMin) / (lngMax - lngMin), 0), 1);
+
+  const x = 15 + lngFactor * 70; // Map directly inside the map container space (15% to 85%)
+  const y = 80 - latFactor * 60; // Map directly (80% south to 20% north)
+
+  return { x, y };
+};
+
+const getBranchCoordinates = (id: string, name: string): { x: number; y: number; lat: number; lng: number } => {
+  const normId = id.toUpperCase();
+  const normName = name.toUpperCase();
+  let lat = 44.6636;
+  let lng = -63.5683;
+
+  if (normId.includes('WINDMILL') || normName.includes('WINDMILL')) {
+    lat = 44.7082;
+    lng = -63.5938;
+  } else if (normId.includes('TANTALLON') || normName.includes('TANTALLON')) {
+    lat = 44.6750;
+    lng = -63.8825;
+  } else if (normId.includes('DARTMOUTH') || normName.includes('DARTMOUTH')) {
+    lat = 44.6636;
+    lng = -63.5683;
+  } else if (normId.includes('BRIDGEWATER') || normName.includes('BRIDGEWATER')) {
+    lat = 44.3789;
+    lng = -64.5126;
+  } else {
+    let score = 0;
+    for (let i = 0; i < id.length; i++) score += id.charCodeAt(i);
+    lat = 44.35 + ((score % 40) / 40) * 0.35;
+    lng = -64.4 + (((score * 17) % 40) / 40) * 0.70;
+  }
+
+  const coords = getPercentCoordsFromGps(lat, lng);
+  return { x: coords.x, y: coords.y, lat, lng };
+};
+
+const getDeliveryCoordinates = (id: string, address: string, originX: number, originY: number): { x: number; y: number; lat: number; lng: number } => {
+  // Convert percentage coordinates back into base lat/lng to perform high accuracy geographic offsets
+  const latMin = 44.25;
+  const latMax = 44.75;
+  const lngMin = -64.65;
+  const lngMax = -63.45;
+
+  const originLng = lngMin + ((originX - 15) / 70) * (lngMax - lngMin);
+  const originLat = latMin + ((80 - originY) / 60) * (latMax - latMin);
+
+  let score = 0;
+  for (let i = 0; i < id.length; i++) score += id.charCodeAt(i);
+  
+  const angle = (score % 360) * (Math.PI / 180);
+  const latOffset = Math.sin(angle) * 0.045 + ((score % 7) - 3.5) * 0.003;
+  const lngOffset = Math.cos(angle) * 0.065 + (((score * 5) % 7) - 3.5) * 0.006;
+  
+  const lat = originLat + latOffset;
+  const lng = originLng + lngOffset;
+  
+  const coords = getPercentCoordsFromGps(lat, lng);
+  return { x: coords.x, y: coords.y, lat, lng };
+};
+
+const calculateDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Earth radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const getBearingLabel = (lat1: number, lng1: number, lat2: number, lng2: number): string => {
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  
+  const y = Math.sin(dLng) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+  let brng = Math.atan2(y, x) * 180 / Math.PI;
+  brng = (brng + 360) % 360;
+  
+  if (brng >= 337.5 || brng < 22.5) return 'North ↑';
+  if (brng >= 22.5 && brng < 67.5) return 'Northeast ↗';
+  if (brng >= 67.5 && brng < 112.5) return 'East →';
+  if (brng >= 112.5 && brng < 157.5) return 'Southeast ↘';
+  if (brng >= 157.5 && brng < 202.5) return 'South ↓';
+  if (brng >= 202.5 && brng < 247.5) return 'Southwest ↙';
+  if (brng >= 247.5 && brng < 292.5) return 'West ←';
+  return 'Northwest ↖';
+};
+
+const getGpsFromPercentCoords = (x: number, y: number): { lat: number; lng: number } => {
+  const latMin = 44.25;
+  const latMax = 44.75;
+  const lngMin = -64.65;
+  const lngMax = -63.45;
+
+  const lng = lngMin + ((x - 15) / 70) * (lngMax - lngMin);
+  const lat = latMin + ((80 - y) / 60) * (latMax - latMin);
+
+  return { lat, lng };
+};
 
 interface DashboardProps {
   deliveries: DeliveryRecord[];
@@ -20,6 +155,341 @@ interface DashboardProps {
 export default function Dashboard({ deliveries, onSelectTab, trucks, branches }: DashboardProps) {
   const activeBranches = branches && branches.length > 0 ? branches : BRANCHES;
   
+  const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
+  const [isPlayingSimulation, setIsPlayingSimulation] = useState<boolean>(true);
+  const [simProgress, setSimProgress] = useState<Record<string, number>>({});
+  const [lastRadarPingTime, setLastRadarPingTime] = useState<string>(() => new Date().toLocaleTimeString());
+  const [isPinging, setIsPinging] = useState<boolean>(false);
+  const [pingPulseLocation, setPingPulseLocation] = useState<{ x: number, y: number } | null>(null);
+  
+  // Custom Map Visual Themes
+  const [mapTheme, setMapTheme] = useState<'daylight' | 'cyber' | 'satellite'>('daylight');
+  
+  // Real-time sitting still Dispatcher HQ Location (defaults to Halifax City Hall middle ground)
+  const [hqCoords, setHqCoords] = useState<{ lat: number, lng: number }>({ lat: 44.6488, lng: -63.5752 });
+  const [isWatchingGps, setIsWatchingGps] = useState<boolean>(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<'off' | 'searching' | 'locked'>('off');
+
+  const [sysLogs, setSysLogs] = useState<string[]>([
+    "Fleet control server connected. Latency: 12ms",
+    "Live GPS coordinate streams initialized."
+  ]);
+
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const layersRef = useRef<{
+    hq: L.LayerGroup | null;
+    branches: L.LayerGroup | null;
+    deliveries: L.LayerGroup | null;
+    trucks: L.LayerGroup | null;
+    routes: L.LayerGroup | null;
+  }>({
+    hq: null,
+    branches: null,
+    deliveries: null,
+    trucks: null,
+    routes: null
+  });
+
+  // 1. Initialize Leaflet map instance on mount
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [44.6488, -63.5752],
+      zoom: 10,
+      zoomControl: true,
+      scrollWheelZoom: true,
+      maxZoom: 18,
+      minZoom: 7
+    });
+
+    mapRef.current = map;
+
+    // Create layer groups and add them to the map
+    layersRef.current.hq = L.layerGroup().addTo(map);
+    layersRef.current.branches = L.layerGroup().addTo(map);
+    layersRef.current.deliveries = L.layerGroup().addTo(map);
+    layersRef.current.trucks = L.layerGroup().addTo(map);
+    layersRef.current.routes = L.layerGroup().addTo(map);
+
+    // Map click handler to relocate Dispatcher HQ coordinates
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      setIsWatchingGps(isWatch => {
+        if (isWatch) {
+          setSysLogs(prev => [
+            `[${new Date().toLocaleTimeString()}] Relocation cancelled: Device GPS Tracking is active.`,
+            ...prev.slice(0, 4)
+          ]);
+          return isWatch;
+        }
+        
+        const { lat, lng } = e.latlng;
+        setHqCoords({ lat, lng });
+        setSysLogs(prev => [
+          `[${new Date().toLocaleTimeString()}] Headquarters coordinates manually relocated to GPS ${lat.toFixed(4)}N, ${lng.toFixed(4)}W.`,
+          ...prev.slice(0, 4)
+        ]);
+        return isWatch;
+      });
+    });
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  // 2. Update base tile layers on mapTheme change
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (tileLayerRef.current) {
+      tileLayerRef.current.remove();
+    }
+
+    let urlTemplate = '';
+    let attribution = '';
+
+    if (mapTheme === 'daylight') {
+      urlTemplate = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+      attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+    } else if (mapTheme === 'cyber') {
+      urlTemplate = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+    } else {
+      urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      attribution = 'Tiles &copy; Esri &mdash; Source: Esri, USDA, USGS, and the GIS User Community';
+    }
+
+    const tileLayer = L.tileLayer(urlTemplate, {
+      attribution,
+      maxZoom: 18,
+    }).addTo(mapRef.current);
+
+    tileLayerRef.current = tileLayer;
+  }, [mapTheme]);
+
+  // 3. Update all markers and route vectors dynamically on state/telemetry changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const { hq, branches: bGroup, deliveries: dGroup, trucks: tGroup, routes: rGroup } = layersRef.current;
+    if (hq) hq.clearLayers();
+    if (bGroup) bGroup.clearLayers();
+    if (dGroup) dGroup.clearLayers();
+    if (tGroup) tGroup.clearLayers();
+    if (rGroup) rGroup.clearLayers();
+
+    // Plot hq
+    if (hq) {
+      const hqIcon = L.divIcon({
+        className: 'custom-hq-marker',
+        html: `
+          <div class="relative flex items-center justify-center">
+            <span class="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-blue-500 opacity-60"></span>
+            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-600 border border-white shadow-lg"></span>
+          </div>
+        `,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      L.marker([hqCoords.lat, hqCoords.lng], {
+        icon: hqIcon,
+        title: 'HQ (Dispatcher)'
+      })
+      .addTo(hq)
+      .bindPopup(`
+        <div class="font-sans text-xs p-1">
+          <p class="font-bold text-slate-800">Dispatch Headquarters</p>
+          <p class="text-[10px] text-slate-500">Location: ${hqCoords.lat.toFixed(4)}N, ${hqCoords.lng.toFixed(4)}W</p>
+          <p class="text-[9px] text-blue-600 mt-1 font-semibold">${isWatchingGps ? "🛰️ Live GPS Connected" : "📍 Anchored Point (Click map to move)"}</p>
+        </div>
+      `);
+    }
+
+    // Plot Branches/DC Nodes
+    if (bGroup) {
+      activeBranches.forEach(branch => {
+        const coords = getBranchCoordinates(branch.id, branch.name);
+        const isDC = branch.type === 'DC';
+        const count = deliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
+
+        const branchIcon = L.divIcon({
+          className: 'custom-branch-marker',
+          html: `
+            <div class="relative -translate-y-1 bg-slate-900 border-2 ${
+              isDC ? 'border-red-500 text-red-00' : 'border-blue-400 text-blue-400 font-bold'
+            } shadow-lg py-0.5 px-1.5 rounded-md text-[9px] font-mono leading-none flex items-center gap-1">
+              <span>${isDC ? "DC" : "DEP"}</span>
+              <span class="text-white opacity-80">${branch.name.split(' ')[0]}</span>
+              ${count > 0 ? `<span class="bg-amber-500 text-slate-950 px-1 rounded-full font-sans font-extrabold text-[8px]">${count}</span>` : ''}
+            </div>
+          `,
+          iconSize: [110, 20],
+          iconAnchor: [55, 10]
+        });
+
+        L.marker([coords.lat, coords.lng], {
+          icon: branchIcon
+        })
+        .addTo(bGroup)
+        .bindPopup(`
+          <div class="font-sans text-xs p-1">
+            <p class="font-bold text-slate-850">${branch.name}</p>
+            <p class="text-[10px] text-slate-500">Facility Type: ${branch.type === 'DC' ? 'Distribution Center' : 'Regional Depot'}</p>
+            <p class="text-[9px] text-slate-400">GPS Coords: ${coords.lat.toFixed(4)}N, ${coords.lng.toFixed(4)}W</p>
+            <p class="text-[10px] text-amber-600 mt-1 font-bold">Pending Carrier Loads: ${count}</p>
+          </div>
+        `);
+      });
+    }
+
+    // Plot Customer Delivery Destinations
+    if (dGroup) {
+      deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
+        const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
+        const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
+        const isAssigned = !!delivery.assignedTruck;
+
+        const deliveryIcon = L.divIcon({
+          className: 'custom-delivery-marker',
+          html: `
+            <div class="p-1 rounded-full border border-slate-900 shadow-md ${
+              isAssigned ? 'bg-amber-500 text-slate-950' : 'bg-slate-700 text-slate-100'
+            }">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="lucide lucide-map-pin"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+          `,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        });
+
+        L.marker([destCoords.lat, destCoords.lng], {
+          icon: deliveryIcon
+        })
+        .addTo(dGroup)
+        .bindPopup(`
+          <div class="font-sans text-xs p-1.5 space-y-0.5 font-sans">
+            <p class="font-bold text-slate-900">🎯 Recipient: ${delivery.customerName}</p>
+            <p class="text-[10px] text-slate-600">${delivery.deliveryAddress}</p>
+            <p class="text-[9px] text-slate-500">Invoice: ${delivery.invoiceNumber} &bull; Items: ${delivery.itemsCount}</p>
+            <div class="mt-1.5 flex items-center gap-1.5 border-t border-slate-100 pt-1.5 font-sans">
+              <span class="px-1.5 py-0.25 text-[8.5px] font-extrabold rounded bg-amber-100 text-amber-800 uppercase">
+                ${delivery.status.replace('_', ' ')}
+              </span>
+              <span class="text-[9px] text-slate-500 font-medium">${isAssigned ? `Driver: ${delivery.assignedTruck}` : 'Pending Driver'}</span>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    // Plot drivers / trucks & lines
+    let activeTruckGps: { lat: number; lng: number } | null = null;
+
+    if (tGroup && rGroup) {
+      trucks.forEach(truck => {
+        const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+        const progress = simProgress[truck.id] || 0.15;
+
+        let origCoords: { lat: number; lng: number; x: number; y: number };
+        let endCoords: { lat: number; lng: number; x: number; y: number };
+        let truckLat: number;
+        let truckLng: number;
+        let isMoving = false;
+
+        if (assignedDelivery) {
+          origCoords = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+          endCoords = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, origCoords.x, origCoords.y);
+          
+          truckLat = origCoords.lat + (endCoords.lat - origCoords.lat) * progress;
+          truckLng = origCoords.lng + (endCoords.lng - origCoords.lng) * progress;
+          isMoving = isPlayingSimulation;
+
+          const isSelected = selectedTrackTruckId === truck.id;
+
+          // Route line: From start depot to customer address
+          L.polyline([[origCoords.lat, origCoords.lng], [endCoords.lat, endCoords.lng]], {
+            color: isSelected ? '#f59e0b' : '#64748b',
+            weight: isSelected ? 3.5 : 2,
+            dashArray: isSelected ? '6,6' : '4,4',
+            opacity: isSelected ? 0.95 : 0.6
+          }).addTo(rGroup);
+        } else {
+          origCoords = getBranchCoordinates(truck.branchId, activeBranches.find(b => b.id === truck.branchId)?.name || '');
+          truckLat = origCoords.lat + 0.003;
+          truckLng = origCoords.lng + 0.003;
+          isMoving = false;
+        }
+
+        const isSelected = selectedTrackTruckId === truck.id;
+        if (isSelected || (!selectedTrackTruckId && trucks[0]?.id === truck.id)) {
+          activeTruckGps = { lat: truckLat, lng: truckLng };
+        }
+
+        const truckIcon = L.divIcon({
+          className: 'custom-truck-marker',
+          html: `
+            <div class="p-1.5 rounded-full shadow-lg border-2 flex items-center justify-center transition-all ${
+              isSelected 
+                ? 'bg-amber-500 border-white text-slate-950 scale-110 ring-4 ring-amber-500/35' 
+                : isMoving 
+                  ? 'bg-emerald-600 border-emerald-400 text-white animate-pulse' 
+                  : 'bg-slate-700 border-slate-500 text-slate-300'
+            }">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M19 18h2a1 1 0 0 0 1-1v-5.14a1 1 0 0 0-.293-.707l-4.07-4.07a1 1 0 0 0-.707-.293H14"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+          `,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
+
+        const markerInstance = L.marker([truckLat, truckLng], {
+          icon: truckIcon,
+          zIndexOffset: isSelected ? 1000 : 100
+        })
+        .addTo(tGroup)
+        .bindPopup(`
+          <div class="font-sans text-xs p-1.5 space-y-1">
+            <div class="flex items-center gap-1.5 border-b border-slate-105 pb-1">
+              <span class="w-1.5 h-1.5 rounded-full ${isMoving ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}"></span>
+              <p class="font-bold text-slate-900">${truck.name}</p>
+            </div>
+            <p class="text-[10px] text-slate-500 font-sans">ID: ${truck.id} &bull; Type: ${truck.type || 'Flatbed'}</p>
+            <p class="text-[9px] text-slate-400 font-mono">GPS: ${truckLat.toFixed(5)}N, ${truckLng.toFixed(5)}W</p>
+            ${assignedDelivery ? `
+              <p class="text-[9.5px] text-amber-600 font-extrabold mt-1">
+                🚚 Delivering order ${assignedDelivery.invoiceNumber} (${Math.round(progress * 100)}% complete)
+              </p>
+            ` : '<p class="text-[9.5px] text-slate-500 mt-1 font-semibold">💤 Standby / Refueling</p>'}
+          </div>
+        `);
+
+        // Update selected truck in state when clicking on marker
+        markerInstance.on('click', () => {
+          setSelectedTrackTruckId(prev => prev === truck.id ? null : truck.id);
+        });
+      });
+    }
+
+    // Telemetry wire linking dispatcher to chosen driver
+    if (activeTruckGps && hqCoords && rGroup) {
+      L.polyline([[hqCoords.lat, hqCoords.lng], [activeTruckGps.lat, activeTruckGps.lng]], {
+        color: '#2563eb',
+        weight: 1.5,
+        dashArray: '4,6',
+        opacity: 0.75
+      }).addTo(rGroup);
+    }
+  }, [hqCoords, activeBranches, deliveries, trucks, simProgress, selectedTrackTruckId, isPlayingSimulation, isWatchingGps]);
+
   // Statistics
   const total = deliveries.length;
   const registered = deliveries.filter(d => d.status === DeliveryStatus.REGISTERED).length;
@@ -36,6 +506,108 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
       pending: branchDeliveries.filter(d => d.status === DeliveryStatus.REGISTERED || d.status === DeliveryStatus.PICKED_AND_LOADED).length
     };
   });
+
+  // GPS Simulation Loop
+  useEffect(() => {
+    if (!isPlayingSimulation) return;
+    const interval = setInterval(() => {
+      setSimProgress(prev => {
+        const next = { ...prev };
+        trucks.forEach(t => {
+          const current = prev[t.id] || 0.15;
+          const assignedDelivery = deliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
+          
+          if (assignedDelivery) {
+            let increment = 0.035;
+            let nextVal = current + increment;
+            if (nextVal > 1.0) {
+              nextVal = 0.05; // Reset or loop travel path
+              setSysLogs(prevLogs => [
+                `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] Beacon ${t.id} reached milestone. Dispatch verified.`,
+                ...prevLogs.slice(0, 4)
+              ]);
+            }
+            next[t.id] = nextVal;
+          } else {
+            // Local idle float
+            let nextVal = current + 0.008;
+            if (nextVal > 1.0) nextVal = 0.05;
+            next[t.id] = nextVal;
+          }
+        });
+        return next;
+      });
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [trucks, deliveries, isPlayingSimulation]);
+
+  // Real browser-based Geolocation tracker
+  useEffect(() => {
+    if (!isWatchingGps) {
+      setGpsStatus('off');
+      return;
+    }
+
+    setGpsStatus('searching');
+    if (!navigator.geolocation) {
+      setGpsError("Geolocation API not supported by browser.");
+      setGpsStatus('off');
+      return;
+    }
+
+    const successHandler = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      
+      // Determine if they are inside the general Nova Scotia region
+      const inRegion = latitude >= 43.5 && latitude <= 45.5 && longitude >= -65.5 && longitude <= -62.5;
+      
+      if (inRegion) {
+        setHqCoords({ lat: latitude, lng: longitude });
+        setGpsError(null);
+      } else {
+        // Position isn't within general Canada Nova Scotia - bridge elements dynamically so they can still see it!
+        setHqCoords({ lat: 44.6488, lng: -63.5752 }); // Halifax Center fallback
+        setGpsError("Bridges enabled: Your real location is outside Nova Scotia. Simulated dispatch point locked at Halifax Harbor.");
+      }
+      setGpsStatus('locked');
+      setSysLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] Live GPS Stream Lock initialized at ${latitude.toFixed(4)}N, ${longitude.toFixed(4)}W.`,
+        ...prev.slice(0, 4)
+      ]);
+    };
+
+    const errorHandler = (err: GeolocationPositionError) => {
+      console.warn("Geolocation permission error:", err);
+      setGpsError("Access restricted. Simulating Dispatch Center at central Halifax City Hall.");
+      setHqCoords({ lat: 44.6488, lng: -63.5752 }); // Fallback
+      setGpsStatus('locked');
+      setSysLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] Dynamic GPS fallback active. Tracking seated dispatcher beacon.`,
+        ...prev.slice(0, 4)
+      ]);
+    };
+
+    const watchId = navigator.geolocation.watchPosition(successHandler, errorHandler, {
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 0
+    });
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [isWatchingGps]);
+
+  // Run a manual Radar Ping
+  const triggerRadarPing = () => {
+    setIsPinging(true);
+    setLastRadarPingTime(new Date().toLocaleTimeString());
+    setSysLogs(prevLogs => [
+      `[${new Date().toLocaleTimeString()}] Broadcast Active Sweep Ping to all regional flatbeds.`,
+      ...prevLogs.slice(0, 4)
+    ]);
+    setTimeout(() => {
+      setIsPinging(false);
+    }, 1200);
+  };
 
   return (
     <div className="space-y-6" id="dashboard-tab">
@@ -93,6 +665,691 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
           </div>
         </div>
 
+      </div>
+
+      {/* Interactive Regional Dispatch & Live Driver GPS Tracker */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-md overflow-hidden flex flex-col">
+        <div className="bg-slate-900 px-6 py-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2.5">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <h4 className="font-sans font-bold text-white tracking-tight text-base sm:text-lg flex items-center gap-2">
+                <Compass className="h-5 w-5 text-amber-500 animate-spin" style={{ animationDuration: '8s' }} />
+                Live Regional Dispatch Grid & Driver GPS Monitor
+              </h4>
+            </div>
+            <p className="text-xs text-slate-400 font-normal">
+              Active telemetry synchronized with Canadian Maritime HRM logistics routing and live regional depots
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Theme Selectors */}
+            <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+              <button
+                type="button"
+                onClick={() => setMapTheme('daylight')}
+                className={`px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'daylight' 
+                    ? 'bg-sky-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-705'
+                }`}
+              >
+                Daylight Chart
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapTheme('cyber')}
+                className={`px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'cyber' 
+                    ? 'bg-cyan-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-705'
+                }`}
+              >
+                Cyber HUD
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapTheme('satellite')}
+                className={`px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'satellite' 
+                    ? 'bg-amber-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-705'
+                }`}
+              >
+                Satellite Zoom
+              </button>
+            </div>
+
+            {/* Live GPS locator button */}
+            <button
+              type="button"
+              onClick={() => setIsWatchingGps(!isWatchingGps)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all text-white border cursor-pointer ${
+                isWatchingGps 
+                  ? 'bg-blue-600 border-blue-500 hover:bg-blue-700 animate-pulse' 
+                  : 'bg-slate-800 border-slate-750 hover:bg-slate-700'
+              }`}
+              title="Track real coordinates from your mobile/desktop live on the logistics grid"
+            >
+              <Globe className={`h-3.5 w-3.5 ${isWatchingGps ? 'animate-spin' : ''}`} />
+              <span>{isWatchingGps ? 'GPS Tracker ON' : 'Sync Device GPS'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPlayingSimulation(!isPlayingSimulation)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all text-white border cursor-pointer ${
+                isPlayingSimulation 
+                  ? 'bg-amber-600/90 border-amber-500/30 hover:bg-amber-600' 
+                  : 'bg-emerald-600/90 border-emerald-500/30 hover:bg-emerald-600'
+              }`}
+            >
+              {isPlayingSimulation ? (
+                <>
+                  <Pause className="h-3.5 w-3.5" />
+                  <span>Pause stream</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5" />
+                  <span>Resume telemetry</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={triggerRadarPing}
+              disabled={isPinging}
+              className={`px-3 py-1.5 bg-slate-800 text-slate-200 rounded-lg text-xs font-semibold cursor-pointer border border-slate-750 transition-all flex items-center space-x-1.5 hover:bg-slate-700 disabled:opacity-50 ${isPinging ? 'animate-pulse' : ''}`}
+            >
+              <Radio className={`h-3.5 w-3.5 text-amber-400 ${isPinging ? 'animate-bounce' : ''}`} />
+              <span>{isPinging ? 'Pinging...' : 'Sweep Radar'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[480px] font-sans">
+          
+          {/* Real zoomable Leaflet Map Container */}
+          <div className="lg:col-span-8 p-4 relative border-b lg:border-b-0 lg:border-r border-slate-200/85 flex flex-col justify-between overflow-hidden min-h-[430px] lg:min-h-[500px] bg-slate-50">
+            <div className="relative flex-1 w-full rounded-2xl overflow-hidden shadow-inner border border-slate-200">
+              <div 
+                ref={mapContainerRef} 
+                className="absolute inset-0 w-full h-full z-10" 
+                style={{ background: '#f8fafc' }}
+              />
+              
+              {/* Floating map visual elements */}
+              <div className="absolute top-3 right-3 text-[10px] font-mono uppercase tracking-widest flex items-center space-x-2 z-20 bg-slate-900/90 border border-slate-800 py-1.5 px-2.5 rounded-lg text-slate-200 shadow-md">
+                <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
+                <span>Interactive Live Fleet grid</span>
+              </div>
+            </div>
+
+            {/* Bottom Legend Map Panel */}
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between text-[11px] gap-2 pr-1 text-slate-500">
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="flex items-center space-x-1.5 font-medium">
+                  <span className="w-4 h-4 bg-red-950 border border-red-500 rounded text-[8px] font-bold flex items-center justify-center text-red-400 font-mono">DC</span>
+                  <span>DC Depot</span>
+                </span>
+                <span className="flex items-center space-x-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 bg-blue-600 rounded-full border border-blue-400"></span>
+                  <span>Active Drivers</span>
+                </span>
+                <span className="flex items-center space-x-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 bg-blue-600 rounded-full border border-white relative inline-flex">
+                    <span className="animate-ping absolute inset-0 rounded-full bg-blue-400 opacity-75"></span>
+                  </span>
+                  <span>Dispatcher (HQ)</span>
+                </span>
+                <span className="flex items-center space-x-1.5 font-medium text-amber-600 animate-pulse">
+                  <MapPin className="h-3 w-3 fill-amber-500 text-amber-600" />
+                  <span>Pending Dropoffs</span>
+                </span>
+              </div>
+              <span className="font-mono text-[9.5px] uppercase opacity-75">
+                Dynamic Map Grids Engine &bull; Halifax Regional Municipality
+              </span>
+            </div>
+          </div>
+
+          <div className="hidden">
+            {/* Visual Vector Map Canvas */}
+          <div 
+            onClick={handleMapClick}
+            className={`lg:col-span-8 p-6 relative border-b lg:border-b-0 lg:border-r flex flex-col justify-between overflow-hidden cursor-crosshair group select-none transition-all duration-300 min-h-[380px] ${
+              mapTheme === 'daylight' 
+                ? 'bg-sky-50/70 border-slate-200 bg-[radial-gradient(#94a3b8_0.8px,transparent_0.8px)] [background-size:20px_20px]' 
+                : mapTheme === 'cyber' 
+                  ? 'bg-slate-950/95 border-slate-800 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]' 
+                  : 'bg-[#050f21] border-slate-800 bg-[radial-gradient(#112240_1px,transparent_1px)] [background-size:18px_18px]'
+            }`}
+          >
+            
+            <div className="absolute top-4 right-4 text-[10px] font-mono uppercase tracking-widest flex items-center space-x-2 z-20 bg-slate-900/90 border border-slate-850 py-1.5 px-2.5 rounded-lg text-slate-300 shadow-md">
+              <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
+              <span>HRM Grid Centroid: REF_44_64N</span>
+            </div>
+
+            {/* High Fidelity Vector Coastlines / Island Geo-Topology Background Layer */}
+            <div className="absolute inset-0 pointer-events-none w-full h-full">
+              <svg className="w-full h-full opacity-90 transition-all duration-500" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                {(() => {
+                  const colors = 
+                    mapTheme === 'daylight' 
+                      ? { water: '#b2e2f2', land: '#faf9f5', shore: '#0284c7', bridge: '#ef4444', highway: '#94a3b8' } 
+                      : mapTheme === 'cyber' 
+                        ? { water: '#020617', land: '#0f172a', shore: '#06b6d4', bridge: '#f59e0b', highway: '#1e293b' } 
+                        : { water: '#050e1e', land: '#111e30', shore: '#38bdf8', bridge: '#10b981', highway: '#112240' };
+                  
+                  return (
+                    <g>
+                      {/* Deep Water base fill */}
+                      <rect width="100" height="100" fill={colors.water} className="transition-all duration-500" />
+
+                      {/* Main Peninsula and West Mainland Shoreline Structure */}
+                      <path
+                        d="M -10,-10 L 48,-10 Q 42,15 44,22 T 38,36 T 32,45 T 18,52 T -10,65 Z"
+                        fill={colors.land}
+                        stroke={colors.shore}
+                        strokeWidth="0.8"
+                        className="transition-all duration-500"
+                      />
+
+                      {/* Bedford Basin enclosed water body */}
+                      <path
+                        d="M 44,12 C 41,6 54,4 58,10 C 60,18 48,22 44,12 Z"
+                        fill={colors.water}
+                        stroke={colors.shore}
+                        strokeWidth="0.5"
+                        className="transition-all duration-500"
+                      />
+
+                      {/* Eastern Dartmouth Landmass */}
+                      <path
+                        d="M 110,-10 L 64,-10 Q 56,12 61,22 T 66,33 T 75,44 T 88,52 T 110,55 Z"
+                        fill={colors.land}
+                        stroke={colors.shore}
+                        strokeWidth="0.8"
+                        className="transition-all duration-500"
+                      />
+
+                      {/* Southerly Bay / South Shore Landmasses (Bridgewater region) */}
+                      <path
+                        d="M -10,63 L 26,58 Q 30,68 22,78 T 10,88 T -10,100 Z"
+                        fill={colors.land}
+                        stroke={colors.shore}
+                        strokeWidth="0.8"
+                        className="transition-all duration-500"
+                      />
+
+                      {/* Islands */}
+                      <circle cx="55" cy="46" r="1.5" fill={colors.land} stroke={colors.shore} strokeWidth="0.3" className="transition-all duration-500" /> { /* McNabs Island */}
+                      <circle cx="51" cy="38" r="0.8" fill={colors.land} stroke={colors.shore} strokeWidth="0.3" className="transition-all duration-500" /> { /* Georges Island */}
+
+                      {/* Major Logistics Bridges Crossing the Harbour Narrows */}
+                      <line x1="43" y1="21" x2="60" y2="19" stroke={colors.bridge} strokeWidth="0.4" strokeDasharray="1,1" className="transition-all duration-500" />
+                      <line x1="40" y1="34" x2="63" y2="30" stroke={colors.bridge} strokeWidth="0.4" className="transition-all duration-500" />
+
+                      {/* Major Highways Ribbons */}
+                      <path d="M 10,12 L 40,24 Q 44,28 52,28 T 72,25 T 90,15" fill="none" stroke={colors.highway} strokeWidth="0.5" strokeDasharray="2,2" opacity="0.6" className="transition-all duration-500" />
+                      <path d="M 22,10 L 22,85" fill="none" stroke={colors.highway} strokeWidth="0.3" opacity="0.5" className="transition-all duration-500" />
+                    </g>
+                  );
+                })()}
+              </svg>
+            </div>
+
+            {/* Live connecting tether line-of-sight signal projection between Headquarters (Sitting Still) and current selected truck */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-15" xmlns="http://www.w3.org/2000/svg">
+              {(() => {
+                const hqPercent = getPercentCoordsFromGps(hqCoords.lat, hqCoords.lng);
+                const matchedTruck = selectedTrackTruckId ? trucks.find(t => t.id === selectedTrackTruckId) : trucks[0];
+                if (!matchedTruck) return null;
+
+                const assignedDelivery = deliveries.find(d => d.assignedTruck === matchedTruck.id && d.status !== DeliveryStatus.DELIVERED);
+                const progress = simProgress[matchedTruck.id] || 0.15;
+                let truckX: number;
+                let truckY: number;
+                let truckLat: number;
+                let truckLng: number;
+
+                if (assignedDelivery) {
+                  const origCoords = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+                  const destCoords = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, origCoords.x, origCoords.y);
+                  truckX = origCoords.x + (destCoords.x - origCoords.x) * progress;
+                  truckY = origCoords.y + (destCoords.y - origCoords.y) * progress;
+                  truckLat = origCoords.lat + (destCoords.lat - origCoords.lat) * progress;
+                  truckLng = origCoords.lng + (destCoords.lng - origCoords.lng) * progress;
+                } else {
+                  const origCoords = getBranchCoordinates(matchedTruck.branchId, activeBranches.find(b => b.id === matchedTruck.branchId)?.name || '');
+                  truckX = origCoords.x + 2;
+                  truckY = origCoords.y + 4;
+                  truckLat = origCoords.lat + 0.005;
+                  truckLng = origCoords.lng + 0.005;
+                }
+
+                const distance = calculateDistanceKm(hqCoords.lat, hqCoords.lng, truckLat, truckLng);
+
+                return (
+                  <g key="tether-wire">
+                    <line
+                      x1={`${hqPercent.x}%`}
+                      y1={`${hqPercent.y}%`}
+                      x2={`${truckX}%`}
+                      y2={`${truckY}%`}
+                      stroke={mapTheme === 'daylight' ? '#2563eb' : '#06b6d4'}
+                      strokeWidth="2"
+                      strokeDasharray="4,6"
+                      opacity="0.8"
+                    />
+                    <foreignObject
+                      x={`${(hqPercent.x + truckX) / 2 - 40}%`}
+                      y={`${(hqPercent.y + truckY) / 2 - 12}%`}
+                      width="80"
+                      height="24"
+                      className="overflow-visible pointer-events-none"
+                    >
+                      <div className="bg-slate-900/90 text-white font-mono text-[9px] font-semibold border border-slate-755 py-0.5 px-1.5 rounded-md shadow-md text-center flex items-center justify-center gap-1">
+                        <span>🛰️ {distance.toFixed(1)} km</span>
+                      </div>
+                    </foreignObject>
+                  </g>
+                );
+              })()}
+            </svg>
+
+            {/* Live routing visualizer paths for active vehicles */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
+              {trucks.map(truck => {
+                const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+                if (!assignedDelivery) return null;
+                
+                const origCoords = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+                const destCoords = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, origCoords.x, origCoords.y);
+                
+                const x1 = `${origCoords.x}%`;
+                const y1 = `${origCoords.y}%`;
+                const x2 = `${destCoords.x}%`;
+                const y2 = `${destCoords.y}%`;
+                
+                const isSelected = selectedTrackTruckId === truck.id;
+
+                return (
+                  <g key={`route-${truck.id}`}>
+                    <line 
+                      x1={x1} 
+                      y1={y1} 
+                      x2={x2} 
+                      y2={y2} 
+                      stroke={isSelected ? "#f59e0b" : (mapTheme === 'daylight' ? '#64748b' : '#475569')} 
+                      strokeWidth={isSelected ? "2.5" : "1.5"} 
+                      strokeDasharray={isSelected ? "5,5" : "4,4"}
+                      opacity={isSelected ? "0.9" : "0.5"}
+                    />
+                    <circle 
+                      cx={x2} 
+                      cy={y2} 
+                      r={isSelected ? "8" : "4"} 
+                      fill="none" 
+                      stroke={isSelected ? "#ef4444" : "#cbd5e1"} 
+                      strokeWidth="1.5" 
+                      opacity="0.6"
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Map Plot Markers layer */}
+            <div className="relative w-full h-full min-h-[360px] z-20">
+              
+              {isPinging && (
+                <div className="absolute inset-0 pointer-events-none border border-slate-700/10 rounded-full animate-ping bg-amber-500/2 opacity-10" />
+              )}
+
+              {/* 1. Dispatcher sitting still HQ anchor plot */}
+              {(() => {
+                const hqPercent = getPercentCoordsFromGps(hqCoords.lat, hqCoords.lng);
+                return (
+                  <div
+                    style={{ left: `${hqPercent.x}%`, top: `${hqPercent.y}%` }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group z-35"
+                  >
+                    <span className="flex h-5 w-5 relative items-center justify-center">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600 border border-white shadow-lg shadow-black/80"></span>
+                    </span>
+                    <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-blue-900 border border-blue-750 text-white font-mono text-[8.5px] py-0.5 px-2 rounded shadow-md whitespace-nowrap z-40">
+                      📍 HQ ({isWatchingGps ? "Device GPS" : "Anchor Point"})
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 2. Branch/DC Nodes */}
+              {activeBranches.map(branch => {
+                const coords = getBranchCoordinates(branch.id, branch.name);
+                const isDC = branch.type === 'DC';
+                const countOfActiveDeliveriesAtBranch = deliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
+
+                return (
+                  <div
+                    key={`marker-${branch.id}`}
+                    style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer z-10 transition-all hover:scale-110"
+                    title={`${branch.name} (${branch.type})`}
+                  >
+                    <div className={`p-1.5 rounded-lg border-2 ${
+                      isDC 
+                        ? 'bg-red-950 border-red-500 text-red-400 font-bold' 
+                        : 'bg-blue-950 border-blue-505 text-blue-400 font-bold'
+                    } shadow-lg shadow-black/50 flex items-center justify-center`}>
+                      <span className="text-[9px] font-mono leading-none">{isDC ? "DC" : "DEP"}</span>
+                    </div>
+
+                    {countOfActiveDeliveriesAtBranch > 0 && (
+                      <span className="absolute -top-2.5 -right-2 px-1 py-0.25 bg-amber-500 text-black font-semibold text-[8px] font-mono rounded-full scale-90 border border-slate-900 leading-none">
+                        {countOfActiveDeliveriesAtBranch}
+                      </span>
+                    )}
+
+                    {/* Popover label on Hover */}
+                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[10px] text-white px-2 py-1 rounded shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-25 font-sans">
+                      <span className="font-semibold">{branch.name}</span>
+                      <p className="text-[8px] text-slate-400 font-mono">ID: {branch.id} &bull; GPS: {coords.lat.toFixed(4)}N, {coords.lng.toFixed(4)}W</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* 3. Customer Delivery Destination Pins */}
+              {deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).map(delivery => {
+                const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
+                const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
+                const isAssigned = !!delivery.assignedTruck;
+
+                return (
+                  <div
+                    key={`pin-${delivery.id}`}
+                    style={{ left: `${destCoords.x}%`, top: `${destCoords.y}%` }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer z-5 transition-all hover:scale-115"
+                    title={`Recipient: ${delivery.customerName}`}
+                  >
+                    <div className={`p-1 rounded-full border shadow-md ${
+                      isAssigned 
+                        ? 'bg-amber-955 border-amber-500 text-amber-400' 
+                        : (mapTheme === 'daylight' ? 'bg-slate-300 border-slate-500 text-slate-700' : 'bg-slate-900 border-slate-700 text-slate-450')
+                    }`}>
+                      <MapPin className="h-2.5 w-2.5" />
+                    </div>
+
+                    {/* Popover */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[10px] text-white px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-25 font-sans space-y-0.5">
+                      <p className="font-semibold text-slate-150">🎯 Recipient: {delivery.customerName}</p>
+                      <p className="text-[8px] text-slate-400 font-mono">Invoice: {delivery.invoiceNumber} &bull; {delivery.deliveryAddress}</p>
+                      <p className="text-[8px] text-amber-400">Status: {delivery.status.replace('_', ' ')} {isAssigned ? `(Assigned: ${delivery.assignedTruck})` : '(Unassigned)'}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* 4. Live Active Driver Trucks Layer */}
+              {trucks.map(truck => {
+                const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+                const progress = simProgress[truck.id] || 0.15;
+                
+                let origCoords: { x: number; y: number; lat: number; lng: number };
+                let endCoords: { x: number; y: number; lat: number; lng: number };
+                let xPosition: number;
+                let yPosition: number;
+                let isMoving = false;
+
+                if (assignedDelivery) {
+                  origCoords = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+                  endCoords = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, origCoords.x, origCoords.y);
+                  
+                  xPosition = origCoords.x + (endCoords.x - origCoords.x) * progress;
+                  yPosition = origCoords.y + (endCoords.y - origCoords.y) * progress;
+                  isMoving = isPlayingSimulation;
+                } else {
+                  origCoords = getBranchCoordinates(truck.branchId, activeBranches.find(b => b.id === truck.branchId)?.name || '');
+                  xPosition = origCoords.x + 2;
+                  yPosition = origCoords.y + 4;
+                  isMoving = false;
+                }
+
+                const isSelected = selectedTrackTruckId === truck.id;
+
+                return (
+                  <button
+                    key={`gps-truck-${truck.id}`}
+                    type="button"
+                    style={{ left: `${xPosition}%`, top: `${yPosition}%` }}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Stop click from propagating and moving the HQ anchor!
+                      setSelectedTrackTruckId(isSelected ? null : truck.id);
+                    }}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 p-1.5 rounded-full shadow-lg border-2 z-30 cursor-pointer group transition-all duration-1000 hover:scale-120 ${
+                      isSelected 
+                        ? 'bg-amber-500 border-white text-slate-950 scale-110 ring-4 ring-amber-500/35' 
+                        : isMoving 
+                          ? 'bg-blue-600 border-blue-400 text-white animate-pulse' 
+                          : 'bg-slate-800 border-slate-600 text-slate-300'
+                    }`}
+                  >
+                    <div className="relative">
+                      {isMoving && (
+                        <span className="absolute -inset-1 rounded-full animate-ping bg-blue-500/20" />
+                      )}
+                      <TruckIcon className="h-3.5 w-3.5 transform-gpu" />
+                    </div>
+
+                    {/* Popover display info */}
+                    <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-850 text-[10px] text-white px-2.5 py-1.5 rounded-xl shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-40 font-sans space-y-0.5">
+                      <p className="font-extrabold text-white flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${isMoving ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                        🚚 {truck.name} ({truck.type || 'Flatbed'})
+                      </p>
+                      <p className="text-[8.5px] text-amber-400 font-medium">Driver: {truck.driver || 'No assigned driver'}</p>
+                      {assignedDelivery ? (
+                        <>
+                          <p className="text-[8px] text-emerald-400 font-mono font-semibold">Active Run: {assignedDelivery.id}</p>
+                          <p className="text-[8px] text-slate-400 font-mono">Manifest Status: {assignedDelivery.status}</p>
+                          <p className="text-[8px] text-slate-400">Destination: {assignedDelivery.deliveryAddress}</p>
+                        </>
+                      ) : (
+                        <p className="text-[8px] text-slate-400 italic">Idle at home depot base</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+
+            </div>
+
+            {/* Bottom Legend Map Panel */}
+            <div className={`mt-4 pt-3 border-t flex flex-wrap items-center justify-between text-[11px] gap-2 pr-2 transition-colors duration-300 z-10 ${
+              mapTheme === 'daylight' ? 'border-slate-300 text-slate-600' : 'border-slate-850 text-slate-400'
+            }`}>
+              <div className="flex flex-wrap items-center gap-4 font-medium">
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-3 h-3 bg-red-950 border border-red-500 rounded text-[8px] font-bold flex items-center justify-center text-red-400 font-mono">DC</span>
+                  <span>DC Depots</span>
+                </span>
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-2.5 h-2.5 bg-blue-600 rounded-full border border-blue-400"></span>
+                  <span>Active Drivers</span>
+                </span>
+                <span className="flex items-center space-x-1.5 font-sans">
+                  <span className="w-2.5 h-2.5 bg-blue-600 rounded-full border border-white relative inline-flex">
+                    <span className="animate-ping absolute inset-0 rounded-full bg-blue-400 opacity-75"></span>
+                  </span>
+                  <span>Dispatcher (You)</span>
+                </span>
+                <span className="flex items-center space-x-1.5">
+                  <MapPin className="h-3 w-3 text-amber-500" />
+                  <span>Pending Dropoffs</span>
+                </span>
+              </div>
+              <span className="font-mono text-[9.5px] uppercase opacity-75">
+                Dynamic Map Grids Engine &bull; Halifax Regional Municipality
+              </span>
+            </div>
+
+          </div>
+
+          {/* Telemetry Sidebar Details */}
+          <div className="lg:col-span-4 p-5 flex flex-col justify-between space-y-6 bg-slate-900 border-l border-slate-800 text-white">
+            
+            <div className="space-y-4">
+              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                <h5 className="font-sans font-bold text-white text-xs tracking-wider uppercase font-mono">
+                  🛰️ Selected Telemetry Tag
+                </h5>
+                <span className="text-[9px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded uppercase">
+                  {selectedTrackTruckId ? "Tag_OK" : "STANDBY"}
+                </span>
+              </div>
+
+              {selectedTrackTruckId ? (() => {
+                const matchedTruck = trucks.find(t => t.id === selectedTrackTruckId);
+                if (!matchedTruck) return null;
+                const assignedDelivery = deliveries.find(d => d.assignedTruck === matchedTruck.id && d.status !== DeliveryStatus.DELIVERED);
+                
+                const progress = simProgress[matchedTruck.id] || 0.15;
+                const homeBranch = activeBranches.find(b => b.id === matchedTruck.branchId);
+
+                // Compute real-time latitude & longitude
+                let lat = 44.6636;
+                let lng = -63.5683;
+                if (assignedDelivery) {
+                  const origCoords = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+                  const destCoords = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, origCoords.x, origCoords.y);
+                  
+                  const xVal = origCoords.x + (destCoords.x - origCoords.x) * progress;
+                  const yVal = origCoords.y + (destCoords.y - origCoords.y) * progress;
+                  
+                  lat = 44.4 + (yVal / 100) * 0.45;
+                  lng = -64.1 + (xVal / 100) * 0.65;
+                } else if (homeBranch) {
+                  const origCoords = getBranchCoordinates(homeBranch.id, homeBranch.name);
+                  lat = origCoords.lat;
+                  lng = origCoords.lng;
+                }
+
+                return (
+                  <div className="space-y-3.5">
+                    <div className="p-3 bg-slate-900 rounded-xl border border-slate-850 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-sans font-extrabold text-amber-400 text-sm">{matchedTruck.name}</span>
+                        <span className="text-[10px] bg-slate-800 border border-slate-700 font-mono py-0.5 px-2 rounded-md font-bold text-slate-300 uppercase">
+                          {matchedTruck.type || 'Flatbed'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
+                        <div>
+                          <p className="text-slate-500 font-mono">Driver Base</p>
+                          <p className="text-slate-200 mt-0.5 font-bold">{matchedTruck.driver || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 font-mono">Home Depot</p>
+                          <p className="text-slate-200 mt-0.5 font-bold truncate">{homeBranch?.name || 'Central'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {assignedDelivery ? (
+                      <div className="bg-amber-955/20 border border-amber-500/25 p-3 rounded-xl space-y-2 text-xs">
+                        <div className="flex items-center justify-between text-amber-500">
+                          <span className="font-semibold font-mono">Transit Manifest</span>
+                          <span className="font-bold uppercase text-[9px] px-1.5 py-0.5 bg-amber-500/10 border border-amber-505/20 rounded font-sans tracking-wide">
+                            {assignedDelivery.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div className="space-y-1.5 font-sans">
+                          <p className="text-slate-300 flex items-start gap-1 justify-between text-[11px]">
+                            <span className="text-slate-400 font-semibold truncate">Ref Order:</span>
+                            <span className="font-mono text-emerald-400 font-bold">{assignedDelivery.id}</span>
+                          </p>
+                          <p className="text-slate-300 flex items-start gap-1 justify-between text-[11px]">
+                            <span className="text-slate-400 font-semibold">Recipient:</span>
+                            <span className="text-slate-200 font-medium truncate max-w-[140px] text-right">{assignedDelivery.customerName}</span>
+                          </p>
+                          <p className="text-slate-300 flex flex-col pt-1 text-[11px]">
+                            <span className="text-slate-400 font-semibold pb-0.5 animate-pulse">Destination:</span>
+                            <span className="text-slate-200 text-[10px] break-words">{assignedDelivery.deliveryAddress}</span>
+                          </p>
+                          <p className="text-slate-300 flex items-center justify-between pt-1 border-t border-slate-900/60 font-mono text-[10px]">
+                            <span>Journey:</span>
+                            <span className="text-amber-500 font-semibold">{Math.round(progress * 100)}% complete</span>
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-900/80 border border-slate-800/60 p-4 rounded-xl text-center space-y-1">
+                        <Info className="h-5 w-5 text-slate-500 mx-auto" />
+                        <h6 className="font-semibold text-slate-300 text-xs">Idle Telemetry Mode</h6>
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                          Waiting at storefront depot station. Assign a ticket to dispatch this vehicle.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Coordinates Monitor Panel */}
+                    <div className="p-3 bg-slate-950 rounded-xl border-2 border-dashed border-slate-900 space-y-1.5">
+                      <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                        <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
+                        Live GPS Coordinates Input
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-[11.5px] font-mono">
+                        <div className="p-1.5 bg-slate-900 rounded border border-slate-850 text-center">
+                          <span className="text-[9px] text-slate-500 block uppercase font-bold">LATITUDE</span>
+                          <span className="text-emerald-400 font-extrabold">{lat.toFixed(6)} N</span>
+                        </div>
+                        <div className="p-1.5 bg-slate-900 rounded border border-slate-850 text-center">
+                          <span className="text-[9px] text-slate-500 block uppercase font-bold">LONGITUDE</span>
+                          <span className="text-emerald-400 font-extrabold">{lng.toFixed(6)} W</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div className="bg-slate-900/40 border border-slate-850 p-6 rounded-2xl text-center space-y-2 flex flex-col items-center justify-center min-h-[220px]">
+                  <Navigation className="h-8 w-8 text-slate-700 animate-bounce" style={{ animationDuration: '3s' }} />
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed max-w-[200px]">
+                    Select any active driver vehicle on the map to bind real-time coordinates, live route traces, and active manifest details.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Active Radar Ping Console Logs */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 uppercase tracking-wider border-b border-slate-900 pb-2.5">
+                <span>🛰️ Dispatch Console Log</span>
+                <span>Sweep: {lastRadarPingTime}</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-900 text-[9.5px] font-mono text-slate-450 space-y-1.5 min-h-[90px] max-h-[110px] overflow-y-auto pr-1">
+                {sysLogs.map((log, index) => (
+                  <div key={index} className="flex items-start space-x-1.5 text-slate-400 hover:text-slate-100 transition-colors">
+                    <span className="text-amber-500/80">&bull;</span>
+                    <span className="leading-normal">{log}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
       </div>
 
       {/* Main Grid: Hub Capacity + Registered Active Fleet */}
