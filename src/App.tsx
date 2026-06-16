@@ -604,55 +604,26 @@ export default function App() {
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-9 w-auto object-contain rounded-lg"
+                className="h-10 w-auto object-contain rounded-lg"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
-              <div className="flex items-center justify-center sm:justify-start space-x-2">
-                <h1 className="font-sans font-extrabold text-lg tracking-tight leading-3">ProSpaces</h1>
-                <span className="bg-white/20 text-white text-[9px] uppercase font-mono px-2 py-0.5 rounded font-bold border border-white/10 tracking-widest leading-none">
-                  {currentTenant.code} Workspace
-                </span>
-                <span className="bg-white/30 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none flex items-center">
-                  Tenant Active: {currentTenant.logoBadge}
-                </span>
-              </div>
-              <p className="text-white/80 text-[11px] font-medium mt-1 leading-none">
-                {currentTenant.regionalFocus} Logistics Portal &bull; {currentTenant.name}
+              <h1 className="font-sans font-extrabold text-xs sm:text-sm uppercase tracking-wider text-white leading-tight">
+                {currentTenant.regionalFocus} Logistics Portal
+              </h1>
+              <p className="text-white/80 text-[10px] sm:text-xs font-medium mt-0.5 leading-none">
+                {currentTenant.name}
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Logged-In User Profile context */}
           <div className="flex items-center space-x-3">
-            <div className={`hidden md:flex items-center space-x-2 ${theme.bannerBg} px-3 py-1.5 rounded-lg text-xs font-mono text-white`}>
+            <div className={`flex items-center space-x-2 ${theme.bannerBg} px-3 py-1.5 rounded-lg text-xs font-mono text-white`}>
               <Store className="h-3.5 w-3.5 text-white/80" />
               <span>{branches.length} Registers &bull; {trucks.length} Vehicles</span>
             </div>
-            
-            {/* Live Supabase Status Badge */}
-            <div className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-mono text-white tracking-tight border transition-all ${
-              supabaseStatus?.connected 
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' 
-                : 'bg-amber-950/40 border-amber-500/30 text-amber-300 animate-pulse'
-            }`}>
-              <Database className="h-3 w-3" />
-              <span>{supabaseStatus?.connected ? 'Supabase Live' : 'Local Sandbox'}</span>
-              {lastSyncTime && (
-                <span className="text-[9px] text-white/50 border-l border-white/10 pl-1.5 ml-1.5 hidden lg:inline">
-                  Synced: {lastSyncTime}
-                </span>
-              )}
-            </div>
-
-            <button 
-              onClick={handleClearAllData}
-              title="Delete all test data (Deliveries, Stores, Trucks, and other profiles) while keeping your session"
-              className="text-[10px] bg-red-600 hover:bg-red-700 px-2.5 py-1.5 rounded border border-red-500/30 font-mono text-white font-semibold transition-colors flex items-center space-x-1 shadow-sm cursor-pointer"
-            >
-              <span>🗑️ Purge Test Data</span>
-            </button>
 
             {/* Authenticated User Badge & Logout Switcher */}
             <div className="flex items-center space-x-2.5 border-l border-white/20 pl-3">
