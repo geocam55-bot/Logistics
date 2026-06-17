@@ -180,7 +180,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
       if (firstReady) {
         code = firstReady.barcode;
       } else {
-        return;
+        // Fallback: Generate a realistic new Sales Order number if no presets exist or all are processed
+        code = `SO-${Math.floor(100000 + Math.random() * 900000)}`;
       }
     }
 
@@ -578,6 +579,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                 className="flex-1 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <button 
+                type="button"
                 onClick={() => handleScanAction(barcodeInput)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold"
               >
