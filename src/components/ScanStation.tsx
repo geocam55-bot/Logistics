@@ -47,6 +47,12 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
   const [audioFeedback, setAudioFeedback] = useState(true);
   const [scanMessage, setScanMessage] = useState('');
   const [flashForm, setFlashForm] = useState(false);
+  const [lastScan, setLastScan] = useState<{
+    barcode: string;
+    timestamp: Date;
+    resolvedStatus: 'NEW' | 'REGISTERED' | 'PICKED' | 'DELIVERED_OR_RETURNED' | 'NOT_FOUND';
+    customerName?: string;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -178,6 +184,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
       }
     }
 
+    setAimedBarcode(''); // Do not remember the chosen target or last scan state!
     setFlashForm(true);
     setTimeout(() => setFlashForm(false), 900);
 
@@ -188,6 +195,30 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
 
     // Look if the item is already registered in our tracker
     const existing = deliveries.find(d => d.id === code);
+    const preset = PRESET_PENDING_EPICOR_ORDERS.find(p => p.barcode === code);
+
+    let resStatus: 'NEW' | 'REGISTERED' | 'PICKED' | 'DELIVERED_OR_RETURNED' | 'NOT_FOUND' = 'NOT_FOUND';
+    let custName = preset?.customerName || '';
+
+    if (existing) {
+      custName = existing.customerName;
+      if (existing.status === DeliveryStatus.REGISTERED) {
+        resStatus = 'REGISTERED';
+      } else if (existing.status === DeliveryStatus.PICKED_AND_LOADED) {
+        resStatus = 'PICKED';
+      } else {
+        resStatus = 'DELIVERED_OR_RETURNED';
+      }
+    } else if (preset) {
+      resStatus = 'NEW';
+    }
+
+    setLastScan({
+      barcode: code,
+      timestamp: new Date(),
+      resolvedStatus: resStatus,
+      customerName: custName
+    });
 
     if (existing) {
       setScannedRecord(existing);
@@ -457,7 +488,13 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                     <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-400 font-mono shrink-0">Aiming At:</span>
                     <select
                       value={aimedBarcode}
-                      onChange={(e) => setAimedBarcode(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          handleScanAction(val);
+                          stopCamera();
+                        }
+                      }}
                       className="bg-slate-800 border-none text-white text-[10px] font-mono rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold truncate max-w-[150px] cursor-pointer"
                     >
                       <option value="" className="bg-slate-900 text-slate-300 italic text-[10px]">
@@ -563,7 +600,10 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
               return (
                 <button
                   key={order.barcode}
-                  onClick={() => handleScanAction(order.barcode)}
+                  onClick={() => {
+                    handleScanAction(order.barcode);
+                    stopCamera();
+                  }}
                   className="w-full text-left p-2 border border-slate-100 rounded-lg hover:bg-slate-50 flex items-center justify-between text-xs transition-colors"
                 >
                   <div className="truncate pr-2">
@@ -666,9 +706,46 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
               ) : (
                 <>
                   <p className="text-sm font-semibold text-gray-900 font-sans">Ready to Scan Delivery</p>
-                  <p className="text-xs max-w-xs mx-auto">
-                    Initiate a physical or simulated scan. The system will auto-route you to the logical next stage.
+                  <p className="text-xs max-w-xs mx-auto text-gray-505 leading-relaxed mb-1">
+                    Initiate a physical scan or select a preset order above to route to the correct logistics phase.
                   </p>
+
+                  {lastScan && (
+                    <div className="w-full max-w-sm mx-auto bg-slate-50 border border-slate-200 p-3 rounded-lg text-left space-y-2 mt-4 shadow-sm animate-pulse">
+                      <div className="flex justify-between items-center pb-1 border-b border-slate-200">
+                        <span className="text-[10px] font-bold uppercase text-slate-500 font-mono tracking-wider">Latest Scan State</span>
+                        <span className="text-[10px] text-slate-400 font-mono">{lastScan.timestamp.toLocaleTimeString()}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
+                        <div>
+                          <span className="text-gray-400 block uppercase font-mono text-[9px]">Barcode Ref</span>
+                          <strong className="font-mono text-blue-600 truncate block">{lastScan.barcode}</strong>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block uppercase font-mono text-[9px]">Cust / Delivery</span>
+                          <strong className="text-slate-800 truncate block">{lastScan.customerName || 'Handwritten/Unknown'}</strong>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-400 block uppercase font-mono text-[9px] mb-0.5">Route Phase Detected</span>
+                          <div className="flex items-center space-x-1.5 mt-0.5">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider ${
+                              lastScan.resolvedStatus === 'NEW' ? 'bg-orange-100 text-orange-850' :
+                              lastScan.resolvedStatus === 'REGISTERED' ? 'bg-blue-105 border border-blue-200 text-blue-800' :
+                              lastScan.resolvedStatus === 'PICKED' ? 'bg-amber-100 text-amber-850' :
+                              lastScan.resolvedStatus === 'DELIVERED_OR_RETURNED' ? 'bg-emerald-100 text-emerald-850' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {lastScan.resolvedStatus === 'NEW' ? 'Unregistered Order (P1)' :
+                               lastScan.resolvedStatus === 'REGISTERED' ? 'Ready to Pack & Load (P2)' :
+                               lastScan.resolvedStatus === 'PICKED' ? 'En Route (P3)' :
+                               lastScan.resolvedStatus === 'DELIVERED_OR_RETURNED' ? 'Fully Documented (P4)' :
+                               'Handwritten Barcode'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
