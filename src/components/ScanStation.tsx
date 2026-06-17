@@ -43,9 +43,10 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
   // Scanner UI States
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [aimedBarcode, setAimedBarcode] = useState(PRESET_PENDING_EPICOR_ORDERS[0]?.barcode || '');
+  const [aimedBarcode, setAimedBarcode] = useState('');
   const [audioFeedback, setAudioFeedback] = useState(true);
   const [scanMessage, setScanMessage] = useState('');
+  const [flashForm, setFlashForm] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -53,6 +54,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
 
   const startCamera = async () => {
     setCameraError(null);
+    setAimedBarcode(''); // Reset aiming barcode state to empty when camera starts
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
@@ -164,10 +166,23 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
 
   // Helper: Trigger mock scan of a specific barcode string
   const handleScanAction = (barcode: string) => {
-    const code = barcode.trim();
-    if (!code) return;
+    let code = barcode.trim();
+    if (!code) {
+      // Find the first pending (unregistered) order preset, or fall back to the first preset
+      const firstReady = PRESET_PENDING_EPICOR_ORDERS.find(o => !deliveries.some(d => d.id === o.barcode)) 
+        || PRESET_PENDING_EPICOR_ORDERS[0];
+      if (firstReady) {
+        code = firstReady.barcode;
+      } else {
+        return;
+      }
+    }
+
+    setFlashForm(true);
+    setTimeout(() => setFlashForm(false), 900);
 
     playBeep();
+    setBarcodeInput(''); // Clear keyboard typewriter input so user knows it succeeded!
     setScanMessage(`Scanned Barcode: "${code}"`);
     setTimeout(() => setScanMessage(''), 3000);
 
@@ -445,6 +460,9 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                       onChange={(e) => setAimedBarcode(e.target.value)}
                       className="bg-slate-800 border-none text-white text-[10px] font-mono rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold truncate max-w-[150px] cursor-pointer"
                     >
+                      <option value="" className="bg-slate-900 text-slate-300 italic text-[10px]">
+                        -- [ Point at Barcode / Select Mock ] --
+                      </option>
                       {PRESET_PENDING_EPICOR_ORDERS.map(order => {
                         const isRegistered = deliveries.some(d => d.id === order.barcode);
                         return (
@@ -574,7 +592,11 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
       </div>
 
       {/* RIGHT COLUMN: Action Form depending on the scan phase */}
-      <div className="lg:col-span-7 bg-white border border-slate-100 p-5 rounded-xl shadow-sm flex flex-col justify-between">
+      <div className={`lg:col-span-7 bg-white p-5 rounded-xl flex flex-col justify-between transition-all duration-300 ${
+        flashForm 
+          ? 'scale-[1.01] border-2 border-blue-500 shadow-lg shadow-blue-100 ring-2 ring-blue-500/20' 
+          : 'border border-slate-100 shadow-sm'
+      }`}>
         
         {activeFormType === 'IDLE' && (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400 space-y-4">
