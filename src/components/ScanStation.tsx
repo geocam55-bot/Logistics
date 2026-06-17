@@ -41,9 +41,104 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
   const [returnDestination, setReturnDestination] = useState('WINDMILL_DC');
 
   // Scanner UI States
-  const [isCameraSimulating, setIsCameraSimulating] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [aimedBarcode, setAimedBarcode] = useState(PRESET_PENDING_EPICOR_ORDERS[0]?.barcode || '');
   const [audioFeedback, setAudioFeedback] = useState(true);
   const [scanMessage, setScanMessage] = useState('');
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanLoopRef = useRef<(() => void) | null>(null);
+
+  const startCamera = async () => {
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      streamRef.current = stream;
+      
+      // Update camera active state first so the video element exists in DOM
+      setIsCameraActive(true);
+      
+      // Allow DOM update and attach video stream
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(err => console.error("Video play failed:", err));
+          
+          // Start native Barcode Detector loop if available
+          // @ts-ignore
+          if ('BarcodeDetector' in window) {
+            try {
+              // @ts-ignore
+              const detector = new BarcodeDetector({ 
+                formats: ['code_128', 'code_39', 'ean_13', 'qr_code'] 
+              });
+              let active = true;
+              const detect = async () => {
+                if (!active || !videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
+                try {
+                  const barcodes = await detector.detect(videoRef.current);
+                  if (barcodes.length > 0) {
+                    const code = barcodes[0].rawValue;
+                    handleScanAction(code);
+                    stopCamera();
+                    active = false;
+                    return;
+                  }
+                } catch (err) {
+                  console.error("Detection error:", err);
+                }
+                if (active) {
+                  requestAnimationFrame(detect);
+                }
+              };
+              requestAnimationFrame(detect);
+              scanLoopRef.current = () => { active = false; };
+            } catch (e) {
+              console.warn("BarcodeDetector creation failed:", e);
+            }
+          }
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error("Camera access failed:", err);
+      let errMsg = "Camera access denied or unavailable.";
+      if (err.name === 'NotAllowedError') {
+        errMsg = "Camera permission was denied. Please allow camera access in your browser settings.";
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errMsg = "No camera hardware detected on this device.";
+      }
+      setCameraError(errMsg);
+      setIsCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (scanLoopRef.current) {
+      scanLoopRef.current();
+      scanLoopRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (scanLoopRef.current) scanLoopRef.current();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   // Audio synthesis Beep
   const playBeep = () => {
@@ -293,53 +388,117 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
             </div>
           </div>
 
-          {/* Camera Scan Simulation Area */}
-          <div className="relative overflow-hidden h-48 bg-slate-900 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
-            {isCameraSimulating ? (
-              <>
-                {/* Simulated Green Scan Beam */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-green-400 opacity-70 animate-bounce shadow-[0_0_15px_rgba(74,222,128,1)]" />
-                <div className="absolute inset-x-8 inset-y-10 border border-dashed border-red-500/40 rounded flex items-center justify-center">
-                  <div className="w-48 h-12 bg-white/10 backdrop-blur rounded flex items-center justify-center text-[10px] text-slate-400 font-mono">
-                    [ Align Barcode Here ]
+          {/* Active Camera Scan Area */}
+          <div className="relative overflow-hidden h-56 bg-slate-900 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
+            {isCameraActive ? (
+              <div className="relative w-full h-full">
+                {/* Real Live Video Feed */}
+                <video
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover rounded-lg bg-black"
+                />
+
+                {/* Laser scan animation overlay */}
+                <div 
+                  className="absolute left-0 right-0 h-1 bg-green-405 opacity-80 shadow-[0_0_15px_rgba(72,187,120,0.9)] z-10" 
+                  style={{
+                    animation: 'scanMotion 3s infinite ease-in-out',
+                    top: '0'
+                  }} 
+                />
+
+                {/* Scope Target Sights */}
+                <div className="absolute inset-x-12 inset-y-12 border-2 border-dashed border-emerald-500/40 rounded-lg flex items-center justify-center pointer-events-none z-10">
+                  <div className="w-4 h-4 border-t-2 border-l-2 border-emerald-400 absolute top-0 left-0" />
+                  <div className="w-4 h-4 border-t-2 border-r-2 border-emerald-400 absolute top-0 right-0" />
+                  <div className="w-4 h-4 border-b-2 border-l-2 border-emerald-400 absolute bottom-0 left-0" />
+                  <div className="w-4 h-4 border-b-2 border-r-2 border-emerald-400 absolute bottom-0 right-0" />
+                  <p className="text-[9px] text-emerald-400/85 font-mono tracking-widest uppercase">Align Barcode</p>
+                </div>
+
+                {/* Tap to Scan Overlay */}
+                <div 
+                  onClick={() => {
+                    handleScanAction(aimedBarcode);
+                    stopCamera();
+                  }}
+                  title="Click anywhere on the feed to trigger scanner manually"
+                  className="absolute inset-0 cursor-pointer flex flex-col justify-between p-2 z-20 group"
+                >
+                  <div className="text-[9px] bg-red-600/90 text-white font-mono px-2 py-0.5 rounded self-start shadow-sm font-semibold animate-pulse">
+                    ● REC: Live Camera Feed
+                  </div>
+
+                  <div className="mb-10 text-[9.5px] text-slate-300 transition-opacity bg-slate-950/75 px-2 py-1.5 rounded inline-block mx-auto backdrop-blur-xs font-semibold select-none group-hover:text-white">
+                    🎯 Tap screen or aim barcode here to scan
                   </div>
                 </div>
 
-                <p className="absolute bottom-10 text-[10px] text-slate-400 font-mono italic">
-                  📸 Webcam Simulated Active...
-                </p>
-
-                <div className="absolute bottom-2 flex space-x-2">
-                  <button 
-                    onClick={() => {
-                      setIsCameraSimulating(false);
-                      // Simulate a trigger scan of a random preset
-                      const randomPreset = PRESET_PENDING_EPICOR_ORDERS[Math.floor(Math.random() * PRESET_PENDING_EPICOR_ORDERS.length)];
-                      handleScanAction(randomPreset.barcode);
-                    }}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-mono text-[10px] px-2.5 py-1 rounded shadow"
-                  >
-                    Simulate Target Spotted
-                  </button>
-                  <button 
-                    onClick={() => setIsCameraSimulating(false)}
-                    className="bg-red-600 hover:bg-red-700 text-white font-mono text-[10px] px-2.5 py-1 rounded"
-                  >
-                    Shut Off
-                  </button>
+                {/* Dropdown Control Console overlay at the bottom */}
+                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-md border border-slate-850 text-white flex items-center justify-between px-2 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center space-x-1 min-w-0 flex-1 pr-1">
+                    <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-400 font-mono shrink-0">Aiming At:</span>
+                    <select
+                      value={aimedBarcode}
+                      onChange={(e) => setAimedBarcode(e.target.value)}
+                      className="bg-slate-800 border-none text-white text-[10px] font-mono rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold truncate max-w-[150px] cursor-pointer"
+                    >
+                      {PRESET_PENDING_EPICOR_ORDERS.map(order => {
+                        const isRegistered = deliveries.some(d => d.id === order.barcode);
+                        return (
+                          <option key={order.barcode} value={order.barcode} className="bg-slate-900 text-white text-[10px]">
+                            {order.barcode} ({order.customerName}) [{isRegistered ? 'Reg' : 'Ready'}]
+                          </option>
+                        );
+                      })}
+                      {deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED && d.status !== DeliveryStatus.RETURNED).map(d => (
+                        <option key={d.id} value={d.id} className="bg-slate-900 text-white text-[10px]">
+                          {d.id} ({d.customerName}) [{d.status}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleScanAction(aimedBarcode);
+                        stopCamera();
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold font-sans text-[9px] px-2.5 py-1 rounded shadow-sm uppercase tracking-wider cursor-pointer"
+                    >
+                      Scan Item
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold font-sans text-[9px] px-2 py-1 rounded cursor-pointer"
+                    >
+                      Off
+                    </button>
+                  </div>
                 </div>
-              </>
+              </div>
             ) : (
               <div className="flex flex-col items-center p-4">
                 <Scan className="h-10 w-10 text-slate-500 animate-pulse mb-2" />
                 <button 
-                  onClick={() => setIsCameraSimulating(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-sans text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center space-x-1.5"
+                  type="button"
+                  onClick={startCamera}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-sans text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm"
                 >
                   <Scan className="h-3.5 w-3.5" />
                   <span>Activate Camera Scanner</span>
                 </button>
-                <span className="text-[10px] text-slate-500 font-mono mt-1.5">For mobile/tablet camera presentation</span>
+                <span className="text-[10px] text-slate-500 font-mono mt-2">Accesses phone or laptop webcam for local scan</span>
+                {cameraError && (
+                  <div className="mt-3 text-[10px] text-red-400 bg-red-950/40 border border-red-900/50 p-2 rounded max-w-xs font-sans leading-relaxed">
+                    ⚠️ {cameraError}
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1,2 +1,17 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
+
+@keyframes scanMotion {
+  0% {
+    top: 5%;
+    opacity: 0.3;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0.3;
+  }
+}
