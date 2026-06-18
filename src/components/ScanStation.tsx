@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
 import { BRANCHES as STATIC_BRANCHES } from '../data';
 import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert } from 'lucide-react';
@@ -66,96 +67,92 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
     customerName?: string;
   } | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const scanLoopRef = useRef<(() => void) | null>(null);
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
 
   const startCamera = async () => {
     setCameraError(null);
     setAimedBarcode(''); // Reset aiming barcode state to empty when camera starts
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-      streamRef.current = stream;
-      
-      // Update camera active state first so the video element exists in DOM
-      setIsCameraActive(true);
-      
-      // Allow DOM update and attach video stream
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(err => console.error("Video play failed:", err));
-          
-          // Start native Barcode Detector loop if available
-          // @ts-ignore
-          if ('BarcodeDetector' in window) {
-            try {
-              // @ts-ignore
-              const detector = new BarcodeDetector({ 
-                formats: ['code_128', 'code_39', 'ean_13', 'qr_code'] 
-              });
-              let active = true;
-              const detect = async () => {
-                if (!active || !videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
-                try {
-                  const barcodes = await detector.detect(videoRef.current);
-                  if (barcodes.length > 0) {
-                    const code = barcodes[0].rawValue;
-                    handleScanAction(code);
-                    stopCamera();
-                    active = false;
-                    return;
-                  }
-                } catch (err) {
-                  console.error("Detection error:", err);
-                }
-                if (active) {
-                  requestAnimationFrame(detect);
-                }
-              };
-              requestAnimationFrame(detect);
-              scanLoopRef.current = () => { active = false; };
-            } catch (e) {
-              console.warn("BarcodeDetector creation failed:", e);
-            }
-          }
+    setIsCameraActive(true);
+    
+    // Allow DOM to update so container is mounted before starting scanner
+    setTimeout(() => {
+      try {
+        const container = document.getElementById('camera-reader-container');
+        if (!container) {
+          console.error("Camera reader container element not found.");
+          setCameraError("Camera element not found in DOM.");
+          setIsCameraActive(false);
+          return;
         }
-      }, 100);
-    } catch (err: any) {
-      console.error("Camera access failed:", err);
-      let errMsg = "Camera access denied or unavailable.";
-      if (err.name === 'NotAllowedError') {
-        errMsg = "Camera permission was denied. Please allow camera access in your browser settings.";
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        errMsg = "No camera hardware detected on this device.";
+
+        const html5QrCode = new Html5Qrcode("camera-reader-container", {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.ITF
+          ],
+          verbose: false
+        });
+        html5QrCodeRef.current = html5QrCode;
+
+        html5QrCode.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            qrbox: (width, height) => {
+              // Perfect bounding scanner box ratio for either 1D barcodes or QR codes
+              return { width: Math.round(width * 0.85), height: Math.round(height * 0.45) };
+            },
+            aspectRatio: 1.333333
+          },
+          (decodedText) => {
+            // Success! Trigger scan action
+            handleScanAction(decodedText);
+            stopCamera();
+          },
+          () => {
+            // Parsing errors thrown continually while aiming are normal/expected
+          }
+        ).catch((err: any) => {
+          console.error("html5-qrcode start failure:", err);
+          let errMsg = err?.message || String(err);
+          if (errMsg.indexOf("NotAllowedError") !== -1 || errMsg.indexOf("Permission") !== -1) {
+            errMsg = "Camera permission was denied. Please allow camera access in your browser/device settings.";
+          }
+          setCameraError(errMsg);
+          setIsCameraActive(false);
+        });
+      } catch (err: any) {
+        console.error("html5-qrcode build exception:", err);
+        setCameraError(err?.message || "Faulty camera initialization.");
+        setIsCameraActive(false);
       }
-      setCameraError(errMsg);
-      setIsCameraActive(false);
-    }
+    }, 150);
   };
 
   const stopCamera = () => {
-    if (scanLoopRef.current) {
-      scanLoopRef.current();
-      scanLoopRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+    if (html5QrCodeRef.current) {
+      if (html5QrCodeRef.current.isScanning) {
+        html5QrCodeRef.current.stop().catch((err: any) => {
+          console.error("Error stopping html5-qrcode:", err);
+        });
+      }
+      html5QrCodeRef.current = null;
     }
     setIsCameraActive(false);
   };
 
   React.useEffect(() => {
     return () => {
-      if (scanLoopRef.current) scanLoopRef.current();
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+      if (html5QrCodeRef.current) {
+        if (html5QrCodeRef.current.isScanning) {
+          html5QrCodeRef.current.stop().catch(() => {});
+        }
+        html5QrCodeRef.current = null;
       }
     };
   }, []);
@@ -484,11 +481,9 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
             {isCameraActive ? (
               <div className="relative w-full h-full">
                 {/* Real Live Video Feed */}
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover rounded-lg bg-black"
+                <div
+                  id="camera-reader-container"
+                  className="w-full h-full rounded-lg overflow-hidden bg-black [&>video]:object-cover [&>video]:w-full [&>video]:h-full"
                 />
 
                 {/* Laser scan animation overlay */}
