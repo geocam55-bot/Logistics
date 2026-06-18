@@ -99,11 +99,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         html5QrCodeRef.current = html5QrCode;
 
         html5QrCode.start(
-          { 
-            facingMode: 'environment',
-            width: { min: 640, ideal: 1280 },
-            height: { min: 480, ideal: 720 }
-          },
+          { facingMode: 'environment' },
           {
             fps: 20,
             qrbox: (width, height) => {
