@@ -68,6 +68,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   } | null>(null);
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startCamera = async () => {
     setCameraError(null);
@@ -94,22 +95,28 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.ITF
           ],
-          verbose: false
+          verbose: false,
+          useBarCodeDetectorIfSupported: true
         });
         html5QrCodeRef.current = html5QrCode;
 
         html5QrCode.start(
           { facingMode: 'environment' },
           {
-            fps: 20,
+            fps: 30, // Tighter sampling frequency
             qrbox: (width, height) => {
-              // Thin wide horizontal box ideal for 1D linear document barcodes
+              // Expand the box so Zxing has a larger cross-section of rows to decode the 1D stripes
               return { 
-                width: Math.round(width * 0.88), 
-                height: Math.round(height * 0.40) 
+                width: Math.round(width * 0.90), 
+                height: Math.round(height * 0.70) 
               };
             },
-            aspectRatio: 1.777778
+            aspectRatio: 1.777778, // 16:9 HD frame geometry ideal for linear codes
+            videoConstraints: {
+              facingMode: 'environment',
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 }
+            }
           },
           (decodedText) => {
             // Success! Trigger scan action
@@ -134,6 +141,47 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         setIsCameraActive(false);
       }
     }, 150);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCameraError(null);
+    setScanMessage("Analyzing select photo for barcodes...");
+
+    try {
+      if (isCameraActive) {
+        stopCamera();
+      }
+
+      // Instantiate a temporary offscreen parser
+      const tempScanner = new Html5Qrcode("file-reader-temp", {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF
+        ],
+        verbose: false
+      });
+
+      const decodedText = await tempScanner.scanFile(file, false);
+      handleScanAction(decodedText);
+      setScanMessage("📋 Barcode fully decrypted from high-res snapshot!");
+      setTimeout(() => setScanMessage(''), 4500);
+    } catch (err: any) {
+      console.error("File scanning error:", err);
+      setCameraError("Unable to extract a clear barcode. Try holding your phone straight and ensure the barcode isn't shadowed or cut off.");
+      setTimeout(() => setCameraError(null), 8000);
+    }
+
+    if (e.target) {
+      e.target.value = '';
+    }
   };
 
   const stopCamera = () => {
@@ -478,7 +526,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           </div>
 
           {/* Active Camera Scan Area */}
-          <div className="relative overflow-hidden h-[320px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
+          <div className="relative overflow-hidden h-[330px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
             {isCameraActive ? (
               <div className="relative w-full h-full">
                 {/* Real Live Video Feed */}
@@ -515,8 +563,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     </div>
                   </div>
 
-                  <div className="mb-14 text-[9.5px] text-slate-350 transition-opacity bg-slate-500/10 px-2.5 py-1.5 rounded inline-block mx-auto backdrop-blur-xs font-semibold select-none group-hover:text-white border border-slate-800">
-                    📷 Point camera at barcode (Tap screen to autofocus)
+                  <div className="mb-14 text-[9.5px] text-slate-300 transition-opacity bg-slate-900/90 px-3 py-2 rounded inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700/85 max-w-[90%] leading-snug">
+                    📷 Hold steady 6-12 inches away to let camera focus continuously. Tapping is not supported under iOS frame.
                   </div>
                 </div>
 
@@ -524,7 +572,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-md border border-slate-800 text-white flex items-center justify-between px-3 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                    <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-300 font-mono truncate">Live Sensor Feed Active</span>
+                    <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-300 font-mono truncate">Live Sensor active</span>
                   </div>
                   
                   <div className="flex items-center shrink-0">
@@ -540,24 +588,51 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
               </div>
             ) : (
               <div className="flex flex-col items-center p-4">
-                <Scan className="h-10 w-10 text-slate-500 animate-pulse mb-2" />
-                <button 
-                  type="button"
-                  onClick={startCamera}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-sans text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm"
-                >
-                  <Scan className="h-3.5 w-3.5" />
-                  <span>Activate Camera Scanner</span>
-                </button>
-                <span className="text-[10px] text-slate-500 font-mono mt-2">Accesses phone or laptop webcam for local scan</span>
+                <Scan className="h-8 w-8 text-slate-500 mb-3" />
+                
+                <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-sm justify-center items-center">
+                  <button 
+                    type="button"
+                    onClick={startCamera}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-sans text-xs font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm border border-blue-550"
+                  >
+                    <Scan className="h-3.5 w-3.5" />
+                    <span>Activate Live Stream</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full sm:w-auto bg-slate-800 hover:bg-slate-750 active:scale-[0.98] text-emerald-400 hover:text-emerald-300 font-sans text-xs font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm border border-slate-700"
+                  >
+                    <span>📷 Snap/Upload Photo</span>
+                  </button>
+                </div>
+
+                <div className="text-[10px] text-slate-450 font-mono mt-3 max-w-[270px] leading-snug">
+                  Use active stream for real-time tracking, or snap a sharp photo with native iOS camera if lenses struggle to focus.
+                </div>
+
                 {cameraError && (
-                  <div className="mt-3 text-[10px] text-red-400 bg-red-950/40 border border-red-900/50 p-2 rounded max-w-xs font-sans leading-relaxed">
+                  <div className="mt-3 text-[10px] text-red-300 bg-red-950/60 border border-red-900/50 p-2 rounded max-w-xs font-sans leading-relaxed text-left">
                     ⚠️ {cameraError}
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* Invisible file input & processing div */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept="image/*" 
+            capture="environment" 
+            className="hidden" 
+            style={{ display: 'none' }} 
+          />
+          <div id="file-reader-temp" className="hidden" style={{ display: 'none' }} />
 
           {/* Real-time ML Kit Extraction Terminal HUD */}
           {lastScan && (
