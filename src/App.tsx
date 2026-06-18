@@ -192,17 +192,17 @@ export default function App() {
           const data = await res.json();
 
           if (data.supabaseActive) {
-            if (data.deliveries.length > 0 || data.trucks.length > 0 || data.branches.length > 0 || data.users.length > 0) {
+            if (data.branches && data.branches.length > 0 && data.trucks && data.trucks.length > 0) {
               // Populate React state from live Supabase Tables
-              setDeliveries(data.deliveries);
-              setTrucks(data.trucks);
-              setBranches(data.branches);
-              setUsers(data.users);
+              setDeliveries(data.deliveries || []);
+              setTrucks(data.trucks || []);
+              setBranches(data.branches || []);
+              setUsers(data.users || []);
 
-              localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries));
-              localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks));
-              localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(data.branches));
-              localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users));
+              localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries || []));
+              localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks || []));
+              localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(data.branches || []));
+              localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users || []));
               setLastSyncTime(new Date().toLocaleTimeString());
               return;
             } else {
