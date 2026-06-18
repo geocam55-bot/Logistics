@@ -804,6 +804,78 @@ async function startServer() {
     }
   });
 
+  // API Route for performing camera snapshot scanning using Gemini Vision
+  app.post("/api/scan-photo", async (req, res) => {
+    try {
+      const { fileData } = req.body;
+      if (!fileData) {
+        return res.status(400).json({ error: "No photo has been provided for scanning." });
+      }
+
+      const parts = fileData.match(/^data:(.*);base64,(.*)$/);
+      if (!parts) {
+        return res.status(400).json({ error: "Format error: Provided data URI is malformed." });
+      }
+
+      const mimeType = parts[1];
+      const base64Data = parts[2];
+
+      const prompt = `You are an automated logistics terminal assistant.
+Scan the uploaded photo to identify and read any barcodes (especially 1D linear barcodes such as Code 128, Code 39, ITF, EAN, UPC, or QR codes).
+Typically, these represent invoices or sales orders containing characters like digits, letters, or dashes (e.g. "I-123456", "7159").
+Decode or locate the text represented by the stripes/bars or square matrix.
+If multiple barcodes are present, prioritize the primary barcode labels.
+Verify that the output matches any text printed underneath or on top of the barcode stripes if appropriate.
+
+Return the result in the active JSON format.
+Output schema keys:
+- success: boolean indicating if a barcode was found and decoded.
+- barcodeText: the decoded string value (or null if not found/legible).
+- barcodeFormat: the format e.g. "CODE_128", "QR_CODE", "CODE_39", "UPC", etc. (or null).`;
+
+      const aiClient = getGeminiClient();
+
+      const response = await aiClient.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: [
+          {
+            inlineData: {
+              mimeType,
+              data: base64Data
+            }
+          },
+          {
+            text: prompt
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              success: { type: Type.BOOLEAN },
+              barcodeText: { type: Type.STRING },
+              barcodeFormat: { type: Type.STRING }
+            },
+            required: ["success", "barcodeText", "barcodeFormat"]
+          },
+          temperature: 0.1
+        }
+      });
+
+      const rawText = response.text;
+      if (!rawText) {
+        throw new Error("Unable to extract response stream text from Gemini.");
+      }
+
+      const parsedJson = JSON.parse(rawText.trim());
+      res.json(parsedJson);
+    } catch (err: any) {
+      console.error("Gemini Scan Photo Error:", err);
+      res.status(500).json({ error: err.message || "An exception occurred during server-side Gemini scanner execution." });
+    }
+  });
+
   // API Route for performing Real-Time OCR (Preserve current Gemini extraction logic untouched!)
   app.post("/api/ocr", async (req, res) => {
     try {

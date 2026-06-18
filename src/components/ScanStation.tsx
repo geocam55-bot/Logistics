@@ -148,35 +148,47 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     if (!file) return;
 
     setCameraError(null);
-    setScanMessage("Analyzing select photo for barcodes...");
+    setScanMessage("Uploading & scanning photo via Gemini AI Core...");
 
     try {
       if (isCameraActive) {
         stopCamera();
       }
 
-      // Instantiate a temporary offscreen parser
-      const tempScanner = new Html5Qrcode("file-reader-temp", {
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF
-        ],
-        verbose: false
+      // Convert image file to Base64 data URL
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+      });
+      reader.readAsDataURL(file);
+      const fileData = await base64Promise;
+
+      const res = await fetch("/api/scan-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileData })
       });
 
-      const decodedText = await tempScanner.scanFile(file, false);
-      handleScanAction(decodedText);
-      setScanMessage("📋 Barcode fully decrypted from high-res snapshot!");
-      setTimeout(() => setScanMessage(''), 4500);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+
+      const result = await res.json();
+      if (result.success && result.barcodeText) {
+        handleScanAction(result.barcodeText);
+        setScanMessage(`📋 Decrypted Barcode: ${result.barcodeText} (${result.barcodeFormat || 'Auto'})`);
+        setTimeout(() => setScanMessage(''), 4500);
+      } else {
+        throw new Error("Gemini was unable to read a valid barcode in that photo. Make sure the barcode is close, in focus, and not shadowed.");
+      }
     } catch (err: any) {
-      console.error("File scanning error:", err);
-      setCameraError("Unable to extract a clear barcode. Try holding your phone straight and ensure the barcode isn't shadowed or cut off.");
-      setTimeout(() => setCameraError(null), 8000);
+      console.error("Barcode photo analysis error:", err);
+      setCameraError(err?.message || "Unable to read barcode. Make sure the labels are bright and fully visible.");
+      setTimeout(() => setCameraError(null), 8500);
+    } finally {
+      setScanMessage("");
     }
 
     if (e.target) {
