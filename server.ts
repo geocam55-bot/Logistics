@@ -37,8 +37,8 @@ let lastSupabaseUrl = "";
 let lastSupabaseKey = "";
 
 function getSupabase() {
-  let url = process.env.SUPABASE_URL;
-  let key = process.env.SUPABASE_ANON_KEY;
+  let url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  let key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
   
   if (!url || !key) {
     return null;
@@ -257,12 +257,13 @@ async function startServer() {
   app.get("/api/supabase-status", async (req, res) => {
     try {
       const supabase = getSupabase();
+      const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       if (!supabase) {
         return res.json({
           configured: false,
           connected: false,
           error: "Supabase credentials are not specified in the workspace settings. Falling back to local offline mode.",
-          url: process.env.SUPABASE_URL || "",
+          url: resolvedUrl,
           schemaSql: SH_SQL
         });
       }
@@ -276,7 +277,7 @@ async function startServer() {
           configured: true,
           connected: false,
           error: `Supabase database is connected, but the schema tables have not been created yet: "${error.message}". Go to your Supabase SQL Editor and run the provided SQL setup script below.`,
-          url: process.env.SUPABASE_URL,
+          url: resolvedUrl,
           schemaSql: SH_SQL
         });
       }
@@ -285,16 +286,17 @@ async function startServer() {
         configured: true,
         connected: true,
         error: null,
-        url: process.env.SUPABASE_URL,
+        url: resolvedUrl,
         schemaSql: SH_SQL
       });
     } catch (e: any) {
       console.error("Diagnosis Exception:", e);
+      const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       res.json({
-        configured: !!process.env.SUPABASE_URL,
+        configured: !!resolvedUrl,
         connected: false,
         error: e.message || "An unresolved error occurred diagnostic check.",
-        url: process.env.SUPABASE_URL || "",
+        url: resolvedUrl,
         schemaSql: SH_SQL
       });
     }

@@ -114,6 +114,68 @@ const WATCH_FILES_PRESETS: Record<string, Record<string, string>> = {
   }
 };
 
+const FACTORY_DEFAULT_TEMPLATES: Record<DocType, DocTemplate> = {
+  'Order': {
+    title: 'PROSPACES SALES ORDER & DISPATCH INVOICE',
+    subtitle: 'RETAIL ORDER ENTRY DIRECT DEPOSIT',
+    fields: {
+      'Order #': { label: 'Order Number', value: 'ORD-94827-26', x: 500, y: 30, w: 125, h: 25, page: 1 },
+      'Date': { label: 'Order Date', value: 'June 11, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
+      'Customer Name': { label: 'Customer Name', value: 'Highland Construction Ltd.', x: 40, y: 115, w: 220, h: 22, page: 1 },
+      'Ship To': { label: 'Ship To Destination', value: '104 Bedford Hwy, Halifax, NS B2M 1G4', x: 40, y: 145, w: 250, h: 35, page: 1 },
+      'Subtotal': { label: 'Order Subtotals', value: '$1,227.30', x: 440, y: 615, w: 160, h: 25, page: 2 },
+      'Gross Weight': { label: 'Gross Weight', value: '4,850 lbs', x: 440, y: 660, w: 160, h: 25, page: 2 }
+    },
+    sampleItems: [
+      { qty: '40', desc: 'Shoring Lumber 2x6x12 Pressure Treated Spruce', price: '$858.00' },
+      { qty: '12', desc: 'Portland Cement Type GU 40kg Bags', price: '$215.40' },
+      { qty: '2', desc: 'Galvanized Framing Nails 3-1/4" Box (3000ct)', price: '$153.90' }
+    ]
+  },
+  'Credit': {
+    title: 'PROSPACES CASHIER CREDIT & ADJUSTMENT MEMO',
+    subtitle: 'CUSTOMER MERCHANDISE RETURN RECEIPT',
+    fields: {
+      'Credit Note #': { label: 'Credit Note #', value: 'CR-88273-04', x: 500, y: 30, w: 125, h: 25, page: 1 },
+      'Date': { label: 'Adjustment Date', value: 'June 10, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
+      'Customer Name': { label: 'Refund Recipient', value: 'Atlantic Deck Builders Co.', x: 40, y: 115, w: 220, h: 22, page: 1 },
+      'Return Reason': { label: 'Return Reason', value: 'Cabinetry dimensions mismatch on-site', x: 40, y: 145, w: 250, h: 35, page: 1 },
+      'Total Credit': { label: 'Total Credit Refund', value: '$1,904.00', x: 440, y: 615, w: 160, h: 25, page: 2 }
+    },
+    sampleItems: [
+      { qty: '-6', desc: 'Deco Custom Oak Cabinets 15" x 30" Upper', price: '- $1,860.00' },
+      { qty: '-2', desc: 'Classic Matte Black Cabinet Handle Packs', price: '- $44.00' }
+    ]
+  },
+  'Supplier Pickup': {
+    title: 'PROSPACES REGIONAL SUPPLY PICKUP DISPATCH AUTHORIZATION',
+    subtitle: 'WAREHOUSE LOGISTICS VENDOR FREIGHT CLAIMS',
+    fields: {
+      'Supplier Code': { label: 'Supplier Code', value: 'VND-MILWAUKEE-99', x: 500, y: 30, w: 125, h: 25, page: 1 },
+      'Date': { label: 'Pickup Date', value: 'June 09, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
+      'Warehouse Location': { label: 'Warehouse Origin', value: 'Milwaukee Central Logistics Hub - NS Terminal', x: 40, y: 115, w: 230, h: 22, page: 1 },
+      'Item Specifications': { label: 'Pickup Specs', value: 'Dock 4-B Premium Cargo Consignment Freight', x: 40, y: 145, w: 250, h: 35, page: 1 },
+    },
+    sampleItems: [
+      { qty: '15', desc: 'M18 Fuel Lithium Brushless 1/2" Hammer Drill Kits', price: 'Consigned freight' },
+      { qty: '8', desc: 'M18 Cordless Sawzall Reciprocating Saw Tools Only', price: 'Consigned freight' }
+    ]
+  },
+  'RMA': {
+    title: 'PROSPACES VENDOR RETURN MERCHANDISE AUTHORIZATION',
+    subtitle: 'MANUFACTURER RMA WARRANTY DEFECT CLASSIFICATION',
+    fields: {
+      'RMA #': { label: 'RMA #', value: 'RMA-774812-C', x: 500, y: 30, w: 125, h: 25, page: 1 },
+      'Date': { label: 'Issue Date', value: 'June 08, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
+      'Manufacturer': { label: 'Manufacturer Returnee', value: 'Dewalt Tool Corp Depot Atlantic', x: 40, y: 115, w: 220, h: 22, page: 1 },
+      'Status Defect Code': { label: 'Defect Code', value: 'FAULTY TRIGGER CONTACTOR BLOCKS', x: 40, y: 145, w: 250, h: 35, page: 1 },
+    },
+    sampleItems: [
+      { qty: '20', desc: 'Dewalt Brushless Cordless Compact Impact Driver', price: 'Warranty Return' }
+    ]
+  }
+};
+
 const mapExtractedFieldsToTemplateKeys = (
   extracted: Record<string, string>,
   templateFields: Record<string, any>,
@@ -2060,23 +2122,43 @@ CREATE TABLE IF NOT EXISTS tenant_state (
 
                 <button
                   onClick={() => {
+                    // Deep copy factory default template to clear all previously parsed background variables and custom properties
+                    const freshTemplate = JSON.parse(JSON.stringify(FACTORY_DEFAULT_TEMPLATES[selectedDocType]));
+                    setActiveTemplates(prev => ({
+                      ...prev,
+                      [selectedDocType]: freshTemplate
+                    }));
+
+                    // Reset mapped fields list to defaults
+                    const defaultFieldsMap: Record<DocType, string[]> = {
+                      'Order': ['Order #', 'Date', 'Customer Name', 'Ship To', 'Subtotal', 'Gross Weight'],
+                      'Credit': ['Credit Note #', 'Date', 'Customer Name', 'Return Reason', 'Total Credit'],
+                      'Supplier Pickup': ['Supplier Code', 'Date', 'Warehouse Location', 'Item Specifications'],
+                      'RMA': ['RMA #', 'Date', 'Manufacturer', 'Status Defect Code']
+                    };
+                    setMappedFields(prev => ({
+                      ...prev,
+                      [selectedDocType]: [...defaultFieldsMap[selectedDocType]]
+                    }));
+
+                    // Clear uploaded file key for selected document type
                     setUploadedFiles(prev => ({ ...prev, [selectedDocType]: null }));
-                    const current = activeTemplates[selectedDocType];
-                    if (current) {
-                      const initial: Record<string, string> = {};
-                      Object.keys(current.fields).forEach((key) => {
-                        initial[key] = current.fields[key].value;
-                      });
-                      setEditedFields(initial);
-                    }
+
+                    // Initialize the edited fields to clean factory state to clear any background information
+                    const initial: Record<string, string> = {};
+                    Object.keys(freshTemplate.fields).forEach((key) => {
+                      initial[key] = freshTemplate.fields[key].value;
+                    });
+                    setEditedFields(initial);
+
                     setExtractionResult(null);
                     setOcrLog([]);
                     setActiveFieldToMap(null);
                     setCurrentPdfPage(1);
-                    setCustomFileFeedback(`✔ Clean Slate! Document, custom uploads, parsing logs, and extraction fields have been fully reset to default templates.`);
+                    setCustomFileFeedback(`✔ Clean Slate! Document, custom uploads, coordinates, parsing logs, and extraction fields have been fully reset to default factory templates.`);
                   }}
                   className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg font-bold flex items-center space-x-1 transition-colors"
-                  title="Clear custom uploaded file, reset parsed extraction values, and clean logs"
+                  title="Clear custom uploaded file, reset parsed extraction values, and clean logs back to factory preset"
                 >
                   <Trash2 className="h-3.5 w-3.5 text-red-500" />
                   <span>Reset Page</span>

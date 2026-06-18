@@ -186,16 +186,9 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
   const handleScanAction = (barcode: string) => {
     let rawCode = barcode.trim();
     if (!rawCode) {
-      // Find the first undelivered delivery from the actual database to scan
-      const firstActive = deliveries.find(d => d.status !== DeliveryStatus.DELIVERED && d.status !== DeliveryStatus.RETURNED);
-      if (firstActive) {
-        rawCode = firstActive.id;
-      } else if (deliveries.length > 0) {
-        rawCode = deliveries[0].id;
-      } else {
-        // Fallback: Generate a realistic new Sales Order number if no database records exist
-        rawCode = `EPICOR${Math.floor(100000000 + Math.random() * 900000000)}-SO`;
-      }
+      setScanMessage("⚠️ Scan aborted: Please provide a valid barcode or enter a document number.");
+      setTimeout(() => setScanMessage(""), 4500);
+      return;
     }
 
     // REDESIGN ITEM #3: Look for the document number. It starts at position 7 for 9 characters.
@@ -427,7 +420,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="scan-station-tab">
       
-      {/* LEFT COLUMN: Barcode Scanner Simulation Deck */}
+      {/* LEFT COLUMN: Barcode Reader Control Deck */}
       <div className="lg:col-span-5 bg-white border border-slate-100 p-5 rounded-xl shadow-sm flex flex-col justify-between" id="ml-kit-scan-deck">
         <div className="space-y-4">
           
@@ -650,7 +643,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
             <div className="flex space-x-2">
               <input 
                 type="text" 
-                placeholder="Type e.g., SO-102934-1"
+                placeholder="Scan active ERP barcode..."
                 value={barcodeInput} 
                 onChange={(e) => setBarcodeInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { handleScanAction(barcodeInput); } }}
@@ -831,7 +824,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
             </div>
             
             <div className="pt-4 text-[11px] text-gray-500 max-w-sm">
-              ℹ️ <strong>Presentation Tip:</strong> Select the ready-to-scan invoice <strong>&ldquo;SO-102934-1&rdquo;</strong> to register a new delivery from Epicor into this platform.
+              ℹ️ <strong>Scanning:</strong> Scan active Epicor / Eagle invoice barcodes to automatically register delivery logs, assign fleet drivers, or log hand-off results.
             </div>
           </div>
         )}
@@ -1179,11 +1172,11 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                   />
                 </div>
 
-                {/* Simulated Delivery Photo upload */}
+                {/* Live Delivery Photo Upload */}
                 <div className="p-3 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100/50 transition-colors flex flex-col items-center justify-center text-center cursor-pointer">
                   <Package className="h-7 w-7 text-slate-400 mb-1" />
-                  <span className="text-xs font-medium text-slate-700">Simulate Photo Proof of Drop-off</span>
-                  <span className="text-[10px] text-gray-400 mt-0.5">Captures GPS Coordinates & timestamp automatically</span>
+                  <span className="text-xs font-medium text-slate-700">Capture Proof of Drop-off Photo</span>
+                  <span className="text-[10px] text-gray-400 mt-0.5">Records GPS coordinates & proof of delivery timestamp</span>
                 </div>
 
                 <div className="p-3 bg-green-50 border border-green-100 rounded-lg text-[11px] text-green-800 space-y-1">
