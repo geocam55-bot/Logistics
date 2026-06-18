@@ -2,16 +2,17 @@ import React, { useState, useRef } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
 import { BRANCHES as STATIC_BRANCHES } from '../data';
-import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert } from 'lucide-react';
+import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface ScanStationProps {
   deliveries: DeliveryRecord[];
   onAddOrUpdateDelivery: (record: DeliveryRecord) => void;
+  onDeleteDelivery?: (id: string) => void;
   trucks: Truck[];
   branches?: Branch[];
 }
 
-export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks, branches }: ScanStationProps) {
+export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDeleteDelivery, trucks, branches }: ScanStationProps) {
   const BRANCHES = branches && branches.length > 0 ? branches : STATIC_BRANCHES;
   // Input fields
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -102,12 +103,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
         html5QrCode.start(
           { facingMode: 'environment' },
           {
-            fps: 15,
-            qrbox: (width, height) => {
-              // Perfect bounding scanner box ratio for either 1D barcodes or QR codes
-              return { width: Math.round(width * 0.85), height: Math.round(height * 0.45) };
-            },
-            aspectRatio: 1.333333
+            fps: 20
           },
           (decodedText) => {
             // Success! Trigger scan action
@@ -508,19 +504,19 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                     stopCamera();
                   }}
                   title="Click anywhere on the feed to trigger scanner manually"
-                  className="absolute inset-0 cursor-pointer flex flex-col justify-between p-2 z-20 group"
+                  className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 z-20"
                 >
                   <div className="flex justify-between items-center w-full">
                     <div className="text-[9px] bg-red-650 text-white font-mono px-2 py-0.5 rounded shadow-sm font-semibold animate-pulse uppercase tracking-wider">
                       ● Live Feed Active
                     </div>
                     <div className="text-[8.5px] bg-slate-900/80 text-emerald-400 font-mono px-1.5 py-0.5 rounded">
-                      Confidence: 99.8%
+                      Autodetect Mode
                     </div>
                   </div>
 
                   <div className="mb-14 text-[9.5px] text-slate-350 transition-opacity bg-slate-950/80 px-2.5 py-1.5 rounded inline-block mx-auto backdrop-blur-xs font-semibold select-none group-hover:text-white border border-slate-800">
-                    🎯 Tap screen to focus and scan
+                    📷 Point camera at barcode (Tap screen to autofocus)
                   </div>
                 </div>
 
@@ -562,8 +558,13 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
                     <button
                       type="button"
                       onClick={() => {
-                        handleScanAction(aimedBarcode);
-                        stopCamera();
+                        if (aimedBarcode) {
+                          handleScanAction(aimedBarcode);
+                          stopCamera();
+                        } else {
+                          setScanMessage("⚠️ Info: Choose a Document Barcode from the dropdown list to trigger scan manually.");
+                          setTimeout(() => setScanMessage(""), 4000);
+                        }
                       }}
                       className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold font-sans text-[9px] px-2.5 py-1 rounded shadow-sm uppercase tracking-wider cursor-pointer"
                     >
@@ -662,30 +663,54 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, trucks,
           <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
             {deliveries.map(record => {
               return (
-                <button
+                <div
                   key={record.id}
-                  onClick={() => {
-                    handleScanAction(record.id);
-                    stopCamera();
-                  }}
-                  className="w-full text-left p-2 border border-slate-100 rounded-lg hover:bg-slate-50 flex items-center justify-between text-xs transition-colors shadow-2xs"
+                  className="w-full p-2 border border-slate-100 rounded-lg hover:bg-slate-50 flex items-center justify-between text-xs transition-colors shadow-2xs group relative bg-white"
                 >
-                  <div className="truncate pr-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleScanAction(record.id);
+                      stopCamera();
+                    }}
+                    className="flex-1 text-left truncate cursor-pointer pr-1"
+                  >
                     <span className="font-mono font-semibold text-gray-900 block">{record.id}</span>
-                    <span className="text-[10px] text-gray-505 block truncate">{record.customerName || 'Walk-in Customer'}</span>
-                  </div>
-                  <div>
-                    {record.status === DeliveryStatus.REGISTERED ? (
-                      <span className="text-[10px] px-1.5 py-0.25 bg-orange-100/80 text-orange-700 border border-orange-200 rounded font-mono font-bold">Registered</span>
-                    ) : record.status === DeliveryStatus.PICKED_AND_LOADED ? (
-                      <span className="text-[10px] px-1.5 py-0.25 bg-amber-100/80 text-amber-700 border border-amber-200 rounded font-mono font-bold">Loaded</span>
-                    ) : record.status === DeliveryStatus.DELIVERED ? (
-                      <span className="text-[10px] px-1.5 py-0.25 bg-green-100/80 text-green-700 border border-green-200 rounded font-mono font-bold">Delivered</span>
-                    ) : (
-                      <span className="text-[10px] px-1.5 py-0.25 bg-red-100/80 text-red-700 border border-red-200 rounded font-mono font-bold">Returned</span>
+                    <span className="text-[10px] text-gray-500 block truncate">{record.customerName || 'Walk-in Customer'}</span>
+                  </button>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <div>
+                      {record.status === DeliveryStatus.REGISTERED ? (
+                        <span className="text-[10px] px-1.5 py-0.25 bg-orange-100/80 text-orange-700 border border-orange-200 rounded font-mono font-bold">Registered</span>
+                      ) : record.status === DeliveryStatus.PICKED_AND_LOADED ? (
+                        <span className="text-[10px] px-1.5 py-0.25 bg-amber-100/80 text-amber-700 border border-amber-200 rounded font-mono font-bold">Loaded</span>
+                      ) : record.status === DeliveryStatus.DELIVERED ? (
+                        <span className="text-[10px] px-1.5 py-0.25 bg-green-100/80 text-green-700 border border-green-200 rounded font-mono font-bold">Delivered</span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.25 bg-red-100/80 text-red-700 border border-red-200 rounded font-mono font-bold">Returned</span>
+                      )}
+                    </div>
+                    {onDeleteDelivery && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete delivery ${record.id} from active database logs?`)) {
+                            onDeleteDelivery(record.id);
+                            if (scannedRecord?.id === record.id) {
+                              setScannedRecord(null);
+                              setActiveFormType('IDLE');
+                            }
+                          }
+                        }}
+                        title="Delete record"
+                        className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 cursor-pointer transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
             {deliveries.length === 0 && (

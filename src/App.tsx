@@ -817,6 +817,7 @@ export default function App() {
             <ScanStation 
               deliveries={deliveries} 
               onAddOrUpdateDelivery={handleAddOrUpdateDelivery} 
+              onDeleteDelivery={handleDeleteDelivery}
               trucks={trucks} 
               branches={branches}
             />
