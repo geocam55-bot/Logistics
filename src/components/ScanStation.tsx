@@ -54,7 +54,6 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   // Scanner UI States
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [aimedBarcode, setAimedBarcode] = useState('');
   const [audioFeedback, setAudioFeedback] = useState(true);
   const [scanMessage, setScanMessage] = useState('');
   const [flashForm, setFlashForm] = useState(false);
@@ -72,7 +71,6 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
   const startCamera = async () => {
     setCameraError(null);
-    setAimedBarcode(''); // Reset aiming barcode state to empty when camera starts
     setIsCameraActive(true);
     
     // Allow DOM to update so container is mounted before starting scanner
@@ -101,9 +99,21 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         html5QrCodeRef.current = html5QrCode;
 
         html5QrCode.start(
-          { facingMode: 'environment' },
+          { 
+            facingMode: 'environment',
+            width: { min: 640, ideal: 1280 },
+            height: { min: 480, ideal: 720 }
+          },
           {
-            fps: 20
+            fps: 20,
+            qrbox: (width, height) => {
+              // Thin wide horizontal box ideal for 1D linear document barcodes
+              return { 
+                width: Math.round(width * 0.88), 
+                height: Math.round(height * 0.40) 
+              };
+            },
+            aspectRatio: 1.777778
           },
           (decodedText) => {
             // Success! Trigger scan action
@@ -193,7 +203,6 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       mlKitParsed = true;
     }
 
-    setAimedBarcode(''); // Do not remember the chosen target or last scan state!
     setFlashForm(true);
     setTimeout(() => setFlashForm(false), 900);
 
@@ -473,18 +482,18 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           </div>
 
           {/* Active Camera Scan Area */}
-          <div className="relative overflow-hidden h-56 bg-slate-900 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
+          <div className="relative overflow-hidden h-[320px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
             {isCameraActive ? (
               <div className="relative w-full h-full">
                 {/* Real Live Video Feed */}
                 <div
                   id="camera-reader-container"
-                  className="w-full h-full rounded-lg overflow-hidden bg-black [&>video]:object-cover [&>video]:w-full [&>video]:h-full"
+                  className="w-full h-full rounded-lg overflow-hidden bg-black [&>video]:object-contain [&>video]:w-full [&>video]:h-full"
                 />
 
                 {/* Laser scan animation overlay */}
                 <div 
-                  className="absolute left-0 right-0 h-1 bg-green-500 opacity-90 shadow-[0_0_15px_rgba(72,187,120,0.95)] z-10 animate-[bounce_4s_infinite]" 
+                  className="absolute left-0 right-0 h-1 bg-green-550 opacity-90 shadow-[0_0_15px_rgba(72,187,120,0.95)] z-10 animate-[bounce_4s_infinite]" 
                   style={{ top: '50%' }}
                 />
 
@@ -499,11 +508,6 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
                 {/* Tap to Scan Overlay */}
                 <div 
-                  onClick={() => {
-                    handleScanAction(aimedBarcode);
-                    stopCamera();
-                  }}
-                  title="Click anywhere on the feed to trigger scanner manually"
                   className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 z-20"
                 >
                   <div className="flex justify-between items-center w-full">
@@ -515,67 +519,25 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     </div>
                   </div>
 
-                  <div className="mb-14 text-[9.5px] text-slate-350 transition-opacity bg-slate-950/80 px-2.5 py-1.5 rounded inline-block mx-auto backdrop-blur-xs font-semibold select-none group-hover:text-white border border-slate-800">
+                  <div className="mb-14 text-[9.5px] text-slate-350 transition-opacity bg-slate-500/10 px-2.5 py-1.5 rounded inline-block mx-auto backdrop-blur-xs font-semibold select-none group-hover:text-white border border-slate-800">
                     📷 Point camera at barcode (Tap screen to autofocus)
                   </div>
                 </div>
 
-                {/* Dropdown Control Console overlay at the bottom */}
-                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-md border border-slate-850 text-white flex items-center justify-between px-2 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center space-x-1 min-w-0 flex-1 pr-1">
-                    <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-400 font-mono shrink-0">Aiming At:</span>
-                    <select
-                      value={aimedBarcode}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setAimedBarcode(val);
-                        if (val) {
-                          handleScanAction(val);
-                          if (isAutoScan) {
-                            stopCamera();
-                          }
-                        }
-                      }}
-                      className="bg-slate-800 border-none text-white text-[10px] font-mono rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold truncate max-w-[150px] cursor-pointer"
-                    >
-                      <option value="" className="bg-slate-900 text-slate-300 italic text-[10px]">
-                        -- [ Choose Document Barcode ] --
-                      </option>
-                      {deliveries.map(d => (
-                        <option key={d.id} value={d.id} className="bg-slate-900 text-white text-[10px]">
-                          {d.id} ({d.customerName || 'Walk-in Customer'}) [{d.status}]
-                        </option>
-                      ))}
-                      {deliveries.length === 0 && (
-                        <option value="" disabled className="bg-slate-900 text-slate-400 text-[10px] italic">
-                          -- No Deliveries in Database --
-                        </option>
-                      )}
-                    </select>
+                {/* Production Control overlay at the bottom */}
+                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-md border border-slate-800 text-white flex items-center justify-between px-3 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-300 font-mono truncate">Live Sensor Feed Active</span>
                   </div>
                   
-                  <div className="flex items-center space-x-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (aimedBarcode) {
-                          handleScanAction(aimedBarcode);
-                          stopCamera();
-                        } else {
-                          setScanMessage("⚠️ Info: Choose a Document Barcode from the dropdown list to trigger scan manually.");
-                          setTimeout(() => setScanMessage(""), 4000);
-                        }
-                      }}
-                      className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold font-sans text-[9px] px-2.5 py-1 rounded shadow-sm uppercase tracking-wider cursor-pointer"
-                    >
-                      Scan Item
-                    </button>
+                  <div className="flex items-center shrink-0">
                     <button
                       type="button"
                       onClick={stopCamera}
-                      className="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold font-sans text-[9px] px-2 py-1 rounded cursor-pointer"
+                      className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white font-bold font-sans text-[9px] px-3 py-1.5 rounded cursor-pointer transition-colors border border-slate-700/60 uppercase tracking-wide"
                     >
-                      Off
+                      Turn Off Camera
                     </button>
                   </div>
                 </div>
