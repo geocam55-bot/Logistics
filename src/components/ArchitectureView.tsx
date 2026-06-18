@@ -1568,6 +1568,9 @@ export default function ArchitectureView({
     : maxTemplatePage;
 
   const getLiveValue = (key: string) => {
+    if (uploadedFiles[selectedDocType]) {
+      return editedFields[key] !== undefined ? editedFields[key] : '';
+    }
     return editedFields[key] !== undefined ? editedFields[key] : activeTemplate.fields[key]?.value || '';
   };
 
@@ -2055,18 +2058,29 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                   <span>Save to Template</span>
                 </button>
 
-                {uploadedFiles[selectedDocType] && (
-                  <button
-                    onClick={() => {
-                      setUploadedFiles(prev => ({ ...prev, [selectedDocType]: null }));
-                      setCustomFileFeedback(`Restored factory default invoice layout for ${selectedDocType}.`);
-                    }}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg font-bold flex items-center space-x-1 transition-colors"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                    <span>Restore Default</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    setUploadedFiles(prev => ({ ...prev, [selectedDocType]: null }));
+                    const current = activeTemplates[selectedDocType];
+                    if (current) {
+                      const initial: Record<string, string> = {};
+                      Object.keys(current.fields).forEach((key) => {
+                        initial[key] = current.fields[key].value;
+                      });
+                      setEditedFields(initial);
+                    }
+                    setExtractionResult(null);
+                    setOcrLog([]);
+                    setActiveFieldToMap(null);
+                    setCurrentPdfPage(1);
+                    setCustomFileFeedback(`✔ Clean Slate! Document, custom uploads, parsing logs, and extraction fields have been fully reset to default templates.`);
+                  }}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg font-bold flex items-center space-x-1 transition-colors"
+                  title="Clear custom uploaded file, reset parsed extraction values, and clean logs"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                  <span>Reset Page</span>
+                </button>
                 
                 <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors select-none">
                   <UploadCloud className="h-3.5 w-3.5" />
@@ -2087,9 +2101,20 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                           }));
                           setExtractionResult(null);
                           setOcrLog([]);
-                          setCustomFileFeedback(`Successfully uploaded real document: "${file.name}"! Tracing viewport updated. Click "Run OCR Engine" to parse.`);
+                          
+                          // Clear edited fields specifically for this new document to prevent background data leakage
+                          const current = activeTemplates[selectedDocType];
+                          if (current) {
+                            const initial: Record<string, string> = {};
+                            Object.keys(current.fields).forEach((key) => {
+                              initial[key] = ''; // Blank out fields
+                            });
+                            setEditedFields(initial);
+                          }
+                          setCustomFileFeedback(`Successfully uploaded real document: "${file.name}"! Tracing viewport updated with clean slate. Click "Run OCR Engine" to parse.`);
                         };
                         reader.readAsDataURL(file);
+                        e.target.value = ''; // Reset input target so uploading same file works
                       }
                     }}
                   />
@@ -2221,7 +2246,17 @@ CREATE TABLE IF NOT EXISTS tenant_state (
                           }));
                           setExtractionResult(null);
                           setOcrLog([]);
-                          setCustomFileFeedback(`✔ Drag & Drop matched! Successfully loaded "${file.name}" into tracing canvas. Click "Run OCR Engine" to parse.`);
+                          
+                          // Clear edited fields specifically for this new document to prevent background data leakage
+                          const current = activeTemplates[selectedDocType];
+                          if (current) {
+                            const initial: Record<string, string> = {};
+                            Object.keys(current.fields).forEach((key) => {
+                              initial[key] = ''; // Blank out fields
+                            });
+                            setEditedFields(initial);
+                          }
+                          setCustomFileFeedback(`✔ Drag & Drop matched! Successfully loaded "${file.name}" into tracing canvas with clean slate. Click "Run OCR Engine" to parse.`);
                         };
                         reader.readAsDataURL(file);
                       }
