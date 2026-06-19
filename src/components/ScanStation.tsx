@@ -1054,7 +1054,14 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             <input 
               ref={manualInputRef}
               type="text" 
-              className="absolute opacity-0 pointer-events-none w-1 h-1" 
+              style={{
+                position: 'absolute',
+                left: '-9999px',
+                top: '0px',
+                width: '1px',
+                height: '1px',
+                opacity: 0.01
+              }}
               inputMode="none"
               value={barcodeInput} 
               onChange={(e) => {
@@ -1063,7 +1070,13 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
               }}
               onKeyDown={(e) => { 
                 if (e.key === 'Enter') { 
-                  handleScanAction(barcodeInput); 
+                  const value = e.currentTarget.value.trim();
+                  if (value) {
+                    handleScanAction(value); 
+                    setLastDecodedResult(value);
+                    setBarcodeInput("");
+                    e.currentTarget.value = "";
+                  }
                 } 
               }}
               onBlur={() => {
