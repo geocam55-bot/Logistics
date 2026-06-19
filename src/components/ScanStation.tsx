@@ -631,16 +631,14 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 <span className="text-blue-600 font-bold">{fullFrameMode ? "Full Feed" : "[7:15] Doc Slice"}</span>
               </div>
             </div>
-          </div>
-
-          {/* Active Camera Scan Area */}
-          <div className="relative overflow-hidden h-[330px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center text-center text-slate-300">
+                  {/* Active Camera Scan Zone */}
+          <div className="relative overflow-hidden min-h-[350px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center p-5 text-center text-slate-300">
             {isCameraActive ? (
-              <div className="relative w-full h-full">
+              <div className="relative w-full h-[320px] flex flex-col justify-between">
                 {/* Real Live Video Feed */}
                 <div
                   id="camera-reader-container"
-                  className="w-full h-full rounded-lg overflow-hidden bg-black [&>video]:object-contain [&>video]:w-full [&>video]:h-full"
+                  className="absolute inset-0 w-full h-full rounded-lg overflow-hidden bg-black [&>video]:object-contain [&>video]:w-full [&>video]:h-full z-0"
                 />
 
                 {/* Laser scan animation overlay */}
@@ -657,13 +655,15 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                   <div className="w-4 h-4 border-t-2 border-r-2 border-emerald-400 absolute top-0 right-0" />
                   <div className="w-4 h-4 border-b-2 border-l-2 border-emerald-400 absolute bottom-0 left-0" />
                   <div className="w-4 h-4 border-b-2 border-r-2 border-emerald-400 absolute bottom-0 right-0" />
-                  <p className="text-[9px] text-emerald-400/85 font-mono tracking-widest uppercase">
+                  <p className="text-[9px] text-emerald-400/85 font-mono tracking-widest uppercase absolute top-2">
                     {fullFrameMode ? "Full Viewfinder Active" : "ML Kit Auto Alignment"}
                   </p>
-                              {/* Tap to Scan Overlay (Allows click on viewfinder directly under iOS iframe constraints!) */}
+                </div>
+
+                {/* Tap to Snap Overlay (Allows click on viewfinder directly under iOS iframe constraints!) */}
                 <div 
                   onClick={snapAndScanLiveFrame}
-                  className="absolute inset-0 cursor-pointer pointer-events-auto flex flex-col justify-between p-2.5 z-20 hover:bg-black/10 active:bg-black/25 transition-all group"
+                  className="absolute inset-0 cursor-pointer pointer-events-auto flex flex-col justify-between p-3.5 z-20 hover:bg-black/10 active:bg-black/25 transition-all group"
                   title="Click anywhere inside camera feedback window to snap & decrypt frame instantly with Gemini AI!"
                 >
                   <div className="flex justify-between items-center w-full pointer-events-none">
@@ -676,63 +676,93 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                   </div>
 
                   {/* High visibility central tap-to-focus scanner ring */}
-                  <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
+                  <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none my-auto">
                     <div className="w-14 h-14 rounded-full border-2 border-emerald-400/80 flex items-center justify-center bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.3)] animate-pulse group-hover:scale-110 transition-transform">
                       <Sparkles className="h-6 w-6 text-emerald-300" />
                     </div>
                     <span className="text-[10px] text-emerald-400 font-mono tracking-wide uppercase bg-slate-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/20 shadow-md">
-                      TAP ANYWHERE TO SNAP & SCAN
+                      TAP VIEW TO SNAP
                     </span>
                   </div>
 
-                  <div className="mb-14 text-[9px] text-white transition-opacity bg-slate-900/95 px-3 py-1.5 rounded-lg inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700 max-w-[92%] leading-relaxed tracking-wide text-center pointer-events-none shadow-xl">
-                    💡 <strong className="text-emerald-400">iOS/Safari:</strong> Tapping anywhere or clicking "Snap & Scan" below will grab the live frame and use Gemini Multimodal OCR to decode instantly.
+                  <div className="text-[9.5px] text-white transition-opacity bg-slate-900/95 px-3 py-1.5 rounded-lg inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700 max-w-[95%] leading-relaxed pointer-events-none shadow-xl mb-12">
+                    💡 <strong className="text-emerald-400">iOS Safari Sandbox:</strong> Programmatic live frame capture might block on some iOS environments. Try Option A (Device Camera) instead for full autofocus support.
                   </div>
                 </div>
 
                 {/* Production Control overlay at the bottom */}
-                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white flex items-center justify-between px-3 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                    <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-300 font-mono truncate">Live Sensor active</span>
-                  </div>
+                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/95 backdrop-blur-md border border-slate-800 text-white flex items-center justify-between px-3 py-2 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                  <span className="font-semibold text-[9.5px] uppercase tracking-wider text-slate-300 font-mono truncate">Live Viewfinder</span>
                   
                   <div className="flex items-center shrink-0 space-x-2">
                     <button
                       type="button"
                       onClick={snapAndScanLiveFrame}
-                      className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold font-sans text-[10px] px-3 py-1.5 rounded-md cursor-pointer transition-colors border border-emerald-500 uppercase tracking-wide flex items-center space-x-1.5 shadow-md shadow-emerald-950/50"
+                      className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold font-sans text-[10px] px-3 py-1.5 rounded-md cursor-pointer transition-colors border border-emerald-500 uppercase tracking-wide flex items-center space-x-1"
                     >
-                      <Sparkles className="h-3.5 w-3.5 animate-pulse text-yellow-300" />
+                      <Sparkles className="h-3 w-3 text-yellow-350" />
                       <span>Snap & Scan</span>
                     </button>
                     <button
                       type="button"
                       onClick={stopCamera}
-                      className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white font-bold font-sans text-[10px] px-3 py-1.5 rounded-md cursor-pointer transition-colors border border-slate-705 uppercase tracking-wide"
+                      className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-205 font-bold font-sans text-[10px] px-2 py-1.5 rounded-md cursor-pointer transition-colors border border-slate-700 uppercase"
                     >
-                      Turn Off
+                      Close Stream
                     </button>
                   </div>
-                </div>         </div>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center p-4">
-                <Scan className="h-8 w-8 text-slate-500 mb-3" />
-                
-                <div className="flex w-full max-w-xs justify-center items-center">
+              <div className="w-full flex flex-col items-center space-y-4 py-2 animate-fade-in">
+                {/* Visual Scanner Icon Ring */}
+                <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner relative">
+                  <Scan className="h-7 w-7 text-emerald-400 absolute animate-pulse" />
+                  <div className="absolute inset-0 rounded-full border border-emerald-500/25 animate-ping opacity-60" style={{ animationDuration: '3s' }} />
+                </div>
+
+                <div className="space-y-1.5 max-w-sm">
+                  <h5 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-emerald-300">SELECT SCANNING METHOD</h5>
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans px-2">
+                    To decrypt linear barcodes inside Mobile iFrame envelopes (such as Safari or iOS wrappers), use the device camera for full optical focus.
+                  </p>
+                </div>
+
+                {/* Primary Action Array */}
+                <div className="flex flex-col gap-2.5 w-full max-w-xs pt-1">
+                  {/* OPTION A: Native High-Res Zoom camera */}
+                  <button 
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-650 active:scale-[0.98] text-white font-sans text-xs font-bold px-4 py-3 rounded-lg transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-emerald-950/40 border border-emerald-500 uppercase tracking-wider"
+                  >
+                    <Sparkles className="h-4 w-4 text-yellow-250 animate-bounce" />
+                    <span>📷 SCAN WITH DEVICE CAMERA</span>
+                  </button>
+
+                  <div className="flex items-center my-1">
+                    <div className="flex-1 border-t border-slate-850" />
+                    <span className="text-[9px] text-slate-550 uppercase px-2 font-mono">Or Use Alternative</span>
+                    <div className="flex-1 border-t border-slate-850" />
+                  </div>
+
+                  {/* OPTION B: Live webcamera */}
                   <button 
                     type="button"
                     onClick={startCamera}
-                    className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-sans text-xs font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm border border-blue-550"
+                    className="w-full bg-slate-850 hover:bg-slate-800 active:scale-[0.98] text-blue-400 hover:text-blue-300 font-sans text-[11px] font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer border border-slate-750"
                   >
                     <Scan className="h-3.5 w-3.5" />
-                    <span>Activate Live Stream Camera</span>
+                    <span>Launch Live Web Viewfinder</span>
                   </button>
                 </div>
 
-                <div className="text-[10px] text-slate-450 font-mono mt-3 max-w-[270px] leading-snug text-center">
-                  Press the button to track and align real-time logistics barcodes. Supports rapid alignment and instant live Tap-to-Snap decryption fallback.
+                <div className="bg-slate-900/60 border border-slate-850 p-2.5 rounded text-[10px] text-slate-400 leading-snug text-left max-w-xs space-y-1">
+                  <span className="font-bold text-slate-200 block">💡 How does Device Scan work?</span>
+                  <p>
+                    Tap the green button to trigger your phone's native camera. Frame the barcode close and snap. 
+                    Our server-side Gemini Core decodes either the <strong>raw barcode lines</strong> or the <strong>printed numeric label</strong> underneath for a guaranteed match!
+                  </p>
                 </div>
 
                 {cameraError && (
@@ -742,6 +772,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 )}
               </div>
             )}
+          </div>
           </div>
 
           {/* Invisible file input & processing div */}

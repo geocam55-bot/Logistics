@@ -877,16 +877,19 @@ async function startServer() {
       const mimeType = parts[1];
       const base64Data = parts[2];
 
-      const prompt = `You are an automated logistics terminal assistant.
-Scan the uploaded photo to identify and read any barcodes (especially 1D linear barcodes such as Code 128, Code 39, ITF, EAN, UPC, or QR codes).
-Typically, these represent invoices or sales orders containing characters like digits, letters, or dashes (e.g. "I-123456", "7159").
-Decode or locate the text represented by the stripes/bars or square matrix.
-If multiple barcodes are present, prioritize the primary barcode labels.
-Verify that the output matches any text printed underneath or on top of the barcode stripes if appropriate.
+      const prompt = `You are an expert logistics automation assistant specializing in high-fidelity optical barcode decryption and tracking.
+Analyze the provided high-resolution document/invoice photo to identify and decode any barcode (such as Code 128, Code 39, ITF, UPC, EAN, or a QR code).
+
+CRITICAL INSTRUCTIONS FOR MAXIMUM SCAN SUCCESS:
+1. 1D BARCODE ANALYSIS: Try to read the individual stripes of the 1D linear barcode.
+2. FAILSAFE HUMAN-READABLE TEXT FALLBACK: Barcode labels on industrial slips (like Epicor, logistics invoices) ALWAYS print their exact alphanumeric representation directly BELOW, ABOVE, or NEXT to the stripes (e.g. "7155", "7159", "I-123456", "SO-94827").
+   If the barcode stripes are slightly compressed, fuzzy, or low-resolution in the camera snapshot, look directly at the clear text printed adjacent to the barcode. That text is a 100% exact string match of the barcode value. Read it as if you had decrypted the barcode itself.
+3. Ignore random text on the invoice, focus strictly on the text label adjacent to the barcode lines/stripes.
+4. Format the final code without spaces if represented that way on the document.
 
 Return the result in the active JSON format.
 Output schema keys:
-- success: boolean indicating if a barcode was found and decoded.
+- success: boolean indicating if a barcode or its printed text value was discovered.
 - barcodeText: the decoded string value (or null if not found/legible).
 - barcodeFormat: the format e.g. "CODE_128", "QR_CODE", "CODE_39", "UPC", etc. (or null).`;
 
