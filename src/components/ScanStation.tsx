@@ -69,6 +69,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const manualInputRef = useRef<HTMLInputElement>(null);
+  const [lockFocus, setLockFocus] = useState(false);
 
   const startCamera = async () => {
     setCameraError(null);
@@ -264,6 +266,11 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
     playBeep();
     setBarcodeInput(''); // Clear keyboard typewriter input so user knows it succeeded!
+    if (lockFocus) {
+      setTimeout(() => {
+        manualInputRef.current?.focus();
+      }, 80);
+    }
     setScanMessage(`ML Kit Decoded: "${code}" (Raw Barcode: "${rawCode}")`);
     setTimeout(() => setScanMessage(''), 4500);
 
@@ -679,24 +686,76 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           )}
 
           {/* Barcode manual typewriter input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-700 block">Manual ERP Invoice/Barcode Input</label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-gray-700 block text-left">Manual ERP Invoice/Barcode Input</label>
+              
+              {/* Lock Focus Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  const newVal = !lockFocus;
+                  setLockFocus(newVal);
+                  if (newVal) {
+                    setTimeout(() => {
+                      manualInputRef.current?.focus();
+                    }, 100);
+                  }
+                }}
+                className={`text-[10px] px-2 py-0.5 rounded border font-sans font-medium flex items-center space-x-1 transition-all ${
+                  lockFocus 
+                    ? 'bg-emerald-100 border-emerald-300 text-emerald-800 font-bold shadow-xs' 
+                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${lockFocus ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+                <span>{lockFocus ? "Bluetooth Scanner Mode: LOCKED" : "Lock Focus for Scanning Target"}</span>
+              </button>
+            </div>
+            
             <div className="flex space-x-2">
               <input 
+                ref={manualInputRef}
                 type="text" 
-                placeholder="Scan active ERP barcode..."
+                placeholder={lockFocus ? "🎯 Hardware scanner focus locked... Pull trigger now!" : "Scan or type active ERP barcode..."}
                 value={barcodeInput} 
                 onChange={(e) => setBarcodeInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { handleScanAction(barcodeInput); } }}
-                className="flex-1 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onBlur={() => {
+                  if (lockFocus) {
+                    setTimeout(() => {
+                      manualInputRef.current?.focus();
+                    }, 50);
+                  }
+                }}
+                className={`flex-1 border px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 transition-all ${
+                  lockFocus 
+                    ? 'border-emerald-500 bg-emerald-50/20 text-emerald-950 font-bold focus:ring-emerald-500' 
+                    : 'border-slate-200 bg-white text-gray-950 focus:ring-blue-500 font-medium'
+                }`}
               />
               <button 
                 type="button"
                 onClick={() => handleScanAction(barcodeInput)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold"
+                className={`text-white px-3 py-2 rounded-lg text-xs font-semibold shrink-0 transition-colors ${
+                  lockFocus ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 Trigger Scan
               </button>
+            </div>
+
+            {/* Quick Helper Tips for iPhone Web Application Operators */}
+            <div className="bg-blue-50/50 border border-blue-100/60 rounded-lg p-2.5 mt-2 text-[11px] text-blue-900 leading-relaxed">
+              <span className="font-bold block mb-0.5 text-blue-950">📱 iOS Web-App Scanner Guide:</span>
+              <ul className="list-disc pl-3.5 space-y-0.5 text-left">
+                <li>
+                  <strong className="text-blue-950">Option A (Camera Lens):</strong> Aim your regular iPhone camera and tap <em className="font-semibold text-slate-800">Activate Live Stream</em>, or snapshot flat paperwork with <em className="font-semibold text-slate-800">Snap/Upload</em> (auto-decoded server-side by Gemini AI).
+                </li>
+                <li>
+                  <strong className="text-blue-950">Option B (Hardware Scanner wedge):</strong> Toggle <span className="font-bold text-emerald-800">Lock Focus</span> above. Connect any Bluetooth or Lightning scanning accessory. It will auto-focus, play audible status beeps, and log packages instantly without needing to tap the screen!
+                </li>
+              </ul>
             </div>
           </div>
          {/* Actual database tracking lists for click-and-scan */}

@@ -165,22 +165,6 @@ export default function App() {
     if (!currentTenant) return;
 
     const tenantId = currentTenant.id;
-    let defaultDeliveries = INITIAL_DELIVERIES;
-    let defaultTrucks = TRUCKS;
-    let defaultBranches = BRANCHES;
-    let defaultUsers = INITIAL_USERS;
-
-    if (tenantId === 'bay-of-fundy') {
-      defaultDeliveries = INITIAL_DELIVERIES_BOF;
-      defaultTrucks = TRUCKS_BOF;
-      defaultBranches = BRANCHES_BOF;
-      defaultUsers = INITIAL_USERS_BOF;
-    } else if (tenantId === 'cabot-trail') {
-      defaultDeliveries = INITIAL_DELIVERIES_CTC;
-      defaultTrucks = TRUCKS_CTC;
-      defaultBranches = BRANCHES_CTC;
-      defaultUsers = INITIAL_USERS_CTC;
-    }
 
     const loadState = async () => {
       // 1. Diagnose Supabase Status
@@ -192,78 +176,55 @@ export default function App() {
           const data = await res.json();
 
           if (data.supabaseActive) {
-            if (data.branches && data.branches.length > 0 && data.trucks && data.trucks.length > 0) {
-              // Populate React state from live Supabase Tables
-              setDeliveries(data.deliveries || []);
-              setTrucks(data.trucks || []);
-              setBranches(data.branches || []);
-              setUsers(data.users || []);
+            // Populate React state directly from live Supabase Tables
+            setDeliveries(data.deliveries || []);
+            setTrucks(data.trucks || []);
+            setBranches(data.branches || []);
+            setUsers(data.users || []);
 
-              localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries || []));
-              localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks || []));
-              localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(data.branches || []));
-              localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users || []));
-              setLastSyncTime(new Date().toLocaleTimeString());
-              return;
-            } else {
-              // Supabase tables are empty: Seed live database from our local template presets immediately
-              console.log("Seeding Supabase with default presets...");
-              setDeliveries(defaultDeliveries);
-              setTrucks(defaultTrucks);
-              setBranches(defaultBranches);
-              setUsers(defaultUsers);
-
-              await fetch("/api/tenant/save-state", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  tenantId,
-                  deliveries: defaultDeliveries,
-                  trucks: defaultTrucks,
-                  branches: defaultBranches,
-                  users: defaultUsers
-                })
-              });
-              setLastSyncTime(new Date().toLocaleTimeString());
-              return;
-            }
+            localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries || []));
+            localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks || []));
+            localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(data.branches || []));
+            localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users || []));
+            setLastSyncTime(new Date().toLocaleTimeString());
+            return;
           }
         } catch (err) {
           console.error("Failed to fetch live Supabase tenant state, using local storage cache:", err);
         }
       }
 
-      // Offline Sandbox Fallback to local storage
+      // Offline Sandbox Fallback to local storage (Starting with empty arrays if uninitialized)
       const cachedD = localStorage.getItem(`prospaces_deliveries_tenant_${tenantId}`);
       if (cachedD) {
-        try { setDeliveries(JSON.parse(cachedD)); } catch (e) { setDeliveries(defaultDeliveries); }
+        try { setDeliveries(JSON.parse(cachedD)); } catch (e) { setDeliveries([]); }
       } else {
-        setDeliveries(defaultDeliveries);
-        localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(defaultDeliveries));
+        setDeliveries([]);
+        localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify([]));
       }
 
       const cachedT = localStorage.getItem(`prospaces_trucks_tenant_${tenantId}`);
       if (cachedT) {
-        try { setTrucks(JSON.parse(cachedT)); } catch (e) { setTrucks(defaultTrucks); }
+        try { setTrucks(JSON.parse(cachedT)); } catch (e) { setTrucks([]); }
       } else {
-        setTrucks(defaultTrucks);
-        localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(defaultTrucks));
+        setTrucks([]);
+        localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify([]));
       }
 
       const cachedB = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
       if (cachedB) {
-        try { setBranches(JSON.parse(cachedB)); } catch (e) { setBranches(defaultBranches); }
+        try { setBranches(JSON.parse(cachedB)); } catch (e) { setBranches([]); }
       } else {
-        setBranches(defaultBranches);
-        localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(defaultBranches));
+        setBranches([]);
+        localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify([]));
       }
 
       const cachedU = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
       if (cachedU) {
-        try { setUsers(JSON.parse(cachedU)); } catch (e) { setUsers(defaultUsers); }
+        try { setUsers(JSON.parse(cachedU)); } catch (e) { setUsers([]); }
       } else {
-        setUsers(defaultUsers);
-        localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(defaultUsers));
+        setUsers([]);
+        localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify([]));
       }
     };
 

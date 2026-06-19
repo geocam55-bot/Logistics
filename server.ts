@@ -169,6 +169,34 @@ function deserializeFromPhone(user: any): any {
   };
 }
 
+function serializeToType(type: string | undefined, registrationDueDate: string | undefined): string {
+  const baseType = (type || "").trim();
+  let res = baseType;
+  if (registrationDueDate) {
+    res += ` ||regdue:${registrationDueDate}`;
+  }
+  return res;
+}
+
+function deserializeType(truck: any): any {
+  if (!truck) return truck;
+  const type = truck.type || "";
+  let cleanType = type;
+  let registrationDueDate = truck.registrationDueDate || "";
+
+  const regdueMatch = type.match(/\|\|regdue:([^\s|]+)/);
+  if (regdueMatch) {
+    registrationDueDate = regdueMatch[1];
+    cleanType = cleanType.replace(/\|\|regdue:[^\s|]+/, "");
+  }
+
+  return {
+    ...truck,
+    type: cleanType.trim(),
+    registrationDueDate
+  };
+}
+
 const SH_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR PROSPACES DELIVERY AND LOGISTICS PORTAL */
 
 -- 1. Create tenants table
@@ -198,7 +226,8 @@ create table if not exists trucks (
   name text not null,
   type text not null,
   driver text not null,
-  "branchId" text not null
+  "branchId" text not null,
+  "registrationDueDate" text
 );
 
 -- 4. Create users table
@@ -541,11 +570,12 @@ async function startServer() {
       }
 
       const deserializedUsers = (rUsers.data || []).map((u: any) => deserializeFromPhone(u));
+      const deserializedTrucks = (rTrucks.data || []).map((t: any) => deserializeType(t));
 
       res.json({
         supabaseActive: true,
         branches: rBranches.data || [],
-        trucks: rTrucks.data || [],
+        trucks: deserializedTrucks,
         users: deserializedUsers,
         deliveries: rDeliveries.data || []
       });
@@ -591,8 +621,24 @@ async function startServer() {
 
       // 2. Trucks
       if (sanitizedTrucks.length > 0) {
-        const { error } = await supabase.from("trucks").upsert(sanitizedTrucks);
-        if (error) throw new Error(`Trucks Sync Error: ${error.message}`);
+        try {
+          const { error } = await supabase.from("trucks").upsert(sanitizedTrucks);
+          if (error) throw error;
+        } catch (dbErr: any) {
+          const errMsg = dbErr.message || String(dbErr);
+          if (errMsg.includes("column") && (errMsg.includes("registrationDueDate") || errMsg.includes("42703"))) {
+            console.warn("Supabase trucks table is missing 'registrationDueDate' column. Retrying upsert with serialized fallback...");
+            const strippedTrucks = sanitizedTrucks.map((t: any) => {
+              const { registrationDueDate, ...rest } = t;
+              (rest as any).type = serializeToType(t.type, t.registrationDueDate);
+              return rest;
+            });
+            const { error: retryErr } = await supabase.from("trucks").upsert(strippedTrucks);
+            if (retryErr) throw new Error(`Trucks Sync Retry Error: ${retryErr.message}`);
+          } else {
+            throw new Error(`Trucks Sync Error: ${dbErr.message}`);
+          }
+        }
       }
 
       // 3. Users

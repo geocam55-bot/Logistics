@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, Branch } from '../types';
-import { Truck as TruckIcon, Plus, Trash2, Edit2, Shield, Info, ChevronRight, FileCheck, AlertTriangle } from 'lucide-react';
+import { Truck as TruckIcon, Plus, Trash2, Edit2, Shield, Info, ChevronRight, FileCheck, AlertTriangle, Calendar } from 'lucide-react';
 
 interface FleetSetupProps {
   trucks: Truck[];
@@ -40,6 +40,7 @@ export default function FleetSetup({
   const [truckType, setTruckType] = useState('Flatbed Boom Truck');
   const [driverName, setDriverName] = useState('');
   const [targetBranchId, setTargetBranchId] = useState('');
+  const [registrationDueDate, setRegistrationDueDate] = useState('');
 
   // Get trucks assigned to the currently selected branch
   const filteredTrucks = trucks.filter(t => t.branchId === selectedBranchId);
@@ -61,6 +62,7 @@ export default function FleetSetup({
     setTruckName(`Truck-${filteredTrucks.length + 1}`);
     setTruckType('Flatbed Boom Truck');
     setDriverName('');
+    setRegistrationDueDate('');
     setTargetBranchId(selectedBranchId || (branches[0]?.id || ''));
     setIsAdding(true);
     setEditingTruckId(null);
@@ -72,6 +74,7 @@ export default function FleetSetup({
     setTruckType(truck.type);
     setDriverName(truck.driver);
     setTargetBranchId(truck.branchId);
+    setRegistrationDueDate(truck.registrationDueDate || '');
     setEditingTruckId(truck.id);
     setIsAdding(false);
   };
@@ -88,7 +91,8 @@ export default function FleetSetup({
       name: truckName.trim(),
       type: truckType,
       driver: driverName.trim(),
-      branchId: targetBranchId
+      branchId: targetBranchId,
+      registrationDueDate: registrationDueDate || undefined
     };
 
     if (editingTruckId) {
@@ -105,6 +109,7 @@ export default function FleetSetup({
     // Reset Form
     setTruckName('');
     setDriverName('');
+    setRegistrationDueDate('');
   };
 
   const handleDelete = (id: string) => {
@@ -261,13 +266,13 @@ export default function FleetSetup({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-gray-700 block mb-1">Truck Model & Hardware</label>
                     <select
                       value={truckType}
                       onChange={(e) => setTruckType(e.target.value)}
-                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800"
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 font-medium"
                     >
                       {TRUCK_TYPES.map(type => (
                         <option key={type} value={type}>{type}</option>
@@ -280,7 +285,7 @@ export default function FleetSetup({
                     <select
                       value={targetBranchId}
                       onChange={(e) => setTargetBranchId(e.target.value)}
-                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
                     >
                       {branches.map(b => (
                         <option key={b.id} value={b.id}>{b.name}</option>
@@ -293,10 +298,20 @@ export default function FleetSetup({
                     <input 
                       type="text" 
                       required
-                      placeholder="Full name of delivery driver"
+                      placeholder="Full name of driver"
                       value={driverName}
                       onChange={(e) => setDriverName(e.target.value)}
                       className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 block mb-1">Registration Due Date</label>
+                    <input 
+                      type="date" 
+                      value={registrationDueDate}
+                      onChange={(e) => setRegistrationDueDate(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                     />
                   </div>
                 </div>
@@ -364,6 +379,30 @@ export default function FleetSetup({
                           <span className="flex items-center text-[11px]">
                             Driver: <strong className="text-slate-800 ml-1">{truck.driver}</strong>
                           </span>
+                          {truck.registrationDueDate && (
+                            <>
+                              <span className="text-gray-300">&bull;</span>
+                              <span className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] border ${
+                                (() => {
+                                  const expDate = new Date(truck.registrationDueDate);
+                                  const now = new Date();
+                                  return expDate < now;
+                                })() 
+                                  ? 'bg-red-50 text-red-700 border-red-200' 
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200/50'
+                              }`}>
+                                <Calendar className="h-3 w-3 shrink-0" />
+                                <span>Reg Due: <strong className="font-mono">{truck.registrationDueDate}</strong></span>
+                                {(() => {
+                                  const expDate = new Date(truck.registrationDueDate);
+                                  const now = new Date();
+                                  return expDate < now;
+                                })() && (
+                                  <span className="text-red-600 font-extrabold uppercase text-[8px] tracking-wider animate-pulse ml-1">(! OVERDUE)</span>
+                                )}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

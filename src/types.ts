@@ -51,6 +51,7 @@ export interface Truck {
   type: string;
   driver: string;
   branchId: string; // Associated branch/DC (e.g. WINDMILL_DC or 01075_TANTALLON)
+  registrationDueDate?: string;
 }
 
 export type UserRole = 'Driver' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';

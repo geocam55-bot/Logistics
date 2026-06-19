@@ -66,21 +66,24 @@ export const TRUCKS: Truck[] = [
     name: 'Lumber Flatbed #01',
     type: 'Heavy Duty Flatbed Loader',
     driver: 'Frank Milligan',
-    branchId: 'WINDMILL_DC'
+    branchId: 'WINDMILL_DC',
+    registrationDueDate: '2026-10-15'
   },
   {
     id: 'TRK-RA-02',
     name: 'Vessel Box Truck #02',
     type: '26ft Hard-side Box Truck',
     driver: 'Sarah Jenkins',
-    branchId: '01075_TANTALLON'
+    branchId: '01075_TANTALLON',
+    registrationDueDate: '2026-08-20'
   },
   {
     id: 'TRK-RA-03',
     name: 'Boom Picker Truck #03',
     type: 'Hiab Crane Boom Truck',
     driver: 'Davey Crocket',
-    branchId: '01076_HALIFAX'
+    branchId: '01076_HALIFAX',
+    registrationDueDate: '2027-01-12'
   }
 ];
 
@@ -292,14 +295,16 @@ export const TRUCKS_BOF: Truck[] = [
     name: 'Valley Cruiser',
     type: 'Three-axle Flatbed',
     driver: 'Bob Comeau',
-    branchId: 'BOF_KENTVILLE_DC'
+    branchId: 'BOF_KENTVILLE_DC',
+    registrationDueDate: '2026-11-30'
   },
   {
     id: 'TRK-BOF-02',
     name: 'Moncton Shuttle',
     type: 'Dry Van Trailer',
     driver: 'John Peterson',
-    branchId: 'BOF_MONCTON_DEPOT'
+    branchId: 'BOF_MONCTON_DEPOT',
+    registrationDueDate: '2027-04-18'
   }
 ];
 
@@ -376,7 +381,8 @@ export const TRUCKS_CTC: Truck[] = [
     name: 'Cabot Titan',
     type: 'Super-B Hauler Flatbed',
     driver: 'Donald McDonald',
-    branchId: 'CTC_SYDNEY_DC'
+    branchId: 'CTC_SYDNEY_DC',
+    registrationDueDate: '2026-07-25'
   }
 ];
 
