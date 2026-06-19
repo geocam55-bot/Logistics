@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, UserRole, Branch } from '../types';
-import { Users, UserPlus, Edit2, Trash2, Shield, Info, CheckCircle, Mail, Phone, Building, AlertTriangle } from 'lucide-react';
+import { Users, UserPlus, Edit2, Trash2, Shield, Info, CheckCircle, Mail, Phone, Building, AlertTriangle, Calendar } from 'lucide-react';
 
 interface UsersSetupProps {
   users: User[];
@@ -28,6 +28,7 @@ export default function UsersSetup({
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('User');
   const [userPhone, setUserPhone] = useState('');
+  const [driverLicenseExpire, setDriverLicenseExpire] = useState('');
   const [associatedStoreId, setAssociatedStoreId] = useState('');
   const [userPassword, setUserPassword] = useState('123456');
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function UsersSetup({
     setUserEmail('');
     setUserRole('User');
     setUserPhone('');
+    setDriverLicenseExpire('');
     setAssociatedStoreId(branches[0]?.id || '');
     setUserPassword('123456');
     setIsAdding(true);
@@ -67,6 +69,7 @@ export default function UsersSetup({
     setUserEmail(user.email);
     setUserRole(user.role);
     setUserPhone(user.phone || '');
+    setDriverLicenseExpire(user.driverLicenseExpire || '');
     setAssociatedStoreId(user.associatedStoreId || '');
     setUserPassword(user.password || '123456');
     setEditingUserId(user.id);
@@ -86,6 +89,7 @@ export default function UsersSetup({
       email: userEmail.trim(),
       role: userRole,
       phone: userPhone.trim() || undefined,
+      driverLicenseExpire: driverLicenseExpire || undefined,
       associatedStoreId: associatedStoreId || undefined,
       password: userPassword || '123456'
     };
@@ -108,6 +112,7 @@ export default function UsersSetup({
     setUserName('');
     setUserEmail('');
     setUserPhone('');
+    setDriverLicenseExpire('');
     setUserPassword('123456');
   };
 
@@ -265,6 +270,23 @@ export default function UsersSetup({
                   </select>
                 </div>
 
+                {userRole === 'Driver' && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 block mb-1">
+                      Driver License Expiration
+                    </label>
+                    <input
+                      type="date"
+                      value={driverLicenseExpire}
+                      onChange={(e) => setDriverLicenseExpire(e.target.value)}
+                      className="w-full border bg-gray-50 border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 flex items-center">
+                      <Calendar className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" /> Real-time active status check will analyze this date
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs font-semibold text-gray-700 block mb-1">Account Login Password</label>
                   <input
@@ -366,6 +388,36 @@ export default function UsersSetup({
                           <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           <span>Passcode: <strong className="font-mono bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded text-[10px]">{user.password || '123456'}</strong></span>
                         </div>
+                        {user.driverLicenseExpire && (
+                          <div className={`flex items-center space-x-2 px-2.5 py-1.5 rounded-lg border mt-2.5 ${
+                            (() => {
+                              const expDate = new Date(user.driverLicenseExpire);
+                              const now = new Date();
+                              return expDate < now;
+                            })() 
+                              ? 'bg-red-50 text-red-800 border-red-200/60' 
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200/60'
+                          }`}>
+                            <Calendar className={`h-3.5 w-3.5 shrink-0 ${
+                              (() => {
+                                const expDate = new Date(user.driverLicenseExpire);
+                                const now = new Date();
+                                return expDate < now;
+                              })() ? 'text-red-500 animate-pulse' : 'text-emerald-500'
+                            }`} />
+                            <div className="text-[11px] leading-tight select-none">
+                              <span className="font-semibold block sm:inline">License Expires: </span>
+                              <span className="font-mono">{user.driverLicenseExpire}</span>
+                              {(() => {
+                                const expDate = new Date(user.driverLicenseExpire);
+                                const now = new Date();
+                                return expDate < now;
+                              })() && (
+                                <span className="text-red-600 font-extrabold ml-1 uppercase text-[9px] tracking-wide animate-pulse block">(! EXPIRED)</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

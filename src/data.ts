@@ -255,7 +255,8 @@ export const INITIAL_USERS: User[] = [
     role: 'Driver',
     phone: '(902) 555-2201',
     associatedStoreId: 'WINDMILL_DC',
-    status: 'Active'
+    status: 'Active',
+    driverLicenseExpire: '2028-11-14'
   },
   {
     id: 'USR-RA-04',
@@ -264,7 +265,8 @@ export const INITIAL_USERS: User[] = [
     role: 'Driver',
     phone: '(902) 555-2202',
     associatedStoreId: '01075_TANTALLON',
-    status: 'Active'
+    status: 'Active',
+    driverLicenseExpire: '2026-03-31'
   }
 ];
 
@@ -309,7 +311,8 @@ export const INITIAL_USERS_BOF: User[] = [
     role: 'Driver',
     phone: '(506) 555-0101',
     associatedStoreId: 'BOF_KENTVILLE_DC',
-    status: 'Active'
+    status: 'Active',
+    driverLicenseExpire: '2029-05-18'
   },
   {
     id: 'USR-BOF-02',
@@ -318,7 +321,8 @@ export const INITIAL_USERS_BOF: User[] = [
     role: 'Driver',
     phone: '(506) 555-0102',
     associatedStoreId: 'BOF_MONCTON_DEPOT',
-    status: 'Active'
+    status: 'Active',
+    driverLicenseExpire: '2028-12-08'
   }
 ];
 
@@ -384,7 +388,8 @@ export const INITIAL_USERS_CTC: User[] = [
     role: 'Driver',
     phone: '(902) 555-8801',
     associatedStoreId: 'CTC_SYDNEY_DC',
-    status: 'Active'
+    status: 'Active',
+    driverLicenseExpire: '2027-10-15'
   }
 ];
 
