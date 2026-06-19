@@ -67,12 +67,15 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     customerName?: string;
   } | null>(null);
 
+  const [fullFrameMode, setFullFrameMode] = useState(true);
+
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   const [lockFocus, setLockFocus] = useState(false);
 
-  const startCamera = async () => {
+  const startCamera = async (forceFullFrame?: boolean) => {
+    const useFullFrame = forceFullFrame !== undefined ? forceFullFrame : fullFrameMode;
     setCameraError(null);
     setIsCameraActive(true);
     
@@ -98,7 +101,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             Html5QrcodeSupportedFormats.ITF
           ],
           verbose: false,
-          useBarCodeDetectorIfSupported: true
+          useBarCodeDetectorIfSupported: false // Disabled for iOS Safari safety to bypass WebKit native detector freeze
         });
         html5QrCodeRef.current = html5QrCode;
 
@@ -106,7 +109,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           { facingMode: 'environment' },
           {
             fps: 30, // Tighter sampling frequency
-            qrbox: (width, height) => {
+            qrbox: useFullFrame ? undefined : (width, height) => {
               // Expand the box so Zxing has a larger cross-section of rows to decode the 1D stripes
               return { 
                 width: Math.round(width * 0.90), 
@@ -143,6 +146,17 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         setIsCameraActive(false);
       }
     }, 150);
+  };
+
+  const toggleFullFrameMode = async () => {
+    const nextVal = !fullFrameMode;
+    setFullFrameMode(nextVal);
+    if (isCameraActive) {
+      stopCamera();
+      setTimeout(() => {
+        startCamera(nextVal);
+      }, 350);
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -531,6 +545,24 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 </button>
               </div>
             </div>
+
+            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200">
+              <div className="flex flex-col text-left">
+                <span className="font-semibold text-slate-700">Full Viewfinder Scope</span>
+                <span className="text-[9px] text-gray-400">Recommended for quick iPhone camera focus</span>
+              </div>
+              <div className="flex items-center space-x-2 bg-slate-100/50 px-1 py-0.5 rounded shrink-0">
+                <span className="text-[10px] text-gray-500 font-mono font-medium">{fullFrameMode ? 'Full Canvas' : 'Target Box'}</span>
+                <button 
+                  type="button"
+                  onClick={toggleFullFrameMode}
+                  className={`w-9 h-5 rounded-full transition-colors relative ${fullFrameMode ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                  aria-label="Toggle Full Frame scanning"
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${fullFrameMode ? 'right-0.5' : 'left-0.5'}`} />
+                </button>
+              </div>
+            </div>
             
             <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-mono pt-1.5 pb-0.5 border-t border-slate-200">
               <div>
@@ -539,7 +571,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
               </div>
               <div>
                 <span className="text-gray-400">Capture Target:</span>{' '}
-                <span className="text-blue-600 font-bold">[7:15] Doc Slice</span>
+                <span className="text-blue-600 font-bold">{fullFrameMode ? "Full Feed" : "[7:15] Doc Slice"}</span>
               </div>
             </div>
           </div>
@@ -561,12 +593,16 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 />
 
                 {/* Scope Target Sights */}
-                <div className="absolute inset-x-12 inset-y-12 border-2 border-dashed border-emerald-500/40 rounded-lg flex items-center justify-center pointer-events-none z-10">
+                <div className={`absolute border-2 border-dashed border-emerald-500/40 rounded-lg flex items-center justify-center pointer-events-none z-10 transition-all ${
+                  fullFrameMode ? 'inset-x-4 inset-y-4' : 'inset-x-12 inset-y-12'
+                }`}>
                   <div className="w-4 h-4 border-t-2 border-l-2 border-emerald-400 absolute top-0 left-0" />
                   <div className="w-4 h-4 border-t-2 border-r-2 border-emerald-400 absolute top-0 right-0" />
                   <div className="w-4 h-4 border-b-2 border-l-2 border-emerald-400 absolute bottom-0 left-0" />
                   <div className="w-4 h-4 border-b-2 border-r-2 border-emerald-400 absolute bottom-0 right-0" />
-                  <p className="text-[9px] text-emerald-400/85 font-mono tracking-widest uppercase">ML Kit Auto Alignment</p>
+                  <p className="text-[9px] text-emerald-400/85 font-mono tracking-widest uppercase">
+                    {fullFrameMode ? "Full Viewfinder Active" : "ML Kit Auto Alignment"}
+                  </p>
                 </div>
 
                 {/* Tap to Scan Overlay */}
