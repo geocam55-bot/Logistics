@@ -66,6 +66,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     resolvedStatus: 'NEW' | 'REGISTERED' | 'PICKED' | 'DELIVERED_OR_RETURNED' | 'NOT_FOUND';
     customerName?: string;
   } | null>(null);
+  const [lastDecodedResult, setLastDecodedResult] = useState('');
+  const [isScanningFrame, setIsScanningFrame] = useState(false);
 
   const [fullFrameMode, setFullFrameMode] = useState(true);
 
@@ -162,6 +164,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   const snapAndScanLiveFrame = async () => {
     setCameraError(null);
     setScanMessage("Capturing viewfinder perspective... Sending to Gemini Decrypter...");
+    setIsScanningFrame(true);
 
     try {
       // Find the live video element spawned by html5-qrcode
@@ -213,6 +216,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       setTimeout(() => setCameraError(null), 8500);
     } finally {
       setScanMessage("");
+      setIsScanningFrame(false);
     }
   };
 
@@ -222,6 +226,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
     setCameraError(null);
     setScanMessage("Uploading & scanning photo via Gemini AI Core...");
+    setIsScanningFrame(true);
 
     try {
       if (isCameraActive) {
@@ -262,6 +267,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       setTimeout(() => setCameraError(null), 8500);
     } finally {
       setScanMessage("");
+      setIsScanningFrame(false);
     }
 
     if (e.target) {
@@ -375,6 +381,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       resolvedStatus: resStatus,
       customerName: custName
     });
+    setLastDecodedResult(rawCode);
 
     if (existing) {
       setScannedRecord(existing);
@@ -633,6 +640,25 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             </div>
                   {/* Active Camera Scan Zone */}
           <div className="relative overflow-hidden min-h-[350px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center p-5 text-center text-slate-300">
+            {isScanningFrame && (
+              <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[60] flex flex-col items-center justify-center p-6 space-y-4 animate-fade-in pointer-events-auto">
+                <div className="relative flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full border-4 border-emerald-500/30 border-t-emerald-400 animate-spin" />
+                  <Sparkles className="h-6 w-6 text-yellow-300 absolute animate-pulse" />
+                </div>
+                <div className="space-y-1.5 max-w-xs">
+                  <h5 className="text-white text-xs font-bold font-mono tracking-widest uppercase text-emerald-400">
+                    📡 GEMINI AI COGNITION ENGINE
+                  </h5>
+                  <p className="text-[11px] text-slate-300 font-sans leading-relaxed font-semibold">
+                    {scanMessage || "Processing image frame and extracting barcode details..."}
+                  </p>
+                  <p className="text-[9px] text-slate-500 font-mono">
+                    Communicating securely on backend proxy port 3000
+                  </p>
+                </div>
+              </div>
+            )}
             {isCameraActive ? (
               <div className="relative w-full h-[320px] flex flex-col justify-between">
                 {/* Real Live Video Feed */}
@@ -789,24 +815,86 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
           {/* Real-time ML Kit Extraction Terminal HUD */}
           {lastScan && (
-            <div className="bg-slate-950 border border-slate-850 p-2.5 rounded-lg font-mono text-[10.5px] text-slate-300 space-y-1">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-1 text-[9.5px]">
-                <span className="text-emerald-400 font-bold">📡 GOOGLE ML KIT COGNITION LOG</span>
-                <span className="text-slate-500">{lastScan.timestamp.toLocaleTimeString()}</span>
+            <div className="space-y-3 p-3.5 bg-slate-900 border border-slate-750 rounded-xl shadow-md animate-fade-in text-left">
+              {/* Glowing Scan Success Alert Message Box */}
+              <div className="flex items-center space-x-2 bg-emerald-500/15 border border-emerald-500/30 px-3 py-2.5 rounded-lg text-emerald-350">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <div className="text-left leading-tight">
+                  <span className="font-bold text-xs uppercase tracking-wider block font-sans">
+                    ✨ CAMERA SCAN COMPLETE
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-sans font-medium">
+                    {lastScan.resolvedStatus === 'NEW' 
+                      ? 'Decoded successfully! Not active in standard route registry.' 
+                      : `Decoded & Auto-Matched to: ${lastScan.customerName || 'Delivery Order'}`}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">RAW_STREAM:</span>
-                <span className="text-white font-semibold truncate max-w-[200px]">{lastScan.barcode}</span>
+
+              {/* Decoded Barcode Value String Text Box with Copy Action */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+                    📋 Decoded Barcode Text Box
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-mono">
+                    Editable Fallback
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={lastDecodedResult}
+                    onChange={(e) => setLastDecodedResult(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 font-mono text-[11.5px] text-emerald-300 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-semibold"
+                    placeholder="Barcode string..."
+                    title="You can manually tweak or edit the scanned barcode string in this box if needed!"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(lastDecodedResult);
+                        setScanMessage("📋 Code copied to clipboard!");
+                        setTimeout(() => setScanMessage(''), 3000);
+                      }
+                    }}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 hover:text-white border border-slate-700 text-slate-300 rounded-lg text-xs font-semibold select-none cursor-pointer duration-150 shrink-0 uppercase tracking-wider text-[10px]"
+                    title="Copy scanned text code"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleScanAction(lastDecodedResult)}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold select-none cursor-pointer duration-150 shrink-0 uppercase tracking-wider text-[10px]"
+                    title="Verify changes & match logistics record"
+                  >
+                    Sync
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-between text-yellow-400 font-semibold border-t border-slate-900 pt-0.5">
-                <span>SLICE_[7:15]:</span>
-                <span className="bg-yellow-950/40 px-1 rounded text-yellow-350 font-bold animate-pulse">
-                  {lastScan.extractedDocNum || lastScan.barcode} (Length: 9)
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-slate-900 pt-0.5 text-[9.5px]">
-                <span className="text-slate-400 font-medium">ENGINE_STATUS:</span>
-                <span className="text-emerald-400 font-semibold">Match Processed (12ms)</span>
+
+              {/* Technical Parameter Readouts */}
+              <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-850 font-mono text-[10.5px] text-slate-400 space-y-1">
+                <div className="flex justify-between items-center text-[9px] border-b border-slate-850/50 pb-1 mb-1 text-slate-500">
+                  <span>⚙️ SYSTEM COGNITION LOGS</span>
+                  <span>{lastScan.timestamp.toLocaleTimeString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>RAW_STREAM:</span>
+                  <span className="text-slate-300 font-medium truncate max-w-[180px]">{lastScan.barcode}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-900 pt-0.5">
+                  <span>EXTRACTED_REF:</span>
+                  <span className="text-yellow-400 active:scale-95 font-bold">
+                    {lastScan.extractedDocNum || lastScan.barcode}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-slate-900 pt-0.5 text-[9px]">
+                  <span>ENGINE_STATUS:</span>
+                  <span className="text-emerald-400 font-semibold uppercase">Parsed & Decrypted</span>
+                </div>
               </div>
             </div>
           )}
