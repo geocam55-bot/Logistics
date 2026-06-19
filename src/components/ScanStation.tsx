@@ -347,6 +347,74 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     };
   }, []);
 
+  // Double-Rugged focus keeper for physical scanner wedges (such as Bluetooth/Lightning hardware)
+  // Ensures focus is automatically re-acquired even if user clicks elsewhere on the page, without causing viewport zoom or keyboard issues.
+  React.useEffect(() => {
+    if (!lockFocus) return;
+
+    // Direct immediate focus on toggle
+    if (manualInputRef.current) {
+      manualInputRef.current.focus();
+    }
+
+    // Keep reclaiming focus back to the hidden scanner input every 500ms
+    const timer = setInterval(() => {
+      if (document.activeElement !== manualInputRef.current && manualInputRef.current) {
+        // Only target focus if user is not actively typing in another input element
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+          manualInputRef.current.focus();
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [lockFocus]);
+
+  // Global keydown hook interceptor to catch physical wedge keyboard scanners if focus gets completely lost
+  React.useEffect(() => {
+    if (!lockFocus) return;
+
+    let scanBuffer = '';
+    let lastKeyStamp = Date.now();
+
+    const handleWedgeKeyDown = (e: KeyboardEvent) => {
+      // Direct typing bypass logic
+      const activeEl = document.activeElement as HTMLElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl !== manualInputRef.current && activeEl.id !== 'visible-barcode-input') {
+        return; // Let user type in other forms/inputs
+      }
+
+      const nowStamp = Date.now();
+      // If time since last keystroke is > 1.5 seconds, reset buffer (as humans type much slower than hardware wedge streams)
+      if (nowStamp - lastKeyStamp > 1500) {
+        scanBuffer = '';
+      }
+      lastKeyStamp = nowStamp;
+
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        if (scanBuffer.trim().length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          const parsedCode = scanBuffer.trim();
+          scanBuffer = '';
+          setLastDecodedResult(parsedCode);
+          setBarcodeInput(parsedCode);
+          handleScanAction(parsedCode);
+        }
+      } else if (e.key.length === 1) {
+        scanBuffer += e.key;
+        setLastDecodedResult(scanBuffer);
+        setBarcodeInput(scanBuffer);
+      }
+    };
+
+    window.addEventListener('keydown', handleWedgeKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleWedgeKeyDown, true);
+    };
+  }, [lockFocus, deliveries]);
+
   // Audio synthesis Beep
   const playBeep = () => {
     if (!audioFeedback) return;
@@ -916,6 +984,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
               </div>
               <div className="flex gap-2">
                 <input
+                  id="visible-barcode-input"
                   type="text"
                   value={lastDecodedResult}
                   onChange={(e) => {
@@ -985,7 +1054,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             <input 
               ref={manualInputRef}
               type="text" 
-              className="sr-only" 
+              className="absolute opacity-0 pointer-events-none w-1 h-1" 
+              inputMode="none"
               value={barcodeInput} 
               onChange={(e) => {
                 setBarcodeInput(e.target.value);
