@@ -134,6 +134,27 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             // Parsing errors thrown continually while aiming are normal/expected
           }
         ).catch((err: any) => {
+          console.warn("Could not start environment camera, attempting default/user camera fallback...", err);
+          // Retry starting the camera with no strict facingMode constraint or default webcam
+          return html5QrCode.start(
+            {}, // Fallback: default/user-facing device camera
+            {
+              fps: 30,
+              qrbox: useFullFrame ? undefined : (width, height) => {
+                return { 
+                  width: Math.round(width * 0.90), 
+                  height: Math.round(height * 0.70) 
+                };
+              },
+              aspectRatio: 1.777778
+            },
+            (decodedText) => {
+              handleScanAction(decodedText);
+              stopCamera();
+            },
+            () => {}
+          );
+        }).catch((err: any) => {
           console.error("html5-qrcode start failure:", err);
           let errMsg = err?.message || String(err);
           if (errMsg.indexOf("NotAllowedError") !== -1 || errMsg.indexOf("Permission") !== -1) {
@@ -357,16 +378,16 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       manualInputRef.current.focus();
     }
 
-    // Keep reclaiming focus back to the hidden scanner input every 500ms
+    // Keep reclaiming focus back to the hidden scanner input every 550ms
     const timer = setInterval(() => {
       if (document.activeElement !== manualInputRef.current && manualInputRef.current) {
-        // Only target focus if user is not actively typing in another input element
+        // Only target focus if user is not actively interacting with another input, select, link, or button element
         const activeTag = document.activeElement?.tagName;
-        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'BUTTON' && activeTag !== 'SELECT' && activeTag !== 'A') {
           manualInputRef.current.focus();
         }
       }
-    }, 500);
+    }, 550);
 
     return () => clearInterval(timer);
   }, [lockFocus]);
@@ -1082,8 +1103,18 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
               onBlur={() => {
                 if (lockFocus) {
                   setTimeout(() => {
-                    manualInputRef.current?.focus();
-                  }, 50);
+                    if (manualInputRef.current) {
+                      const activeEl = document.activeElement;
+                      if (activeEl) {
+                        const tag = activeEl.tagName;
+                        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT' || tag === 'A') {
+                          // Do not steal focus if the user clicked into an interactive element or button
+                          return;
+                        }
+                      }
+                      manualInputRef.current.focus();
+                    }
+                  }, 120);
                 }
               }}
             />

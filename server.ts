@@ -1080,7 +1080,10 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
   });
 
   // Serve static assets and frontend index inside our middleware stack
-  if (process.env.NODE_ENV !== "production") {
+  // In the deployed container, we want to serve the bundled production files from `dist` if they exist.
+  const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(path.join(process.cwd(), "dist/index.html"));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
