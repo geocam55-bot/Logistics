@@ -159,6 +159,63 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     }
   };
 
+  const snapAndScanLiveFrame = async () => {
+    setCameraError(null);
+    setScanMessage("Capturing viewfinder perspective... Sending to Gemini Decrypter...");
+
+    try {
+      // Find the live video element spawned by html5-qrcode
+      const videoEl = document.querySelector("#camera-reader-container video") as HTMLVideoElement | null;
+      if (!videoEl) {
+        throw new Error("No active camera sensor feedback discovered in the viewfinder window. Try starting the live stream first or snapping a photo instead.");
+      }
+
+      // Create off-screen canvas to extract pixel grid
+      const canvas = document.createElement("canvas");
+      canvas.width = videoEl.videoWidth || 640;
+      canvas.height = videoEl.videoHeight || 480;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Failed to activate local canvas drawing engine to grab video frame.");
+      }
+
+      // Render video frame on canvas
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+      // Export as compression-safe JPEG data URI
+      const fileData = canvas.toDataURL("image/jpeg", 0.92);
+
+      // Submit base64 dump directly to server-side Gemini scanner
+      const res = await fetch("/api/scan-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileData })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server HTTP response code ${res.status}`);
+      }
+
+      const result = await res.json();
+      if (result.success && result.barcodeText) {
+        handleScanAction(result.barcodeText);
+        setScanMessage(`📋 Decrypted Barcode: ${result.barcodeText} (${result.barcodeFormat || 'Auto'})`);
+        stopCamera();
+        setTimeout(() => setScanMessage(''), 4500);
+      } else {
+        throw new Error("Gemini did not detect a clear barcode in the live frame. Bring the lens closer to the document, hold it steady to avoid motion blur, and try again.");
+      }
+    } catch (err: any) {
+      console.error("Frame snap capture error:", err);
+      setCameraError(err?.message || "Failed to scan live frame. Please hold steady and try again.");
+      setTimeout(() => setCameraError(null), 8500);
+    } finally {
+      setScanMessage("");
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -603,69 +660,79 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                   <p className="text-[9px] text-emerald-400/85 font-mono tracking-widest uppercase">
                     {fullFrameMode ? "Full Viewfinder Active" : "ML Kit Auto Alignment"}
                   </p>
-                </div>
-
-                {/* Tap to Scan Overlay */}
+                              {/* Tap to Scan Overlay (Allows click on viewfinder directly under iOS iframe constraints!) */}
                 <div 
-                  className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 z-20"
+                  onClick={snapAndScanLiveFrame}
+                  className="absolute inset-0 cursor-pointer pointer-events-auto flex flex-col justify-between p-2.5 z-20 hover:bg-black/10 active:bg-black/25 transition-all group"
+                  title="Click anywhere inside camera feedback window to snap & decrypt frame instantly with Gemini AI!"
                 >
-                  <div className="flex justify-between items-center w-full">
-                    <div className="text-[9px] bg-red-650 text-white font-mono px-2 py-0.5 rounded shadow-sm font-semibold animate-pulse uppercase tracking-wider">
+                  <div className="flex justify-between items-center w-full pointer-events-none">
+                    <div className="text-[9px] bg-red-650 text-white font-mono px-2 py-0.5 rounded shadow-sm font-semibold animate-pulse uppercase tracking-wider select-none">
                       ● Live Feed Active
                     </div>
-                    <div className="text-[8.5px] bg-slate-900/80 text-emerald-400 font-mono px-1.5 py-0.5 rounded">
-                      Autodetect Mode
+                    <div className="text-[8.5px] bg-slate-900/90 text-emerald-400 font-mono px-1.5 py-0.5 rounded border border-emerald-500/20 select-none">
+                      Tap-to-Snap Active
                     </div>
                   </div>
 
-                  <div className="mb-14 text-[9.5px] text-slate-300 transition-opacity bg-slate-900/90 px-3 py-2 rounded inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700/85 max-w-[90%] leading-snug">
-                    📷 Hold steady 6-12 inches away to let camera focus continuously. Tapping is not supported under iOS frame.
+                  {/* High visibility central tap-to-focus scanner ring */}
+                  <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
+                    <div className="w-14 h-14 rounded-full border-2 border-emerald-400/80 flex items-center justify-center bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.3)] animate-pulse group-hover:scale-110 transition-transform">
+                      <Sparkles className="h-6 w-6 text-emerald-300" />
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-mono tracking-wide uppercase bg-slate-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/20 shadow-md">
+                      TAP ANYWHERE TO SNAP & SCAN
+                    </span>
+                  </div>
+
+                  <div className="mb-14 text-[9px] text-white transition-opacity bg-slate-900/95 px-3 py-1.5 rounded-lg inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700 max-w-[92%] leading-relaxed tracking-wide text-center pointer-events-none shadow-xl">
+                    💡 <strong className="text-emerald-400">iOS/Safari:</strong> Tapping anywhere or clicking "Snap & Scan" below will grab the live frame and use Gemini Multimodal OCR to decode instantly.
                   </div>
                 </div>
 
                 {/* Production Control overlay at the bottom */}
-                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-md border border-slate-800 text-white flex items-center justify-between px-3 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="absolute bottom-2 left-2 right-2 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white flex items-center justify-between px-3 py-1.5 rounded-lg text-xs z-30 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
                     <span className="font-semibold text-[9px] uppercase tracking-wider text-slate-300 font-mono truncate">Live Sensor active</span>
                   </div>
                   
-                  <div className="flex items-center shrink-0">
+                  <div className="flex items-center shrink-0 space-x-2">
+                    <button
+                      type="button"
+                      onClick={snapAndScanLiveFrame}
+                      className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold font-sans text-[10px] px-3 py-1.5 rounded-md cursor-pointer transition-colors border border-emerald-500 uppercase tracking-wide flex items-center space-x-1.5 shadow-md shadow-emerald-950/50"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 animate-pulse text-yellow-300" />
+                      <span>Snap & Scan</span>
+                    </button>
                     <button
                       type="button"
                       onClick={stopCamera}
-                      className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white font-bold font-sans text-[9px] px-3 py-1.5 rounded cursor-pointer transition-colors border border-slate-700/60 uppercase tracking-wide"
+                      className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white font-bold font-sans text-[10px] px-3 py-1.5 rounded-md cursor-pointer transition-colors border border-slate-705 uppercase tracking-wide"
                     >
-                      Turn Off Camera
+                      Turn Off
                     </button>
                   </div>
-                </div>
+                </div>         </div>
               </div>
             ) : (
               <div className="flex flex-col items-center p-4">
                 <Scan className="h-8 w-8 text-slate-500 mb-3" />
                 
-                <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-sm justify-center items-center">
+                <div className="flex w-full max-w-xs justify-center items-center">
                   <button 
                     type="button"
                     onClick={startCamera}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-sans text-xs font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm border border-blue-550"
+                    className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-sans text-xs font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm border border-blue-550"
                   >
                     <Scan className="h-3.5 w-3.5" />
-                    <span>Activate Live Stream</span>
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full sm:w-auto bg-slate-800 hover:bg-slate-750 active:scale-[0.98] text-emerald-400 hover:text-emerald-300 font-sans text-xs font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm border border-slate-700"
-                  >
-                    <span>📷 Snap/Upload Photo</span>
+                    <span>Activate Live Stream Camera</span>
                   </button>
                 </div>
 
-                <div className="text-[10px] text-slate-450 font-mono mt-3 max-w-[270px] leading-snug">
-                  Use active stream for real-time tracking, or snap a sharp photo with native iOS camera if lenses struggle to focus.
+                <div className="text-[10px] text-slate-450 font-mono mt-3 max-w-[270px] leading-snug text-center">
+                  Press the button to track and align real-time logistics barcodes. Supports rapid alignment and instant live Tap-to-Snap decryption fallback.
                 </div>
 
                 {cameraError && (
