@@ -897,17 +897,19 @@ Output schema keys:
 
       const response = await aiClient.models.generateContent({
         model: "gemini-3.5-flash",
-        contents: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data
+              }
+            },
+            {
+              text: prompt
             }
-          },
-          {
-            text: prompt
-          }
-        ],
+          ]
+        },
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -981,17 +983,19 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
 
       const response = await aiClient.models.generateContent({
         model: "gemini-3.5-flash",
-        contents: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data
+              }
+            },
+            {
+              text: prompt
             }
-          },
-          {
-            text: prompt
-          }
-        ],
+          ]
+        },
         config: {
           responseMimeType: "application/json",
           responseSchema: {
