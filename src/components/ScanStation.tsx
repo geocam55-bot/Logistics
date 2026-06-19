@@ -122,7 +122,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
             videoConstraints: {
               facingMode: 'environment',
               width: { min: 640, ideal: 1280, max: 1920 },
-              height: { min: 480, ideal: 720, max: 1080 }
+              height: { min: 480, ideal: 720, max: 1080 },
+              advanced: [{ focusMode: "continuous" } as any]
             }
           },
           (decodedText) => {
@@ -146,7 +147,10 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                   height: Math.round(height * 0.70) 
                 };
               },
-              aspectRatio: 1.777778
+              aspectRatio: 1.777778,
+              videoConstraints: {
+                advanced: [{ focusMode: "continuous" } as any]
+              }
             },
             (decodedText) => {
               handleScanAction(decodedText);
