@@ -288,8 +288,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
   
   const [showEngineSettings, setShowEngineSettings] = useState<boolean>(false);
   
-  // Real-time sitting still Dispatcher HQ Location (defaults to Silicon Valley middle ground, matches active trucks coords)
-  const [hqCoords, setHqCoords] = useState<{ lat: number, lng: number }>({ lat: 37.3382, lng: -121.8863 });
+  // Real-time sitting still Dispatcher HQ Location (defaults to Halifax City Hall / Atlantic Canada)
+  const [hqCoords, setHqCoords] = useState<{ lat: number, lng: number }>({ lat: 44.6488, lng: -63.5752 });
   const [isWatchingGps, setIsWatchingGps] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'off' | 'searching' | 'locked'>('off');
@@ -343,7 +343,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
       (b.name || '').toUpperCase().includes('SAN JOSE')
     );
     
-    if (hasCaliforniaBranch || activeBranches.length === 0) {
+    if (hasCaliforniaBranch) {
       setHqCoords({ lat: 37.3382, lng: -121.8863 }); // California default HQ
     } else {
       setHqCoords({ lat: 44.6488, lng: -63.5752 }); // Halifax default HQ
@@ -361,7 +361,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
       (b.name || '').toUpperCase().includes('SAN JOSE')
     );
 
-    const initialCenter: L.LatLngExpression = (hasCaliforniaBranch || activeBranches.length === 0)
+    const initialCenter: L.LatLngExpression = hasCaliforniaBranch
       ? [37.3382, -121.8863]
       : [44.6488, -63.5752];
 
