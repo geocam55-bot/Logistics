@@ -117,11 +117,18 @@ export default function App() {
   const checkSupabaseStatus = async () => {
     try {
       const res = await fetch("/api/supabase-status");
+      if (!res.ok) {
+        throw new Error(`Server returned non-ok status: ${res.status}`);
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON content. You might be accessing the application via a static host (like Vercel) instead of the full-stack container environment.");
+      }
       const data = await res.json();
       setSupabaseStatus(data);
       return data;
-    } catch (e) {
-      console.warn("Failed checking Supabase connection diagnostics:", e);
+    } catch (e: any) {
+      console.warn("Failed checking Supabase connection diagnostics:", e.message || e);
       return null;
     }
   };
@@ -173,6 +180,13 @@ export default function App() {
       if (status && status.connected) {
         try {
           const res = await fetch(`/api/tenant/state?tenantId=${tenantId}`);
+          if (!res.ok) {
+            throw new Error(`Server returned non-ok status: ${res.status}`);
+          }
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            throw new Error("Server returned non-JSON content.");
+          }
           const data = await res.json();
 
           if (data.supabaseActive) {
@@ -236,13 +250,20 @@ export default function App() {
     const loadTenants = async () => {
       try {
         const res = await fetch("/api/tenants");
+        if (!res.ok) {
+          throw new Error(`Server returned non-ok status: ${res.status}`);
+        }
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Server returned non-JSON content. You might be accessing the application via a static host (like Vercel) instead of the full-stack container environment.");
+        }
         const data = await res.json();
         if (data.tenants) {
           setAllTenants(data.tenants);
           localStorage.setItem('prospaces_all_tenants', JSON.stringify(data.tenants));
         }
-      } catch (err) {
-        console.warn("Failed retrieving tenants from database on mount:", err);
+      } catch (err: any) {
+        console.warn("Failed retrieving tenants from database on mount:", err.message || err);
       }
     };
     loadTenants();
