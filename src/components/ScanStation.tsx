@@ -68,11 +68,11 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   } | null>(null);
   const [lastDecodedResult, setLastDecodedResult] = useState('');
   const [isScanningFrame, setIsScanningFrame] = useState(false);
+  const [isBgScanning, setIsBgScanning] = useState(false);
 
   const [fullFrameMode, setFullFrameMode] = useState(true);
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   const [lockFocus, setLockFocus] = useState(false);
 
@@ -95,15 +95,25 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         const html5QrCode = new Html5Qrcode("camera-reader-container", {
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.AZTEC,
+            Html5QrcodeSupportedFormats.CODABAR,
             Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.MAXICODE,
+            Html5QrcodeSupportedFormats.ITF,
             Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.PDF_417,
+            Html5QrcodeSupportedFormats.RSS_14,
+            Html5QrcodeSupportedFormats.RSS_EXPANDED,
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.ITF
+            Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION
           ],
           verbose: false,
-          useBarCodeDetectorIfSupported: false // Disabled for iOS Safari safety to bypass WebKit native detector freeze
+          useBarCodeDetectorIfSupported: true // Enabled iOS Safari native BarcodeDetector API for instant, hardware-level decoding!
         });
         html5QrCodeRef.current = html5QrCode;
 
@@ -195,13 +205,18 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       // Find the live video element spawned by html5-qrcode
       const videoEl = document.querySelector("#camera-reader-container video") as HTMLVideoElement | null;
       if (!videoEl) {
-        throw new Error("No active camera sensor feedback discovered in the viewfinder window. Try starting the live stream first or snapping a photo instead.");
+        throw new Error("No active camera sensor feedback discovered in the viewfinder window. Try starting the live stream first.");
+      }
+
+      // Safe check to avoid IndexSizeError/InvalidStateError on Safari when video is not fully active yet
+      if (videoEl.videoWidth === 0 || videoEl.videoHeight === 0) {
+        throw new Error("The live camera viewfinder is still preparing its lens. Please wait 1 second and tap the screen again.");
       }
 
       // Create off-screen canvas to extract pixel grid
       const canvas = document.createElement("canvas");
-      canvas.width = videoEl.videoWidth || 640;
-      canvas.height = videoEl.videoHeight || 480;
+      canvas.width = videoEl.videoWidth;
+      canvas.height = videoEl.videoHeight;
 
       const ctx = canvas.getContext("2d");
       if (!ctx) {
@@ -242,6 +257,55 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     } finally {
       setScanMessage("");
       setIsScanningFrame(false);
+    }
+  };
+
+  const snapAndScanLiveFrameBackground = async () => {
+    if (isScanningFrame || isBgScanning || !isCameraActive) return;
+    
+    try {
+      const videoEl = document.querySelector("#camera-reader-container video") as HTMLVideoElement | null;
+      if (!videoEl || videoEl.videoWidth === 0 || videoEl.videoHeight === 0) {
+        return; // camera source not fully hydrated in frame yet
+      }
+
+      setIsBgScanning(true);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = videoEl.videoWidth;
+      canvas.height = videoEl.videoHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        setIsBgScanning(false);
+        return;
+      }
+
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      const fileData = canvas.toDataURL("image/jpeg", 0.70); // slightly smaller for faster background streams
+
+      const res = await fetch("/api/scan-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileData })
+      });
+
+      if (!res.ok) {
+        setIsBgScanning(false);
+        return;
+      }
+
+      const result = await res.json();
+      if (result.success && result.barcodeText) {
+        handleScanAction(result.barcodeText);
+        setScanMessage(`📋 AI Auto-Decrypted: ${result.barcodeText} (${result.barcodeFormat || 'Auto'})`);
+        stopCamera();
+        setTimeout(() => setScanMessage(''), 4500);
+      }
+    } catch (err: any) {
+      console.warn("Background AI stream scan failed (expected between steady frames):", err);
+    } finally {
+      setIsBgScanning(false);
     }
   };
 
@@ -371,6 +435,17 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       }
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!isCameraActive) return;
+
+    // Run background AI Assist frame scanner every 3.5 seconds to bypass iOS ZXing performance limitations!
+    const intervalId = setInterval(() => {
+      snapAndScanLiveFrameBackground();
+    }, 3500);
+
+    return () => clearInterval(intervalId);
+  }, [isCameraActive, isScanningFrame]);
 
   // Double-Rugged focus keeper for physical scanner wedges (such as Bluetooth/Lightning hardware)
   // Ensures focus is automatically re-acquired even if user clicks elsewhere on the page, without causing viewport zoom or keyboard issues.
@@ -780,7 +855,9 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 <span className="text-blue-600 font-bold">{fullFrameMode ? "Full Feed" : "[7:15] Doc Slice"}</span>
               </div>
             </div>
-                  {/* Active Camera Scan Zone */}
+          </div>
+
+          {/* Active Camera Scan Zone */}
           <div className="relative overflow-hidden min-h-[515px] bg-slate-950 rounded-lg border-2 border-slate-800 flex flex-col items-center justify-center p-5 text-center text-slate-300">
             {isScanningFrame && (
               <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[60] flex flex-col items-center justify-center p-6 space-y-4 animate-fade-in pointer-events-auto">
@@ -838,9 +915,16 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     <div className="text-[9px] bg-red-650 text-white font-mono px-2 py-0.5 rounded shadow-sm font-semibold animate-pulse uppercase tracking-wider select-none">
                       ● Live Feed Active
                     </div>
-                    <div className="text-[8.5px] bg-slate-900/90 text-emerald-400 font-mono px-1.5 py-0.5 rounded border border-emerald-500/20 select-none">
-                      Tap-to-Snap Active
-                    </div>
+                    {isBgScanning ? (
+                      <div className="text-[9px] bg-sky-600 text-white font-mono px-2 py-0.5 rounded shadow-[0_0_10px_rgba(2,132,199,0.7)] font-bold animate-pulse uppercase tracking-wider select-none flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        AI Decrypting Live Stream...
+                      </div>
+                    ) : (
+                      <div className="text-[8.5px] bg-slate-900/90 text-emerald-400 font-mono px-1.5 py-0.5 rounded border border-emerald-500/20 select-none">
+                        Tap-to-Snap Active
+                      </div>
+                    )}
                   </div>
 
                   {/* High visibility central tap-to-focus scanner ring */}
@@ -853,8 +937,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     </span>
                   </div>
 
-                  <div className="text-[9.5px] text-white transition-opacity bg-slate-900/95 px-3 py-1.5 rounded-lg inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700 max-w-[95%] leading-relaxed pointer-events-none shadow-xl mb-12">
-                    💡 <strong className="text-emerald-400">iOS Safari Sandbox:</strong> Programmatic live frame capture might block on some iOS environments. Try Option A (Device Camera) instead for full autofocus support.
+                  <div className="text-[9.5px] text-white transition-opacity bg-slate-900/95 px-3 py-1.5 rounded-lg inline-block mx-auto backdrop-blur-md font-semibold select-none border border-slate-700 max-w-[95%] leading-relaxed pointer-events-none shadow-xl mb-12 text-center">
+                    💡 <strong className="text-emerald-400">iOS Safari Tip:</strong> Hold your lens still over the barcode. The background AI scanner checks active video frames automatically every 3.5 seconds, or tap the viewfinder anywhere to decrypt instantly!
                   </div>
                 </div>
 
@@ -890,47 +974,33 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 </div>
 
                 <div className="space-y-1.5 max-w-sm">
-                  <h5 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-emerald-300">SELECT SCANNING METHOD</h5>
+                  <h5 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-emerald-300">LIVE WEB VIEWFINDER</h5>
                   <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans px-2">
-                    To decrypt linear barcodes inside Mobile iFrame envelopes (such as Safari or iOS wrappers), use the device camera for full optical focus.
+                    Activate the video camera feed to scan packaging slips, epicor receipts, or invoices in real time.
                   </p>
                 </div>
 
-                {/* Primary Action Array */}
-                <div className="flex flex-col gap-2.5 w-full max-w-xs pt-1">
-                  {/* OPTION A: Native High-Res Zoom camera */}
+                {/* Primary Action Button */}
+                <div className="w-full max-w-xs pt-1">
                   <button 
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-650 active:scale-[0.98] text-white font-sans text-xs font-bold px-4 py-3 rounded-lg transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-emerald-950/40 border border-emerald-500 uppercase tracking-wider"
+                    onClick={() => startCamera()}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-650 active:scale-[0.98] text-white font-sans text-xs font-bold px-4 py-3.5 rounded-lg transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-emerald-950/40 border border-emerald-500 uppercase tracking-wider"
                   >
                     <Sparkles className="h-4 w-4 text-yellow-250 animate-bounce" />
-                    <span>📷 SCAN WITH DEVICE CAMERA</span>
-                  </button>
-
-                  <div className="flex items-center my-1">
-                    <div className="flex-1 border-t border-slate-850" />
-                    <span className="text-[9px] text-slate-550 uppercase px-2 font-mono">Or Use Alternative</span>
-                    <div className="flex-1 border-t border-slate-850" />
-                  </div>
-
-                  {/* OPTION B: Live webcamera */}
-                  <button 
-                    type="button"
-                    onClick={startCamera}
-                    className="w-full bg-slate-850 hover:bg-slate-800 active:scale-[0.98] text-blue-400 hover:text-blue-300 font-sans text-[11px] font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer border border-slate-750"
-                  >
-                    <Scan className="h-3.5 w-3.5" />
-                    <span>Launch Live Web Viewfinder</span>
+                    <span>📷 LAUNCH LIVE VIEWFINDER</span>
                   </button>
                 </div>
 
-                <div className="bg-slate-900/60 border border-slate-850 p-2.5 rounded text-[10px] text-slate-400 leading-snug text-left max-w-xs space-y-1">
-                  <span className="font-bold text-slate-200 block">💡 How does Device Scan work?</span>
+                <div className="bg-slate-900/60 border border-slate-850 p-3 rounded text-[10.5px] text-slate-400 leading-relaxed text-left max-w-xs space-y-1.5">
+                  <span className="font-bold text-slate-200 block">💡 How does Live AI Scanning work?</span>
                   <p>
-                    Tap the green button to trigger your phone's native camera. Frame the barcode close and snap. 
-                    Our server-side Gemini Core decodes either the <strong>raw barcode lines</strong> or the <strong>printed numeric label</strong> underneath for a guaranteed match!
+                    Point your camera at any 1D/2D barcode or QR code. The system uses a state-of-the-art dual engine:
                   </p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li><strong>Continuous AI Scanning:</strong> Active frames are checked in the background automatically every 3.5 seconds via server-side Gemini.</li>
+                    <li><strong>Tap-to-Snap:</strong> At any time, tap anywhere on the live viewfinder screen to instantly capture a pristine high-resolution scan!</li>
+                  </ul>
                 </div>
 
                 {cameraError && (
@@ -941,19 +1011,8 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
               </div>
             )}
           </div>
-          </div>
 
-          {/* Invisible file input & processing div */}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept="image/*" 
-            capture="environment" 
-            className="hidden" 
-            style={{ display: 'none' }} 
-          />
-          <div id="file-reader-temp" className="hidden" style={{ display: 'none' }} />
+      <div id="file-reader-temp" className="hidden" style={{ display: 'none' }} />
 
           {/* PERSISTENT BARCODE CONSOLE & DECISION HUB */}
           <div className="space-y-3.5 p-4 bg-slate-900 border border-slate-750 rounded-xl shadow-md text-left">
@@ -1159,12 +1218,12 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           {/* Quick Helper Tips for iPhone Web Application Operators */}
           <div className="bg-blue-50/50 border border-blue-100/60 rounded-lg p-2.5 mt-2 text-[11px] text-blue-900 leading-relaxed">
             <span className="font-bold block mb-0.5 text-blue-950">📱 iOS Web-App Scanner Guide:</span>
-            <ul className="list-disc pl-3.5 space-y-0.5 text-left">
+            <ul className="list-disc pl-3.5 space-y-1 text-left">
               <li>
-                <strong className="text-blue-950">Option A (Camera Lens):</strong> Aim your regular iPhone camera and tap <em className="font-semibold text-slate-800">Activate Live Stream</em>, or snapshot flat paperwork with <em className="font-semibold text-slate-800">Snap/Upload</em> (auto-decoded server-side by Gemini AI).
+                <strong className="text-blue-950">Live Web Viewfinder:</strong> Aim your iPhone lens at any barcode and tap <span className="font-semibold text-slate-800">LAUNCH LIVE VIEWFINDER</span>. Center the barcode to decode packaging slips or transit routing grids instantly.
               </li>
               <li>
-                <strong className="text-blue-950">Option B (Hardware Scanner wedge):</strong> Toggle <span className="font-bold text-emerald-800">Lock Focus</span> above. Connect any Bluetooth or Lightning scanning accessory. It will auto-focus, play audible status beeps, and log packages instantly without needing to tap the screen!
+                <strong className="text-blue-950">Hardware Scanner Integration:</strong> Connect any enterprise Bluetooth/Lightning barcode reader wedge. Toggle <span className="font-bold text-emerald-800">Lock Focus</span> inside the scanner deck above to scan continuously and execute automated routing without needing to touch the screen!
               </li>
             </ul>
           </div>
