@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck as TruckType } from '../types';
-import { BRANCHES } from '../data';
 import { 
   Truck as TruckIcon, 
   CheckCircle2, 
@@ -265,7 +264,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ deliveries, onSelectTab, trucks, branches }: DashboardProps) {
-  const activeBranches = branches && branches.length > 0 ? branches : BRANCHES;
+  const activeBranches = branches || [];
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
   const [isPlayingSimulation, setIsPlayingSimulation] = useState<boolean>(true);
@@ -278,9 +277,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
   const [mapTheme, setMapTheme] = useState<'daylight' | 'cyber' | 'satellite'>('daylight');
 
   // Map engine configuration (Supports TomTom and OpenStreetMap/CartoDB fallbacks)
-  const [mapEngine, setMapEngine] = useState<'carto' | 'tomtom'>(() => {
-    return (localStorage.getItem('FLEET_MAP_ENGINE') as 'carto' | 'tomtom') || 'tomtom';
-  });
+  const [mapEngine, setMapEngine] = useState<'carto' | 'tomtom'>('carto');
   
   const [tomTomApiKey, setTomTomApiKey] = useState<string>(() => {
     return localStorage.getItem('FLEET_TOMTOM_API_KEY') || 'Q6ALAtN4vWofc1XpL9RfeT7vAwQJ8fG'; // Sample public development key
@@ -964,53 +961,6 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Map Engine Selector */}
-            <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg border border-slate-700 shadow-inner">
-              <button
-                type="button"
-                onClick={() => {
-                  setMapEngine('tomtom');
-                  localStorage.setItem('FLEET_MAP_ENGINE', 'tomtom');
-                }}
-                className={`px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                  mapEngine === 'tomtom' 
-                    ? 'bg-emerald-500 text-slate-950 shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-                title="TomTom premium vector-styled maps"
-              >
-                <Compass className="h-2.5 w-2.5" />
-                TomTom
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMapEngine('carto');
-                  localStorage.setItem('FLEET_MAP_ENGINE', 'carto');
-                }}
-                className={`px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                  mapEngine === 'carto' 
-                    ? 'bg-slate-700 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-                title="Standard CartoDB OpenStreetMap styled maps"
-              >
-                Standard
-              </button>
-              {mapEngine === 'tomtom' && (
-                <button
-                  type="button"
-                  onClick={() => setShowEngineSettings(!showEngineSettings)}
-                  className={`p-1 rounded transition-all flex items-center justify-center ${
-                    showEngineSettings ? 'bg-amber-500 text-slate-950 font-bold' : 'text-amber-400 hover:text-white hover:bg-slate-700'
-                  }`}
-                  title="Configure TomTom Settings & API Key"
-                >
-                  <Settings className="h-3.5 w-3.5 animate-spin" style={{ animationDuration: '6s' }} />
-                </button>
-              )}
-            </div>
-
             {/* Theme Selectors */}
             <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
               <button
@@ -1047,53 +997,6 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                 Satellite Zoom
               </button>
             </div>
-
-            {/* Live GPS locator button */}
-            <button
-              type="button"
-              onClick={() => setIsWatchingGps(!isWatchingGps)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all text-white border cursor-pointer ${
-                isWatchingGps 
-                  ? 'bg-blue-600 border-blue-500 hover:bg-blue-700 animate-pulse' 
-                  : 'bg-slate-800 border-slate-750 hover:bg-slate-700'
-              }`}
-              title="Track real coordinates from your mobile/desktop live on the logistics grid"
-            >
-              <Globe className={`h-3.5 w-3.5 ${isWatchingGps ? 'animate-spin' : ''}`} />
-              <span>{isWatchingGps ? 'GPS Tracker ON' : 'Sync Device GPS'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsPlayingSimulation(!isPlayingSimulation)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all text-white border cursor-pointer ${
-                isPlayingSimulation 
-                  ? 'bg-amber-600/90 border-amber-500/30 hover:bg-amber-600' 
-                  : 'bg-emerald-600/90 border-emerald-500/30 hover:bg-emerald-600'
-              }`}
-            >
-              {isPlayingSimulation ? (
-                <>
-                  <Pause className="h-3.5 w-3.5" />
-                  <span>Pause stream</span>
-                </>
-              ) : (
-                <>
-                  <Play className="h-3.5 w-3.5" />
-                  <span>Resume telemetry</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={triggerRadarPing}
-              disabled={isPinging}
-              className={`px-3 py-1.5 bg-slate-800 text-slate-200 rounded-lg text-xs font-semibold cursor-pointer border border-slate-750 transition-all flex items-center space-x-1.5 hover:bg-slate-700 disabled:opacity-50 ${isPinging ? 'animate-pulse' : ''}`}
-            >
-              <Radio className={`h-3.5 w-3.5 text-amber-400 ${isPinging ? 'animate-bounce' : ''}`} />
-              <span>{isPinging ? 'Pinging...' : 'Sweep Radar'}</span>
-            </button>
           </div>
         </div>
 
@@ -1182,162 +1085,6 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                 </div>
               )}
             </div>
-
-            {/* Interactive Timeline Navigation Panel (As seen in the screenshot request) */}
-            {trucks.length > 0 && (() => {
-              const activeScrubTruckId = selectedTrackTruckId || trucks[0].id;
-              const scrubProgress = simProgress[activeScrubTruckId] ?? 0.15;
-              return (
-                <div className="mt-4 bg-white rounded-xl border border-slate-205/60 p-4 shadow-xs font-sans flex flex-col md:flex-row items-center gap-4 relative z-20">
-                  
-                  {/* Timeline Info label and icons */}
-                  <div className="flex gap-2.5 items-center justify-between w-full md:w-auto text-[11px] text-slate-500 min-w-[200px] border-b md:border-b-0 md:border-r border-slate-200 pb-2 md:pb-0 md:pr-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                        <Sliders className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <span className="font-semibold text-slate-900 block leading-none text-xs uppercase tracking-wide">Telemetry Scrub</span>
-                        <span className="text-[10px] text-slate-450 font-mono mt-1">ID: {activeScrubTruckId}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end text-right font-mono">
-                      <span className="text-blue-605 font-bold bg-blue-50 px-1.5 py-0.5 border border-blue-100 rounded text-[9px]">
-                        {Math.round(scrubProgress * 100)}% progress
-                      </span>
-                      <span className="text-[9.5px] text-slate-400 mt-1 font-semibold">{getTimelineTimestamp(scrubProgress)}</span>
-                    </div>
-                  </div>
-
-                  {/* Slider Track container */}
-                  <div className="flex-1 w-full relative pt-5 pb-9 px-2">
-                    
-                    {/* Horizontal track line */}
-                    <div className="absolute top-1/2 -translate-y-1/2 left-2 right-2 h-1 bg-slate-200 rounded-full">
-                      {/* Highlight track progress */}
-                      <div 
-                        className="h-full bg-blue-550 rounded-full"
-                        style={{ width: `${scrubProgress * 100}%` }}
-                      />
-                    </div>
-
-                    {/* Markers pins as seen in the screenshot */}
-                    {/* 1. Start stop marker */}
-                    <div 
-                      className="absolute top-1/2 -translate-y-1/2 left-2 flex flex-col items-center group cursor-pointer z-30"
-                      onClick={() => {
-                        setSimProgress(p => ({ ...p, [activeScrubTruckId]: 0.0 }));
-                      }}
-                      title="Depot Departure - 02:00 pm"
-                    >
-                      <div className="w-3.5 h-3.5 rounded-full bg-slate-400 border border-white hover:scale-110 transition-all flex items-center justify-center">
-                        <Clock className="w-2 h-2 text-white" />
-                      </div>
-                      <span className="absolute top-3 font-mono text-[8.5px] text-slate-400 font-bold whitespace-nowrap mt-1">
-                        02:00 pm
-                      </span>
-                    </div>
-
-                {/* 2. Rapid Accel Marker (Pin icon) */}
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 left-[25%] flex flex-col items-center group cursor-pointer z-35"
-                  onClick={() => {
-                    setSimProgress(p => ({ ...p, [activeScrubTruckId]: 0.25 }));
-                  }}
-                  title="Telemetry Alert: Rapid Acceleration Hazard (02:24 pm)"
-                >
-                  <div className="w-4 h-4 rounded-full bg-amber-500 border border-white hover:scale-110 transition-all flex items-center justify-center text-[8px] text-white shadow-sm">
-                    <AlertTriangle className="w-2.5 h-2.5" />
-                  </div>
-                  <span className="absolute -top-7 text-[8.5px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-mono shadow-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-40">
-                    2:24 pm &bull; Rapid Accel
-                  </span>
-                </div>
-
-                {/* 3. Harsh Brakes Warning Marker */}
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 left-[60%] flex flex-col items-center group cursor-pointer z-35"
-                  onClick={() => {
-                    setSimProgress(p => ({ ...p, [activeScrubTruckId]: 0.60 }));
-                  }}
-                  title="Harsh Brake Event detected (02:58 pm)"
-                >
-                  <div className="w-4 h-4 rounded-full bg-rose-500 border border-white hover:scale-110 transition-all flex items-center justify-center text-[8px] text-white shadow-sm">
-                    <Zap className="w-2.5 h-2.5" />
-                  </div>
-                  <span className="absolute -top-7 text-[8.5px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-mono shadow-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-40">
-                    2:58 pm &bull; Harsh Brake
-                  </span>
-                </div>
-
-                {/* 4. End stop destination marker */}
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 right-2 flex flex-col items-center group cursor-pointer z-30"
-                  onClick={() => {
-                    setSimProgress(p => ({ ...p, [activeScrubTruckId]: 1.0 }));
-                  }}
-                  title="Scheduled Customer Arrival - 03:36 pm"
-                >
-                  <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border border-white hover:scale-110 transition-all flex items-center justify-center">
-                    <MapPin className="w-2 h-2 text-white" />
-                  </div>
-                  <span className="absolute top-3 font-mono text-[8.5px] text-slate-400 font-bold whitespace-nowrap mt-1">
-                    03:36 pm
-                  </span>
-                </div>
-
-                {/* Dynamic Sliding Vehicle Handle and Speech Tooltip Bubble */}
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none transition-all duration-100 flex flex-col items-center z-40"
-                  style={{ left: `${Math.min(Math.max((scrubProgress * 100), 2.5), 97.5)}%` }}
-                >
-                  {/* Car / Truck Icon as seen in screenshot */}
-                  <div className="w-7 h-7 rounded-lg bg-blue-600 border border-white shadow-md flex items-center justify-center text-white scale-110 ring-2 ring-blue-500/20">
-                    <TruckIcon className="w-4 h-4" />
-                  </div>
-
-                  {/* Tooltip speech bubble pointing up - matches the screenshot tooltip exactly */}
-                  <div className="absolute top-8 flex flex-col items-center">
-                    {/* Speech bubble arrow pointer */}
-                    <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 transform -translate-y-0.5 shadow-xs" />
-                    {/* Timestamp bubble */}
-                    <div className="bg-slate-900 border border-slate-800 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
-                      {getTimelineTimestamp(scrubProgress)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Invisible input range covering the track for premium native drag support */}
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={scrubProgress * 100}
-                  onChange={(e) => {
-                    setIsPlayingSimulation(false); // pause to let user scrub freely!
-                    const val = parseFloat(e.target.value) / 100;
-                    setSimProgress(p => ({ ...p, [activeScrubTruckId]: val }));
-                  }}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-50"
-                  title="Drag to scrub visual vehicle coordinate logs"
-                />
-
-              </div>
-
-              {/* CREATE CLIP Action Button */}
-              <button
-                type="button"
-                onClick={() => setShowCreateClipModal(true)}
-                className="w-full md:w-auto px-4 py-2.5 bg-[#0070f3] hover:bg-blue-600 active:scale-95 text-white font-bold text-xs rounded uppercase tracking-wider shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Film className="w-3.5 h-3.5" />
-                <span>Create Clip</span>
-              </button>
-
-            </div>
-          );
-        })()}
           </div>
 
           <div className="hidden">

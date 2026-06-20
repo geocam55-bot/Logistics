@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { Tenant, User } from '../types';
-import { TENANTS, INITIAL_USERS, INITIAL_USERS_BOF, INITIAL_USERS_CTC } from '../data';
+import { TENANTS } from '../data';
 import { Shield, Key, CheckCircle2, ArrowRight, Mail, Lock, Building2, UserCheck, HelpCircle, Loader2 } from 'lucide-react';
 import prospacesLogo from '../assets/images/prospaces_logo_1781387785955.jpg';
 
@@ -180,12 +180,6 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
             role: "SUPER_ADMIN" as any,
             associatedStoreId: "WINDMILL_DC"
           };
-        } else if (resolvedTenant.id === 'bay-of-fundy') {
-          matchedUser = INITIAL_USERS_BOF.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
-        } else if (resolvedTenant.id === 'cabot-trail') {
-          matchedUser = INITIAL_USERS_CTC.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
-        } else {
-          matchedUser = INITIAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
         }
 
         if (matchedUser) {
@@ -387,7 +381,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                   </label>
                   <button 
                     type="button"
-                    onClick={() => setShowMemberLookup(!showMemberLookup)}
+                    onClick={() => setError("Password reset is managed by your local branch administrator.")}
                     className="text-xs font-semibold text-blue-650 hover:text-blue-700 hover:underline"
                   >
                     Forgot password?
@@ -402,16 +396,8 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
+                    className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowMemberLookup(!showMemberLookup)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                    title="Toggle Corporate Directory helper"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
               {/* Sign In Button */}
@@ -547,72 +533,6 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
 
         {/* Bottom Navigation Links & Active Lookup helper drawer */}
         <div className="mt-8 text-center text-xs space-y-4 shrink-0 transition-all">
-          {showMemberLookup && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left max-w-md mx-auto max-h-[220px] overflow-y-auto space-y-3.5 shadow-inner transition-all">
-              <p className="text-[10px] text-slate-500 font-medium leading-normal">
-                Click any of the system users or the super administrator profile below to quickly populate credentials for sandbox testing:
-              </p>
-
-              {/* System Admin */}
-              <div className="space-y-1.5 border border-amber-300/60 bg-amber-50/40 p-2 rounded-lg">
-                <span className="text-[8.5px] uppercase font-black tracking-wider text-amber-700 block font-mono">
-                  👑 Admin bypass (Global system controller)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('superadmin@prospaces.com');
-                    setError(null);
-                    setIsRegistering(false);
-                  }}
-                  className={`w-full p-2 rounded text-left text-xs border transition-all cursor-pointer ${
-                    email === 'superadmin@prospaces.com'
-                      ? 'bg-amber-100 border-amber-400 text-amber-900 font-bold'
-                      : 'bg-white border-amber-200 text-amber-800 hover:border-amber-400'
-                  }`}
-                >
-                  <div className="font-bold flex items-center justify-between">
-                    <span>ProSpaces Super Admin</span>
-                    <span className="bg-amber-200 text-amber-800 text-[8px] font-mono font-bold px-1 rounded uppercase">SUPER_ADMIN</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400 mt-0.5 block">superadmin@prospaces.com</span>
-                </button>
-              </div>
-
-              {/* Corporate Workspace Users list */}
-              {(tenantsList || TENANTS).map((tenant) => {
-                const users = 
-                  tenant.id === 'bay-of-fundy' ? INITIAL_USERS_BOF :
-                  tenant.id === 'cabot-trail' ? INITIAL_USERS_CTC :
-                  INITIAL_USERS;
-
-                return (
-                  <div key={tenant.id} className="space-y-1.5 border-t border-slate-200/50 pt-2 first:border-0 first:pt-0">
-                    <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500 block font-mono">
-                      {tenant.logoBadge} {tenant.name} Users
-                    </span>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {users.slice(0, 4).map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => handleQuickLookup(user)}
-                          className={`p-2 rounded text-left text-[11px] border transition-all cursor-pointer truncate ${
-                            email === user.email 
-                              ? 'bg-blue-55 border-blue-400 text-blue-900 font-bold' 
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
-                          }`}
-                        >
-                          <span className="font-bold block truncate">{user.name}</span>
-                          <span className="text-[9.5px] font-mono text-slate-400 mt-0.5 block truncate">{user.email}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
           <div className="flex items-center justify-center space-x-3 text-slate-400">
             <a href="#" className="hover:text-slate-605 transition-colors">Privacy Policy</a>

@@ -1,6 +1,5 @@
 import { useState, FormEvent } from 'react';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
-import { BRANCHES as STATIC_BRANCHES } from '../data';
 import { 
   Search, MapPin, Eye, Clock, User, Phone, CheckCircle2, 
   AlertTriangle, ChevronDown, ChevronUp, FileText, 
@@ -16,7 +15,7 @@ interface DeliveryQueueProps {
 }
 
 export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches }: DeliveryQueueProps) {
-  const BRANCHES = branches && branches.length > 0 ? branches : STATIC_BRANCHES;
+  const BRANCHES = branches || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);

@@ -5,11 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { DeliveryRecord, Truck, Branch, User, Tenant } from './types';
-import { 
-  INITIAL_DELIVERIES, TRUCKS, BRANCHES, INITIAL_USERS, TENANTS,
-  BRANCHES_BOF, TRUCKS_BOF, INITIAL_USERS_BOF, INITIAL_DELIVERIES_BOF,
-  BRANCHES_CTC, TRUCKS_CTC, INITIAL_USERS_CTC, INITIAL_DELIVERIES_CTC
-} from './data';
+import { TENANTS } from './data';
 import Dashboard from './components/Dashboard';
 import ScanStation from './components/ScanStation';
 import DeliveryQueue from './components/DeliveryQueue';

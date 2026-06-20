@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
-import { BRANCHES as STATIC_BRANCHES } from '../data';
 import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface ScanStationProps {
@@ -13,7 +12,7 @@ interface ScanStationProps {
 }
 
 export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDeleteDelivery, trucks, branches }: ScanStationProps) {
-  const BRANCHES = branches && branches.length > 0 ? branches : STATIC_BRANCHES;
+  const BRANCHES = branches || [];
   // Input fields
   const [barcodeInput, setBarcodeInput] = useState('');
   const [scannedRecord, setScannedRecord] = useState<DeliveryRecord | null>(null);

@@ -31,7 +31,6 @@ import {
   X
 } from 'lucide-react';
 import { Branch, DeliveryRecord, DeliveryStatus } from '../types';
-import { BRANCHES as STATIC_BRANCHES } from '../data';
 
 type DocType = 'Order' | 'Credit' | 'Supplier Pickup' | 'RMA';
 
@@ -246,7 +245,7 @@ export default function ArchitectureView({
   defaultSegment,
   allowedSegments
 }: ArchitectureViewProps) {
-  const activeBranches = branches && branches.length > 0 ? branches : STATIC_BRANCHES;
+  const activeBranches = branches || [];
   const [selectedBranchId, setSelectedBranchId] = useState<string>(activeBranches[0]?.id || 'WINDMILL_DC');
   const [activeSegment, setActiveSegment] = useState<'blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db'>(
     defaultSegment || 'blueprint'
