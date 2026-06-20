@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { BrowserMultiFormatReader } from '@zxing/library';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
 import { BRANCHES as STATIC_BRANCHES } from '../data';
 import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert, Trash2 } from 'lucide-react';
@@ -72,7 +72,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
   const [fullFrameMode, setFullFrameMode] = useState(true);
 
-  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const zxingCodeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   const [lockFocus, setLockFocus] = useState(false);
 
@@ -82,107 +82,57 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     setIsCameraActive(true);
     
     // Allow DOM to update so container is mounted before starting scanner
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        const container = document.getElementById('camera-reader-container');
-        if (!container) {
-          console.error("Camera reader container element not found.");
-          setCameraError("Camera element not found in DOM.");
+        const videoElement = document.getElementById('zxing-video-preview') as HTMLVideoElement | null;
+        if (!videoElement) {
+          console.error("ZXing target video element not found in DOM.");
+          setCameraError("Camera video preview element not found.");
           setIsCameraActive(false);
           return;
         }
 
-        const html5QrCode = new Html5Qrcode("camera-reader-container", {
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.AZTEC,
-            Html5QrcodeSupportedFormats.CODABAR,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.MAXICODE,
-            Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.PDF_417,
-            Html5QrcodeSupportedFormats.RSS_14,
-            Html5QrcodeSupportedFormats.RSS_EXPANDED,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION
-          ],
-          verbose: false,
-          useBarCodeDetectorIfSupported: true // Enabled iOS Safari native BarcodeDetector API for instant, hardware-level decoding!
-        });
-        html5QrCodeRef.current = html5QrCode;
+        const codeReader = new BrowserMultiFormatReader();
+        zxingCodeReaderRef.current = codeReader;
 
-        html5QrCode.start(
-          { facingMode: 'environment' },
-          {
-            fps: 30, // Tighter sampling frequency
-            qrbox: useFullFrame ? undefined : (width, height) => {
-              // Expand the box so Zxing has a larger cross-section of rows to decode the 1D stripes
-              return { 
-                width: Math.round(width * 0.90), 
-                height: Math.round(height * 0.70) 
-              };
-            },
-            aspectRatio: 1.777778, // 16:9 HD frame geometry ideal for linear codes
-            videoConstraints: {
-              facingMode: 'environment',
-              width: { min: 640, ideal: 1280, max: 1920 },
-              height: { min: 480, ideal: 720, max: 1080 },
-              advanced: [{ focusMode: "continuous" } as any]
-            }
-          },
-          (decodedText) => {
-            // Success! Trigger scan action
-            handleScanAction(decodedText);
-            stopCamera();
-          },
-          () => {
-            // Parsing errors thrown continually while aiming are normal/expected
+        // Try selecting back/environment camera if possible
+        let selectedDeviceId: string | undefined = undefined;
+        try {
+          const videoDevices = await codeReader.listVideoInputDevices();
+          if (videoDevices && videoDevices.length > 0) {
+            const backCamera = videoDevices.find(device => 
+              device.label.toLowerCase().includes('back') || 
+              device.label.toLowerCase().includes('environment') ||
+              device.label.toLowerCase().includes('rear')
+            );
+            selectedDeviceId = backCamera ? backCamera.deviceId : videoDevices[0].deviceId;
           }
-        ).catch((err: any) => {
-          console.warn("Could not start environment camera, attempting default/user camera fallback...", err);
-          // Retry starting the camera with no strict facingMode constraint or default webcam
-          return html5QrCode.start(
-            {}, // Fallback: default/user-facing device camera
-            {
-              fps: 30,
-              qrbox: useFullFrame ? undefined : (width, height) => {
-                return { 
-                  width: Math.round(width * 0.90), 
-                  height: Math.round(height * 0.70) 
-                };
-              },
-              aspectRatio: 1.777778,
-              videoConstraints: {
-                advanced: [{ focusMode: "continuous" } as any]
-              }
-            },
-            (decodedText) => {
-              handleScanAction(decodedText);
+        } catch (deviceListErr) {
+          console.warn("Could not query camera device list, default constraints will handle camera selection:", deviceListErr);
+        }
+
+        await codeReader.decodeFromVideoDevice(
+          selectedDeviceId,
+          videoElement,
+          (result, error) => {
+            if (result) {
+              const text = result.getText();
+              console.log("ZXing decoded active stream barcode:", text);
+              handleScanAction(text);
               stopCamera();
-            },
-            () => {}
-          );
-        }).catch((err: any) => {
-          console.error("html5-qrcode start failure:", err);
-          let errMsg = err?.message || String(err);
-          if (errMsg.indexOf("NotAllowedError") !== -1 || errMsg.indexOf("Permission") !== -1) {
-            errMsg = "Camera permission was denied. Please allow camera access in your browser/device settings.";
+            }
           }
-          setCameraError(errMsg);
-          setIsCameraActive(false);
-        });
+        );
       } catch (err: any) {
-        console.error("html5-qrcode build exception:", err);
-        setCameraError(err?.message || "Faulty camera initialization.");
+        console.error("ZXing camera startup exception:", err);
+        let errMsg = err?.message || String(err);
+        if (errMsg.indexOf("NotAllowedError") !== -1 || errMsg.indexOf("Permission") !== -1) {
+          errMsg = "Camera permission was denied. Please allow camera access in your browser/device settings.";
+        }
+        setCameraError(errMsg);
         setIsCameraActive(false);
       }
-    }, 150);
+    }, 200);
   };
 
   const toggleFullFrameMode = async () => {
@@ -196,14 +146,60 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     }
   };
 
+  const scanBarcodeFromDataUrl = async (dataUrl: string): Promise<string | null> => {
+    try {
+      // 1. Try native BarcodeDetector API if available
+      try {
+        if ('BarcodeDetector' in window) {
+          const resBlob = await fetch(dataUrl);
+          const blob = await resBlob.blob();
+          const BarcodeDetectorClass = (window as any).BarcodeDetector;
+          const barcodeDetector = new BarcodeDetectorClass({
+            formats: [
+              'code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'qr_code', 'upc_a', 'upc_e', 'pdf417'
+            ]
+          });
+          const bitmap = await createImageBitmap(blob);
+          const results = await barcodeDetector.detect(bitmap);
+          if (results && results.length > 0) {
+            console.log("Decoded barcode via client-side BarcodeDetector:", results[0].rawValue);
+            return results[0].rawValue;
+          }
+        }
+      } catch (detectorErr) {
+        console.warn("Client-side BarcodeDetector failed, falling back to ZXing:", detectorErr);
+      }
+
+      // 2. ZXing fallback
+      const codeReader = new BrowserMultiFormatReader();
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error("Failed to load image into memory"));
+      });
+
+      const zxingResult = await codeReader.decodeFromImage(img);
+      if (zxingResult) {
+        const decodedText = zxingResult.getText();
+        console.log("Decoded barcode via client-side ZXing decodeFromImage:", decodedText);
+        return decodedText;
+      }
+      return null;
+    } catch (err) {
+      console.warn("Client-side ZXing decoding from image failed:", err);
+      return null;
+    }
+  };
+
   const snapAndScanLiveFrame = async () => {
     setCameraError(null);
-    setScanMessage("Capturing viewfinder perspective... Sending to Gemini Decrypter...");
+    setScanMessage("Capturing viewfinder... Analyzing local barcode patterns...");
     setIsScanningFrame(true);
 
     try {
-      // Find the live video element spawned by html5-qrcode
-      const videoEl = document.querySelector("#camera-reader-container video") as HTMLVideoElement | null;
+      // Find the live video element spawned by ZXing
+      const videoEl = document.querySelector("#zxing-video-preview") as HTMLVideoElement | null;
       if (!videoEl) {
         throw new Error("No active camera sensor feedback discovered in the viewfinder window. Try starting the live stream first.");
       }
@@ -229,26 +225,44 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       // Export as compression-safe JPEG data URI
       const fileData = canvas.toDataURL("image/jpeg", 0.92);
 
-      // Submit base64 dump directly to server-side Gemini scanner
-      const res = await fetch("/api/scan-photo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileData })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Server HTTP response code ${res.status}`);
+      // 1. High-Performance Client side decoding first (completely offline, avoids Vercel 404s!)
+      const clientSideBarcode = await scanBarcodeFromDataUrl(fileData);
+      if (clientSideBarcode) {
+        handleScanAction(clientSideBarcode);
+        setScanMessage(`📋 Decoded Barcode (Browser Engine): ${clientSideBarcode}`);
+        stopCamera();
+        setTimeout(() => setScanMessage(''), 4500);
+        return;
       }
 
-      const result = await res.json();
-      if (result.success && result.barcodeText) {
-        handleScanAction(result.barcodeText);
-        setScanMessage(`📋 Decrypted Barcode: ${result.barcodeText} (${result.barcodeFormat || 'Auto'})`);
+      // 2. Submit base64 dump directly to server-side Gemini scanner as fallback
+      setScanMessage("Local scan unresolved. Engaging AI decrypter...");
+      let isFallBackSuccess = false;
+      let fallbackText = '';
+      try {
+        const res = await fetch("/api/scan-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileData })
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.barcodeText) {
+            isFallBackSuccess = true;
+            fallbackText = result.barcodeText;
+          }
+        }
+      } catch (e) {
+        console.warn("Backend OCR proxy was unreachable or responded with 404 on Vercel.", e);
+      }
+
+      if (isFallBackSuccess) {
+        handleScanAction(fallbackText);
+        setScanMessage(`📋 Decrypted Barcode (AI Fallback): ${fallbackText}`);
         stopCamera();
         setTimeout(() => setScanMessage(''), 4500);
       } else {
-        throw new Error("Gemini did not detect a clear barcode in the live frame. Bring the lens closer to the document, hold it steady to avoid motion blur, and try again.");
+        throw new Error("Unable to read a barcode from the live frame. Make sure you hold the lens steady, center the barcode closely under bright lighting, or enter it manually below.");
       }
     } catch (err: any) {
       console.error("Frame snap capture error:", err);
@@ -264,7 +278,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     if (isScanningFrame || isBgScanning || !isCameraActive) return;
     
     try {
-      const videoEl = document.querySelector("#camera-reader-container video") as HTMLVideoElement | null;
+      const videoEl = document.querySelector("#zxing-video-preview") as HTMLVideoElement | null;
       if (!videoEl || videoEl.videoWidth === 0 || videoEl.videoHeight === 0) {
         return; // camera source not fully hydrated in frame yet
       }
@@ -284,26 +298,38 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
       const fileData = canvas.toDataURL("image/jpeg", 0.70); // slightly smaller for faster background streams
 
-      const res = await fetch("/api/scan-photo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileData })
-      });
-
-      if (!res.ok) {
-        setIsBgScanning(false);
+      // 1. Try local client decoding first in background loop
+      const clientSideBarcode = await scanBarcodeFromDataUrl(fileData);
+      if (clientSideBarcode) {
+        handleScanAction(clientSideBarcode);
+        setScanMessage(`📋 Auto-Decoded (Local Browser): ${clientSideBarcode}`);
+        stopCamera();
+        setTimeout(() => setScanMessage(''), 4500);
         return;
       }
 
-      const result = await res.json();
-      if (result.success && result.barcodeText) {
-        handleScanAction(result.barcodeText);
-        setScanMessage(`📋 AI Auto-Decrypted: ${result.barcodeText} (${result.barcodeFormat || 'Auto'})`);
-        stopCamera();
-        setTimeout(() => setScanMessage(''), 4500);
+      // 2. Try background remote AI scan if available
+      try {
+        const res = await fetch("/api/scan-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileData })
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.barcodeText) {
+            handleScanAction(result.barcodeText);
+            setScanMessage(`📋 AI Auto-Decrypted: ${result.barcodeText}`);
+            stopCamera();
+            setTimeout(() => setScanMessage(''), 4500);
+          }
+        }
+      } catch (apiErr) {
+        // Safe to ignore background fetch errors (such as Vercel static deployments throwing 404s)
       }
     } catch (err: any) {
-      console.warn("Background AI stream scan failed (expected between steady frames):", err);
+      console.warn("Background client stream scan failed:", err);
     } finally {
       setIsBgScanning(false);
     }
@@ -357,7 +383,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     if (!file) return;
 
     setCameraError(null);
-    setScanMessage("Preprocessing & downscaling photograph...");
+    setScanMessage("Preprocessing & optimizing image details...");
     setIsScanningFrame(true);
 
     try {
@@ -374,30 +400,48 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       reader.readAsDataURL(file);
       const originalBase64 = await base64Promise;
 
-      setScanMessage("Encrypting viewport & transmitting to Gemini AI Core...");
       const fileData = await compressImage(originalBase64).catch((err) => {
         console.warn("Downscaling failed, using raw upload stream:", err);
         return originalBase64;
       });
 
-      const res = await fetch("/api/scan-photo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileData })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error ${res.status}`);
+      // 1. Client-Side High-Speed Barcode Parser (Local BarcodeDetector + html5-qrcode)
+      setScanMessage("Decoding photograph using local browser engines...");
+      const clientSideBarcode = await scanBarcodeFromDataUrl(fileData);
+      if (clientSideBarcode) {
+        handleScanAction(clientSideBarcode);
+        setScanMessage(`📋 Decoded Barcode (Browser Engine): ${clientSideBarcode}`);
+        setTimeout(() => setScanMessage(''), 4500);
+        return;
       }
 
-      const result = await res.json();
-      if (result.success && result.barcodeText) {
-        handleScanAction(result.barcodeText);
-        setScanMessage(`📋 Decrypted Barcode: ${result.barcodeText} (${result.barcodeFormat || 'Auto'})`);
+      // 2. Remote Gemini AI Decoder proxy fallback
+      setScanMessage("Local scan unresolved. Engaging AI decrypter...");
+      let isFallBackSuccess = false;
+      let fallbackText = '';
+      try {
+        const res = await fetch("/api/scan-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileData })
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.barcodeText) {
+            isFallBackSuccess = true;
+            fallbackText = result.barcodeText;
+          }
+        }
+      } catch (err) {
+        console.warn("Remote AI endpoint disabled or returned 404 (common on static Vercel hosts):", err);
+      }
+
+      if (isFallBackSuccess) {
+        handleScanAction(fallbackText);
+        setScanMessage(`📋 Decrypted Barcode (AI Fallback): ${fallbackText}`);
         setTimeout(() => setScanMessage(''), 4500);
       } else {
-        throw new Error("Gemini was unable to read a valid barcode in that photo. Make sure the barcode is close, in focus, and not shadowed.");
+        throw new Error("Unable to read a barcode from this image. Please capture a clear, well-lit close up of the label without any folds or shadows, or type the barcode manually.");
       }
     } catch (err: any) {
       console.error("Barcode photo analysis error:", err);
@@ -414,24 +458,26 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   };
 
   const stopCamera = () => {
-    if (html5QrCodeRef.current) {
-      if (html5QrCodeRef.current.isScanning) {
-        html5QrCodeRef.current.stop().catch((err: any) => {
-          console.error("Error stopping html5-qrcode:", err);
-        });
+    if (zxingCodeReaderRef.current) {
+      try {
+        zxingCodeReaderRef.current.reset();
+      } catch (err) {
+        console.error("Error stopping ZXing code reader:", err);
       }
-      html5QrCodeRef.current = null;
+      zxingCodeReaderRef.current = null;
     }
     setIsCameraActive(false);
   };
 
   React.useEffect(() => {
     return () => {
-      if (html5QrCodeRef.current) {
-        if (html5QrCodeRef.current.isScanning) {
-          html5QrCodeRef.current.stop().catch(() => {});
+      if (zxingCodeReaderRef.current) {
+        try {
+          zxingCodeReaderRef.current.reset();
+        } catch (err) {
+          // safe to ignore
         }
-        html5QrCodeRef.current = null;
+        zxingCodeReaderRef.current = null;
       }
     };
   }, []);
@@ -883,8 +929,16 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                 {/* Real Live Video Feed */}
                 <div
                   id="camera-reader-container"
-                  className="absolute inset-0 w-full h-full rounded-lg overflow-hidden bg-black [&>video]:object-contain [&>video]:w-full [&>video]:h-full z-0"
-                />
+                  className="absolute inset-0 w-full h-full rounded-lg overflow-hidden bg-black z-0"
+                >
+                  <video
+                    id="zxing-video-preview"
+                    className="w-full h-full object-contain"
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                </div>
 
                 {/* Laser scan animation overlay */}
                 <div 
