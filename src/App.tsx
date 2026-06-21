@@ -138,6 +138,12 @@ export default function App() {
     b: Branch[],
     u: User[]
   ) => {
+    // Save to browser cache immediately so that local fallback remains 100% persistent in sandbox
+    localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(d));
+    localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(t));
+    localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(b));
+    localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(u));
+
     setSyncStatus('SYNCING');
     try {
       const res = await fetch('/api/tenant/save-state', {
@@ -154,14 +160,20 @@ export default function App() {
         })
       });
       if (res.ok) {
+        const body = await res.json();
         setSyncStatus('IDLE');
-        setLastSyncTime(new Date().toLocaleTimeString());
+        if (body.supabaseActive) {
+          setLastSyncTime(new Date().toLocaleTimeString());
+        } else {
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
+        }
       } else {
         setSyncStatus('ERROR');
       }
     } catch (e) {
       console.warn("Offline/Local Sync mode is currently operational:", e);
-      setSyncStatus('ERROR');
+      setSyncStatus('IDLE');
+      setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
     }
   };
 
@@ -204,7 +216,18 @@ export default function App() {
           setLastSyncTime(new Date().toLocaleTimeString());
           return;
         } else {
-          throw new Error("Database dashboard reports inactive or unconfigured backend connector.");
+          // Supabase is unconfigured/inactive. Fallback to Local/Session Storage mode with the backend-provided sample seed data.
+          console.warn("Database dashboard reports unconfigured backend connector. Using local sandbox fallback.");
+          const cachedDeliveries = localStorage.getItem(`prospaces_deliveries_tenant_${tenantId}`);
+          const cachedTrucks = localStorage.getItem(`prospaces_trucks_tenant_${tenantId}`);
+          const cachedBranches = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
+          const cachedUsers = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
+
+          setDeliveries(cachedDeliveries ? JSON.parse(cachedDeliveries) : (data.branches ? (data.deliveries || []) : []));
+          setTrucks(cachedTrucks ? JSON.parse(cachedTrucks) : (data.branches ? (data.trucks || []) : []));
+          setBranches(cachedBranches ? JSON.parse(cachedBranches) : (data.branches || []));
+          setUsers(cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : []));
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox)`);
         }
       } catch (err: any) {
         console.error("Failed to fetch live Supabase tenant state:", err);
