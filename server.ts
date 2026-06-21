@@ -687,13 +687,16 @@ async function startServer() {
         });
       }
 
-      // Fetch all tables in parallel to keep it blazingly fast
-      const [rBranches, rTrucks, rUsers, rDeliveries] = await Promise.all([
-        supabase.from("branches").select("*").eq("tenantId", tenantId),
-        supabase.from("trucks").select("*").eq("tenantId", tenantId),
-        supabase.from("users").select("*").eq("tenantId", tenantId),
-        supabase.from("deliveries").select("*").eq("tenantId", tenantId)
-      ]);
+      // Fetch all tables in parallel with a timeout to prevent hanging
+      const [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
+        Promise.all([
+          supabase.from("branches").select("*").eq("tenantId", tenantId),
+          supabase.from("trucks").select("*").eq("tenantId", tenantId),
+          supabase.from("users").select("*").eq("tenantId", tenantId),
+          supabase.from("deliveries").select("*").eq("tenantId", tenantId)
+        ]),
+        5000
+      );
 
       // If schema tables don't exist yet, it'll error.
       if (rBranches.error || rTrucks.error || rUsers.error || rDeliveries.error) {

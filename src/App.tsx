@@ -192,17 +192,27 @@ export default function App() {
         const res = await fetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
         if (!res.ok) {
           const text = await res.text();
-          let parsedErr = "Failed to communicate with the database.";
+          let parsedErr = `Server returned error status ${res.status}.`;
           try {
             const json = JSON.parse(text);
             parsedErr = json.error || parsedErr;
-          } catch (_) {}
+          } catch (_) {
+            const cleanText = text.trim();
+            if (cleanText) {
+              const preview = cleanText.slice(0, 120).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+              parsedErr = `HTTP ${res.status}: ${preview || 'Non-JSON fallback response'}`;
+            }
+          }
           throw new Error(parsedErr);
         }
         
         const contentType = res.headers.get("content-type") || "";
         if (!contentType.includes("application/json")) {
-          throw new Error("Server returned non-JSON configuration content. Please reload the webpage.");
+          let text = "";
+          try { text = await res.text(); } catch (_) {}
+          const cleanText = text.trim();
+          const preview = cleanText ? cleanText.slice(0, 120).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : "";
+          throw new Error(`Server returned non-JSON configuration content (Type: ${contentType}). ${preview ? 'Preview: ' + preview : 'Please reload the page'}`);
         }
         
         const data = await res.json();
