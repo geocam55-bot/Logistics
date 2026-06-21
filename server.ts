@@ -340,6 +340,50 @@ async function startServer() {
     }
   });
 
+  // Public DB diagnostics endpoint to compare dev/prod data counts
+  app.get("/api/debug-db", async (req, res) => {
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.json({ initialized: false, error: "Database not configured." });
+      }
+      const [rTenants, rUsers, rBranches, rTrucks, rDeliveries] = await Promise.all([
+        supabase.from("tenants").select("*"),
+        supabase.from("users").select("*"),
+        supabase.from("branches").select("*"),
+        supabase.from("trucks").select("*"),
+        supabase.from("deliveries").select("*")
+      ]);
+      return res.json({
+        initialized: true,
+        envSupabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "NOT_SET",
+        counts: {
+          tenants: rTenants.data?.length || 0,
+          users: rUsers.data?.length || 0,
+          branches: rBranches.data?.length || 0,
+          trucks: rTrucks.data?.length || 0,
+          deliveries: rDeliveries.data?.length || 0
+        },
+        errors: {
+          tenants: rTenants.error?.message || null,
+          users: rUsers.error?.message || null,
+          branches: rBranches.error?.message || null,
+          trucks: rTrucks.error?.message || null,
+          deliveries: rDeliveries.error?.message || null
+        },
+        records: {
+          tenants: rTenants.data || [],
+          users: rUsers.data || [],
+          branches: rBranches.data || [],
+          trucks: rTrucks.data || [],
+          deliveries: rDeliveries.data || []
+        }
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // Real-time Database Auth Lookups (No simulation)
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -1118,9 +1162,12 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
     try {
       const supabase = getSupabase();
       if (supabase) {
-        const [rUsers, rTenants] = await Promise.all([
+        const [rUsers, rTenants, rBranches, rTrucks, rDeliveries] = await Promise.all([
           supabase.from("users").select("*"),
-          supabase.from("tenants").select("*")
+          supabase.from("tenants").select("*"),
+          supabase.from("branches").select("*"),
+          supabase.from("trucks").select("*"),
+          supabase.from("deliveries").select("*")
         ]);
         const fs = await import("fs");
         fs.writeFileSync(
@@ -1129,8 +1176,14 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
             timestamp: new Date().toISOString(),
             users: rUsers.data || [],
             tenants: rTenants.data || [],
+            branches: rBranches.data || [],
+            trucks: rTrucks.data || [],
+            deliveries: rDeliveries.data || [],
             usersError: rUsers.error,
-            tenantsError: rTenants.error
+            tenantsError: rTenants.error,
+            branchesError: rBranches.error,
+            trucksError: rTrucks.error,
+            deliveriesError: rDeliveries.error
           }, null, 2)
         );
         console.log("Database diagnosis dump complete: debug-database-diagnostic.json successfully created.");

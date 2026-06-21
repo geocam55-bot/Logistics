@@ -109,6 +109,8 @@ export default function App() {
   } | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'ERROR'>('IDLE');
+  const [lastFetchError, setLastFetchError] = useState<string | null>(null);
+  const [loadTrigger, setLoadTrigger] = useState<number>(0);
 
   const checkSupabaseStatus = async () => {
     try {
@@ -163,51 +165,60 @@ export default function App() {
     }
   };
 
-  // Hydrate state from Supabase dynamically on tenant switch
+  // Hydrate state from Supabase dynamically on tenant switch or manual retry trigger
   useEffect(() => {
     if (!currentTenant) return;
 
     const tenantId = currentTenant.id;
 
     const loadState = async () => {
-      // 1. Diagnose Supabase Status
-      const status = await checkSupabaseStatus();
+      setLastFetchError(null);
+      try {
+        // Run connectivity diagnostics in background to keep UI stats updated
+        checkSupabaseStatus().catch(() => {});
 
-      if (status && status.connected) {
-        try {
-          const res = await fetch(`/api/tenant/state?tenantId=${tenantId}`);
-          if (!res.ok) {
-            throw new Error(`Server returned non-ok status: ${res.status}`);
-          }
-          const contentType = res.headers.get("content-type") || "";
-          if (!contentType.includes("application/json")) {
-            throw new Error("Server returned non-JSON content.");
-          }
-          const data = await res.json();
-
-          if (data.supabaseActive) {
-            // Populate React state directly from live Supabase Tables
-            setDeliveries(data.deliveries || []);
-            setTrucks(data.trucks || []);
-            setBranches(data.branches || []);
-            setUsers(data.users || []);
-            setLastSyncTime(new Date().toLocaleTimeString());
-            return;
-          }
-        } catch (err) {
-          console.error("Failed to fetch live Supabase tenant state:", err);
+        const res = await fetch(`/api/tenant/state?tenantId=${tenantId}`);
+        if (!res.ok) {
+          const text = await res.text();
+          let parsedErr = "Failed to communicate with the database.";
+          try {
+            const json = JSON.parse(text);
+            parsedErr = json.error || parsedErr;
+          } catch (_) {}
+          throw new Error(parsedErr);
         }
-      }
+        
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Server returned non-JSON configuration content. Please reload the webpage.");
+        }
+        
+        const data = await res.json();
 
-      // If Supabase is offline/not configured, clear local values to be safe and enforce database connection
-      setDeliveries([]);
-      setTrucks([]);
-      setBranches([]);
-      setUsers([]);
+        if (data.supabaseActive) {
+          // Populate React state directly from live Supabase Tables
+          setDeliveries(data.deliveries || []);
+          setTrucks(data.trucks || []);
+          setBranches(data.branches || []);
+          setUsers(data.users || []);
+          setLastSyncTime(new Date().toLocaleTimeString());
+          return;
+        } else {
+          throw new Error("Database dashboard reports inactive or unconfigured backend connector.");
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch live Supabase tenant state:", err);
+        setLastFetchError(err.message || String(err));
+        // Clear local dynamic values to prevent displaying stale/unauthenticated information
+        setDeliveries([]);
+        setTrucks([]);
+        setBranches([]);
+        setUsers([]);
+      }
     };
 
     loadState();
-  }, [currentTenant]);
+  }, [currentTenant, loadTrigger]);
 
   // Load corporate tenants on boot
   useEffect(() => {
@@ -730,16 +741,49 @@ export default function App() {
 
         </div>
 
-        {supabaseStatus && !supabaseStatus.connected && (
-          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start space-x-3 text-amber-900 shadow-sm animate-fade-in" id="database-disconnected-msg">
-            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="flex-1 text-xs">
-              <strong className="font-bold text-sm text-amber-955 block">Database Disconnected / Placeholder State Mode</strong>
-              <p className="mt-1 leading-relaxed text-amber-900 font-semibold font-sans">
-                This environment is configured to run exclusively on the live Supabase Database. However, the connection is currently inactive or using empty local placeholders.
-                Please head to the <button onClick={() => setActiveTab('architecture')} className="font-bold underline text-blue-800 hover:text-blue-900 focus:outline-none cursor-pointer">Overall Architecture</button> tab to view the live database setup instructions and run the SQL schema scripts.
-              </p>
+        {lastFetchError && (
+          <div className="bg-rose-50 border border-rose-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-rose-950 shadow-sm animate-fade-in" id="database-fetch-error-msg">
+            <div className="flex items-start space-x-3 text-xs">
+              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-extrabold text-sm text-rose-900 block">Database Query Failed / Stale State Sync</strong>
+                <p className="mt-1 leading-relaxed text-rose-800 font-sans font-medium">
+                  The client was unable to sync with the Supabase database. Error details: <code className="bg-rose-100 px-1 py-0.5 rounded text-rose-700 font-mono text-[10px] break-all">{lastFetchError}</code>
+                </p>
+                <p className="mt-1.5 text-[10px] text-rose-500 font-medium">
+                  Ensure your tables are created correctly. Click "Overall Architecture" to generate/verify your SQL tables.
+                </p>
+              </div>
             </div>
+            <button
+              onClick={() => setLoadTrigger(prev => prev + 1)}
+              className="shrink-0 flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-all cursor-pointer font-sans"
+            >
+              <RefreshCw className={`h-3 w-3 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
+              <span>Retry Connection</span>
+            </button>
+          </div>
+        )}
+
+        {supabaseStatus && !supabaseStatus.connected && !lastFetchError && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-amber-900 shadow-sm animate-fade-in" id="database-disconnected-msg">
+            <div className="flex items-start space-x-3 text-xs">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold text-sm text-amber-955 block">Database Handshake Link Disconnected</strong>
+                <p className="mt-1 leading-relaxed text-amber-900 font-semibold font-sans">
+                  The connection backplanes to your live Supabase database are currently offline. Check your credentials inside corporate settings.
+                  You can inspect the table status and generated tables inside <button onClick={() => setActiveTab('architecture')} className="font-extrabold underline text-blue-800 hover:text-blue-900 focus:outline-none cursor-pointer">Overall Architecture</button>.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setLoadTrigger(prev => prev + 1)}
+              className="shrink-0 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-all cursor-pointer font-sans"
+            >
+              <RefreshCw className={`h-3 w-3 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
+              <span>Retry Diagnostics</span>
+            </button>
           </div>
         )}
 
