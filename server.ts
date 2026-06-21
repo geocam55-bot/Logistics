@@ -43,9 +43,9 @@ function getSupabase() {
     return null;
   }
 
-  // Trim and strip surrounding quotes
-  url = url.trim().replace(/^['"]|['"]$/g, '');
-  key = key.trim().replace(/^['"]|['"]$/g, '');
+  // Trim and strip surrounding quotes (including escaped, double, single, or backslashed characters)
+  url = url.trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+  key = key.trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
 
   // Strip trailing slashes and common suffix paths like "/rest/v1" or "/rest" that cause duplicate path errors in the client
   url = url.replace(/\/rest\/v1\/?$/i, '');
@@ -579,6 +579,9 @@ async function startServer() {
 
   // Fetch full state for a specific tenant from Supabase (or return premium mock fallback arrays when database is unconfigured)
   app.get("/api/tenant/state", async (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     try {
       const { tenantId } = req.query;
       if (!tenantId) {

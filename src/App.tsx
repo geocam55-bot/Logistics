@@ -189,7 +189,7 @@ export default function App() {
         // Run connectivity diagnostics in background to keep UI stats updated
         checkSupabaseStatus().catch(() => {});
 
-        const res = await fetch(`/api/tenant/state?tenantId=${tenantId}`);
+        const res = await fetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
         if (!res.ok) {
           const text = await res.text();
           let parsedErr = "Failed to communicate with the database.";
@@ -232,11 +232,27 @@ export default function App() {
       } catch (err: any) {
         console.error("Failed to fetch live Supabase tenant state:", err);
         setLastFetchError(err.message || String(err));
-        // Clear local dynamic values to prevent displaying stale/unauthenticated information
-        setDeliveries([]);
-        setTrucks([]);
-        setBranches([]);
-        setUsers([]);
+        
+        // Upgrade: Graceful, non-blocking local storage cache hydration so that the user is NOT stuck with a frozen/blank UI
+        try {
+          console.warn("Using offline / cached database hydration fallback to maintain interactive operations.");
+          const cachedDeliveries = localStorage.getItem(`prospaces_deliveries_tenant_${tenantId}`);
+          const cachedTrucks = localStorage.getItem(`prospaces_trucks_tenant_${tenantId}`);
+          const cachedBranches = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
+          const cachedUsers = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
+
+          setDeliveries(cachedDeliveries ? JSON.parse(cachedDeliveries) : []);
+          setTrucks(cachedTrucks ? JSON.parse(cachedTrucks) : []);
+          setBranches(cachedBranches ? JSON.parse(cachedBranches) : []);
+          setUsers(cachedUsers ? JSON.parse(cachedUsers) : []);
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Local Fallback)`);
+        } catch (fbErr) {
+          console.error("Fallback state load failed:", fbErr);
+          setDeliveries([]);
+          setTrucks([]);
+          setBranches([]);
+          setUsers([]);
+        }
       }
     };
 
