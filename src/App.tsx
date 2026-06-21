@@ -163,7 +163,7 @@ export default function App() {
     }
   };
 
-  // Hydrate state from localStorage or Supabase dynamically on tenant switch
+  // Hydrate state from Supabase dynamically on tenant switch
   useEffect(() => {
     if (!currentTenant) return;
 
@@ -191,51 +191,19 @@ export default function App() {
             setTrucks(data.trucks || []);
             setBranches(data.branches || []);
             setUsers(data.users || []);
-
-            localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(data.deliveries || []));
-            localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(data.trucks || []));
-            localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(data.branches || []));
-            localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users || []));
             setLastSyncTime(new Date().toLocaleTimeString());
             return;
           }
         } catch (err) {
-          console.error("Failed to fetch live Supabase tenant state, using local storage cache:", err);
+          console.error("Failed to fetch live Supabase tenant state:", err);
         }
       }
 
-      // Offline Sandbox Fallback to local storage (Starting with empty arrays if uninitialized)
-      const cachedD = localStorage.getItem(`prospaces_deliveries_tenant_${tenantId}`);
-      if (cachedD) {
-        try { setDeliveries(JSON.parse(cachedD)); } catch (e) { setDeliveries([]); }
-      } else {
-        setDeliveries([]);
-        localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify([]));
-      }
-
-      const cachedT = localStorage.getItem(`prospaces_trucks_tenant_${tenantId}`);
-      if (cachedT) {
-        try { setTrucks(JSON.parse(cachedT)); } catch (e) { setTrucks([]); }
-      } else {
-        setTrucks([]);
-        localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify([]));
-      }
-
-      const cachedB = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
-      if (cachedB) {
-        try { setBranches(JSON.parse(cachedB)); } catch (e) { setBranches([]); }
-      } else {
-        setBranches([]);
-        localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify([]));
-      }
-
-      const cachedU = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
-      if (cachedU) {
-        try { setUsers(JSON.parse(cachedU)); } catch (e) { setUsers([]); }
-      } else {
-        setUsers([]);
-        localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify([]));
-      }
+      // If Supabase is offline/not configured, clear local values to be safe and enforce database connection
+      setDeliveries([]);
+      setTrucks([]);
+      setBranches([]);
+      setUsers([]);
     };
 
     loadState();
@@ -323,7 +291,7 @@ export default function App() {
     }
   };
 
-  // Update localStorage and sync with Supabase when deliveries change
+  // Sync with Supabase when deliveries change
   const handleAddOrUpdateDelivery = (newRecord: DeliveryRecord) => {
     if (!currentTenant) return;
     const updated = [...deliveries];
@@ -334,7 +302,6 @@ export default function App() {
       updated.unshift(newRecord);
     }
     setDeliveries(updated);
-    localStorage.setItem(`prospaces_deliveries_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
   };
 
@@ -342,7 +309,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = deliveries.filter(d => d.id !== id);
     setDeliveries(updated);
-    localStorage.setItem(`prospaces_deliveries_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=deliveries&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
@@ -353,7 +319,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = [...trucks, newTruck];
     setTrucks(updated);
-    localStorage.setItem(`prospaces_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
@@ -361,7 +326,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = trucks.map(t => t.id === updatedTruck.id ? updatedTruck : t);
     setTrucks(updated);
-    localStorage.setItem(`prospaces_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
@@ -369,7 +333,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = trucks.filter(t => t.id !== id);
     setTrucks(updated);
-    localStorage.setItem(`prospaces_trucks_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=trucks&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
@@ -380,7 +343,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = [...branches, newBranch];
     setBranches(updated);
-    localStorage.setItem(`prospaces_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
@@ -388,7 +350,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = branches.map(b => b.id === updatedBranch.id ? updatedBranch : b);
     setBranches(updated);
-    localStorage.setItem(`prospaces_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
@@ -396,7 +357,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = branches.filter(b => b.id !== id);
     setBranches(updated);
-    localStorage.setItem(`prospaces_branches_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=branches&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
@@ -407,7 +367,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = [...users, newUser];
     setUsers(updated);
-    localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
@@ -415,7 +374,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = users.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u);
     setUsers(updated);
-    localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
@@ -423,7 +381,6 @@ export default function App() {
     if (!currentTenant) return;
     const updated = users.filter(u => u.id !== id);
     setUsers(updated);
-    localStorage.setItem(`prospaces_users_tenant_${currentTenant.id}`, JSON.stringify(updated));
     // Trigger remote deletion
     fetch(`/api/tenant/delete-record?table=users&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
@@ -443,18 +400,11 @@ export default function App() {
       const emptyBranches: Branch[] = [];
       const preservedUsers: User[] = [currentUser];
       
-      // Update local state and localStorage
+      // Update local state
       setDeliveries(emptyDeliveries);
-      localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(emptyDeliveries));
-      
       setTrucks(emptyTrucks);
-      localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(emptyTrucks));
-      
       setBranches(emptyBranches);
-      localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(emptyBranches));
-      
       setUsers(preservedUsers);
-      localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(preservedUsers));
       
       // Call the live API to wipe database records permanently
       setSyncStatus('SYNCING');

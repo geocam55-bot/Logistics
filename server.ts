@@ -544,12 +544,8 @@ async function startServer() {
 
       const supabase = getSupabase();
       if (!supabase) {
-        return res.json({
-          supabaseActive: false,
-          deliveries: [],
-          trucks: [],
-          branches: [],
-          users: []
+        return res.status(503).json({
+          error: "Supabase database is inactive or unconfigured. A live Supabase database connection is strictly required."
         });
       }
 
@@ -579,14 +575,8 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error("Failed to read Supabase state:", err);
-      // Fallback response inside error boundaries to let client handle the offline recovery
-      res.json({
-        supabaseActive: false,
-        error: formatDatabaseError(err),
-        deliveries: [],
-        trucks: [],
-        branches: [],
-        users: []
+      res.status(500).json({
+        error: formatDatabaseError(err)
       });
     }
   });
@@ -601,7 +591,9 @@ async function startServer() {
 
       const supabase = getSupabase();
       if (!supabase) {
-        return res.json({ success: true, localOnly: true });
+        return res.status(503).json({
+          error: "Supabase database is inactive or unconfigured. Cannot save state."
+        });
       }
 
       // Force-inject appropriate tenantIds into nested payloads to maintain strict database isolation
@@ -729,7 +721,9 @@ async function startServer() {
 
       const supabase = getSupabase();
       if (!supabase) {
-        return res.json({ success: true, localOnly: true });
+        return res.status(503).json({
+          error: "Supabase database is inactive or unconfigured. Cannot perform deletion."
+        });
       }
 
       // Ensure we only delete matching ids belonging to the authenticated tenant
@@ -757,7 +751,9 @@ async function startServer() {
 
       const supabase = getSupabase();
       if (!supabase) {
-        return res.json({ success: true, localOnly: true });
+        return res.status(503).json({
+          error: "Supabase database is inactive or unconfigured. Cannot clear data."
+        });
       }
 
       // 1. Delete all deliveries
@@ -1045,7 +1041,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
       }
       const supabase = getSupabase();
       if (!supabase) {
-        return res.json({ success: true, localOnly: true });
+        return res.status(503).json({ error: "Supabase database is inactive or unconfigured. Cannot add tenant." });
       }
       const { error } = await supabase.from("tenants").upsert([tenant]);
       if (error) throw error;
@@ -1061,7 +1057,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
       const { id } = req.params;
       const supabase = getSupabase();
       if (!supabase) {
-        return res.json({ success: true, localOnly: true });
+        return res.status(503).json({ error: "Supabase database is inactive or unconfigured. Cannot delete tenant." });
       }
 
       // Safeguard: Cascade delete child tables to prevent orphaned records in our multi-tenant database
