@@ -183,9 +183,8 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           primaryColor: 'blue'
         };
 
-        const fallbackUser = {
+        const fallbackUser: User = {
           id: "USR-57008",
-          tenantId: fallbackTenant.id,
           name: fallbackEmail.includes("george") ? "George Campbell" : (fallbackEmail.split("@")[0].charAt(0).toUpperCase() + fallbackEmail.split("@")[0].slice(1) || "Demo User"),
           email: fallbackEmail || "george.campbell@ronaatlantic.ca",
           role: "Admin",
