@@ -168,34 +168,8 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           setError("No active employee profile matched this address in the Supabase connected live database. Register below to create a direct database record now.");
         }
       } else {
-        // Fallback for offline sandbox mode or database timeout query fallback
-        let matchedUser: User | undefined;
-        
-        // Special case for offline superadmin
-        if (email.toLowerCase().trim() === 'superadmin@prospaces.com') {
-          matchedUser = {
-            id: "USR-SUPER-ADMIN-01",
-            name: "ProSpaces Super Admin",
-            email: "superadmin@prospaces.com",
-            role: "SUPER_ADMIN" as any,
-            associatedStoreId: "WINDMILL_DC"
-          };
-        }
-
-        if (matchedUser) {
-          onLoginSuccess(resolvedTenant, matchedUser);
-        } else {
-          // Create custom dynamic user directly
-          const calculatedName = customName.trim() || email.split('@')[0].split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-          const dynamicUser: User = {
-            id: `USR-MOCK-${Math.floor(Math.random() * 90) + 10}`,
-            name: calculatedName,
-            email: email.trim(),
-            role: customRole,
-            associatedStoreId: resolvedTenant.id === 'bay-of-fundy' ? 'BOF_MONCTON_DC' : resolvedTenant.id === 'cabot-trail' ? 'CTC_HAWKESBURY_DC' : 'WINDMILL_DC'
-          };
-          onLoginSuccess(resolvedTenant, dynamicUser);
-        }
+        // Enforce live database requirement
+        setError("Supabase database connection is inactive or unconfigured. A live database connection is strictly required for both development and production. Please configure your live SUPABASE_URL and SUPABASE_ANON_KEY in settings or the .env file.");
       }
     } catch (err: any) {
       console.error(err);
@@ -302,19 +276,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       <div className="w-full md:w-7/12 bg-white flex flex-col justify-between py-10 px-6 sm:px-12 md:px-16 lg:px-24">
         
         {/* Navigation Action Area */}
-        <div className="flex items-center justify-between pointer-events-none md:pointer-events-auto shrink-0 mb-6 font-medium">
-          <button 
-            type="button" 
-            onClick={() => {
-              if (email) setEmail('');
-              setIsRegistering(false); 
-              setError(null);
-            }}
-            className="text-xs text-slate-400 hover:text-slate-700 transition-colors flex items-center space-x-1"
-          >
-            <span>← Back to home</span>
-          </button>
-          
+        <div className="flex items-center justify-end pointer-events-none md:pointer-events-auto shrink-0 mb-6 font-medium">
           <span className="text-[10px] font-bold text-slate-300 font-mono tracking-widest uppercase">
             SECURED ENDPOINT
           </span>

@@ -273,9 +273,7 @@ create table if not exists deliveries (
 
 -- Seed Initial Logistical Partners
 insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
-('atlantic-logistics', 'Atlantic Shipping & Logistics', 'ATL', 'Serving Nova Scotia regional stores & main Windmill Road DC hub.', '⚓', 'Nova Scotia (Dartmouth, Tantallon, Halifax)', 'blue'),
-('bay-of-fundy', 'Bay of Fundy Transport Ltd', 'BOF', 'Serving Annapolis Valley and New Brunswick logistics gateways.', '🌊', 'New Brunswick & Annapolis Valley (Kentville, Truro, Moncton)', 'emerald'),
-('cabot-trail', 'Cabot Trail Cargo & Hauling', 'CTC', 'Providing Cape Breton heavy industrial bulk distribution services.', '⛰️', 'Cape Breton (Sydney, Port Hawkesbury)', 'indigo')
+('ronaatlantic', 'RONA Atlantic', 'RA', 'Corporate logistics tracking for RONA franchise dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
 on conflict (id) do nothing;
 `;
 
@@ -302,7 +300,7 @@ async function startServer() {
         return res.json({
           configured: false,
           connected: false,
-          error: "Supabase credentials are not specified in the workspace settings. Falling back to local offline mode.",
+          error: "Supabase database credentials are unconfigured or placeholder. A live Supabase database is strictly required for this application in both development and production. Please open the 'Settings > Secrets' panel and configure SUPABASE_URL and SUPABASE_ANON_KEY.",
           url: resolvedUrl,
           schemaSql: SH_SQL
         });

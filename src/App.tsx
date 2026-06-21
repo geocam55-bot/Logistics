@@ -18,7 +18,7 @@ import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
-  Database, RefreshCw, FileDown
+  Database, RefreshCw, FileDown, AlertTriangle
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
 
@@ -779,6 +779,19 @@ export default function App() {
           )}
 
         </div>
+
+        {supabaseStatus && !supabaseStatus.connected && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start space-x-3 text-amber-900 shadow-sm animate-fade-in" id="database-disconnected-msg">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-xs">
+              <strong className="font-bold text-sm text-amber-955 block">Database Disconnected / Placeholder State Mode</strong>
+              <p className="mt-1 leading-relaxed text-amber-900 font-semibold font-sans">
+                This environment is configured to run exclusively on the live Supabase Database. However, the connection is currently inactive or using empty local placeholders.
+                Please head to the <button onClick={() => setActiveTab('architecture')} className="font-bold underline text-blue-800 hover:text-blue-900 focus:outline-none cursor-pointer">Overall Architecture</button> tab to view the live database setup instructions and run the SQL schema scripts.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic content area depending on tabs */}
         <div className="flex-1 transition-all duration-300" id="current-tab-view">
