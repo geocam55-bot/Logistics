@@ -1216,32 +1216,39 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
 
   // Serve static assets and frontend index inside our middleware stack
   // In the deployed container, we want to serve the bundled production files from `dist` if they exist.
-  const isProduction = process.env.NODE_ENV === "production" || process.argv.some(arg => arg.includes("dist/server.cjs") || arg.includes("dist\\server.cjs"));
+  let isProduction = process.env.NODE_ENV === "production" || process.argv.some(arg => arg.includes("dist/server.cjs") || arg.includes("dist\\server.cjs"));
 
   if (!isProduction) {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
 
-    // Fallback for HTML pages / SPA routing in development to prevent 404s on refresh
-    app.get("*", async (req, res, next) => {
-      const url = req.originalUrl;
-      // Skip API and files/assets
-      if (url.startsWith("/api") || url.includes(".")) {
-        return next();
-      }
-      try {
-        let template = fs.readFileSync(path.join(process.cwd(), "index.html"), "utf-8");
-        template = await vite.transformIndexHtml(url, template);
-        res.status(200).set({ "Content-Type": "text/html" }).end(template);
-      } catch (e: any) {
-        next(e);
-      }
-    });
-  } else {
+      // Fallback for HTML pages / SPA routing in development to prevent 404s on refresh
+      app.get("*", async (req, res, next) => {
+        const url = req.originalUrl;
+        // Skip API and files/assets
+        if (url.startsWith("/api") || url.includes(".")) {
+          return next();
+        }
+        try {
+          let template = fs.readFileSync(path.join(process.cwd(), "index.html"), "utf-8");
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ "Content-Type": "text/html" }).end(template);
+        } catch (e: any) {
+          next(e);
+        }
+      });
+    } catch (e) {
+      console.warn("Vite middleware load failed. Falling back to static production mode.", e);
+      isProduction = true;
+    }
+  }
+
+  if (isProduction) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
