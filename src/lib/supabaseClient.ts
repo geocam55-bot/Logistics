@@ -49,11 +49,17 @@ export function deserializeFromPhone(user: any): any {
   };
 }
 
-export function serializeToType(type: string | undefined, registrationDueDate: string | undefined): string {
+export function serializeToType(type: string | undefined, registrationDueDate: string | undefined, lat?: number, lng?: number): string {
   const baseType = (type || "").trim();
   let res = baseType;
   if (registrationDueDate) {
     res += ` ||regdue:${registrationDueDate}`;
+  }
+  if (lat !== undefined && lat !== null) {
+    res += ` ||lat:${lat}`;
+  }
+  if (lng !== undefined && lng !== null) {
+    res += ` ||lng:${lng}`;
   }
   return res;
 }
@@ -63,6 +69,8 @@ export function deserializeType(truck: any): any {
   const type = truck.type || "";
   let cleanType = type;
   let registrationDueDate = truck.registrationDueDate || "";
+  let lat: number | undefined;
+  let lng: number | undefined;
 
   const regdueMatch = type.match(/\|\|regdue:([^\s|]+)/);
   if (regdueMatch) {
@@ -70,10 +78,24 @@ export function deserializeType(truck: any): any {
     cleanType = cleanType.replace(/\|\|regdue:[^\s|]+/, "");
   }
 
+  const latMatch = type.match(/\|\|lat:([^\s|]+)/);
+  if (latMatch) {
+    lat = parseFloat(latMatch[1]);
+    cleanType = cleanType.replace(/\|\|lat:[^\s|]+/, "");
+  }
+
+  const lngMatch = type.match(/\|\|lng:([^\s|]+)/);
+  if (lngMatch) {
+    lng = parseFloat(lngMatch[1]);
+    cleanType = cleanType.replace(/\|\|lng:[^\s|]+/, "");
+  }
+
   return {
     ...truck,
     type: cleanType.trim(),
-    registrationDueDate
+    registrationDueDate,
+    ...(lat !== undefined && !isNaN(lat) ? { lat } : {}),
+    ...(lng !== undefined && !isNaN(lng) ? { lng } : {})
   };
 }
 
@@ -233,7 +255,7 @@ export async function saveTenantStateDirect(
     id: t.id,
     tenantId,
     name: t.name,
-    type: serializeToType(t.type, t.registrationDueDate),
+    type: serializeToType(t.type, t.registrationDueDate, t.lat, t.lng),
     driver: t.driver,
     branchId: t.branchId
   }));

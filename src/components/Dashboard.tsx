@@ -46,6 +46,8 @@ const KNOWN_COORDS: Record<string, { lat: number; lng: number }> = {
   'DARTMOUTH': { lat: 44.6636, lng: -63.5683 },
   'BRIDGEWATER': { lat: 44.3789, lng: -64.5126 },
   'HALIFAX': { lat: 44.6488, lng: -63.5752 },
+  'CHAIN LAKE': { lat: 44.6295, lng: -63.6651 },
+  '137 CHAIN LAKE': { lat: 44.6295, lng: -63.6651 },
   
   // Silicon Valley, California
   'CAMPBELL': { lat: 37.2872, lng: -121.9500 },
@@ -627,8 +629,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
         }
 
         const progress = simProgress[truck.id] ?? 0.15;
-        const truckLat = origLat + (destLat - origLat) * progress;
-        const truckLng = origLng + (destLng - origLng) * progress;
+        const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined;
+        const truckLat = hasRealGps ? (truck as any).lat : (origLat + (destLat - origLat) * progress);
+        const truckLng = hasRealGps ? (truck as any).lng : (origLng + (destLng - origLng) * progress);
         allPlottedCoords.push([truckLat, truckLng]);
 
         const isSelected = selectedTrackTruckId === truck.id;
@@ -661,9 +664,11 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
           iconAnchor: [14, 14]
         });
 
-        const popupMessage = assignedDelivery
-          ? `Delivering order ${assignedDelivery.invoiceNumber} (${Math.round(progress * 100)}% complete)`
-          : 'Standby / Refueling';
+        const popupMessage = hasRealGps 
+          ? `Broadcasting Live Coordinates (Currently at 137 Chain Lake Drive / Bayer's Lake)`
+          : assignedDelivery
+            ? `Delivering order ${assignedDelivery.invoiceNumber} (${Math.round(progress * 100)}% complete)`
+            : 'Standby / Refueling';
 
         const markerInstance = L.marker([truckLat, truckLng], {
           icon: truckIcon,
@@ -1202,8 +1207,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                 }
 
                 const progress = simProgress[matchedTruck.id] ?? 0.15;
-                const truckLat = origLat + (destLat - origLat) * progress;
-                const truckLng = origLng + (destLng - origLng) * progress;
+                const hasRealGps = (matchedTruck as any).lat !== undefined && (matchedTruck as any).lng !== undefined;
+                const truckLat = hasRealGps ? (matchedTruck as any).lat : (origLat + (destLat - origLat) * progress);
+                const truckLng = hasRealGps ? (matchedTruck as any).lng : (origLng + (destLng - origLng) * progress);
                 const percentCoords = getPercentCoordsFromGps(truckLat, truckLng);
                 const truckX = percentCoords.x;
                 const truckY = percentCoords.y;
@@ -1412,8 +1418,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                 }
 
                 const progress = simProgress[truck.id] ?? 0.15;
-                const truckLat = origLat + (destLat - origLat) * progress;
-                const truckLng = origLng + (destLng - origLng) * progress;
+                const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined;
+                const truckLat = hasRealGps ? (truck as any).lat : (origLat + (destLat - origLat) * progress);
+                const truckLng = hasRealGps ? (truck as any).lng : (origLng + (destLng - origLng) * progress);
                 const percentCoords = getPercentCoordsFromGps(truckLat, truckLng);
                 const xPosition = percentCoords.x;
                 const yPosition = percentCoords.y;

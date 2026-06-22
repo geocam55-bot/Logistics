@@ -94,6 +94,55 @@ export default function App() {
     }
   }, [currentUser, activeTab]);
 
+  // Driver Live GPS Geolocation Sync to database
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'Driver' || !currentTenant) return;
+
+    // Find the truck assigned to this driver
+    const driverTruck = trucks.find(t => t.driver === currentUser.name);
+    if (!driverTruck) {
+      console.warn("No registered vehicle matches driver profile name:", currentUser.name);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      console.warn("Device geolocation is not supported by this browser.");
+      return;
+    }
+
+    const successHandler = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      const previousLat = (driverTruck as any).lat;
+      const previousLng = (driverTruck as any).lng;
+
+      // Update if position changed by more than 0.00005 degrees (approx 5 meters)
+      const latDiff = previousLat !== undefined ? Math.abs(previousLat - latitude) : 1;
+      const lngDiff = previousLng !== undefined ? Math.abs(previousLng - longitude) : 1;
+
+      if (latDiff > 0.00005 || lngDiff > 0.00005) {
+        console.log(`Live GPS tracked for driver: ${latitude}, ${longitude}`);
+        const updatedTruck = {
+          ...driverTruck,
+          lat: latitude,
+          lng: longitude
+        };
+        handleUpdateTruck(updatedTruck);
+      }
+    };
+
+    const errorHandler = (err: GeolocationPositionError) => {
+      console.warn("Live GPS device lock failed:", err.message);
+    };
+
+    const watchId = navigator.geolocation.watchPosition(successHandler, errorHandler, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    });
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [currentUser, trucks, currentTenant]);
+
   // Trigger login session handlers
   const handleLoginSuccess = (tenant: Tenant, user: User) => {
     setCurrentTenant(tenant);

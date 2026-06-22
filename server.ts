@@ -168,11 +168,17 @@ function deserializeFromPhone(user: any): any {
   };
 }
 
-function serializeToType(type: string | undefined, registrationDueDate: string | undefined): string {
+function serializeToType(type: string | undefined, registrationDueDate: string | undefined, lat?: number, lng?: number): string {
   const baseType = (type || "").trim();
   let res = baseType;
   if (registrationDueDate) {
     res += ` ||regdue:${registrationDueDate}`;
+  }
+  if (lat !== undefined && lat !== null) {
+    res += ` ||lat:${lat}`;
+  }
+  if (lng !== undefined && lng !== null) {
+    res += ` ||lng:${lng}`;
   }
   return res;
 }
@@ -182,6 +188,8 @@ function deserializeType(truck: any): any {
   const type = truck.type || "";
   let cleanType = type;
   let registrationDueDate = truck.registrationDueDate || "";
+  let lat: number | undefined;
+  let lng: number | undefined;
 
   const regdueMatch = type.match(/\|\|regdue:([^\s|]+)/);
   if (regdueMatch) {
@@ -189,10 +197,24 @@ function deserializeType(truck: any): any {
     cleanType = cleanType.replace(/\|\|regdue:[^\s|]+/, "");
   }
 
+  const latMatch = type.match(/\|\|lat:([^\s|]+)/);
+  if (latMatch) {
+    lat = parseFloat(latMatch[1]);
+    cleanType = cleanType.replace(/\|\|lat:[^\s|]+/, "");
+  }
+
+  const lngMatch = type.match(/\|\|lng:([^\s|]+)/);
+  if (lngMatch) {
+    lng = parseFloat(lngMatch[1]);
+    cleanType = cleanType.replace(/\|\|lng:[^\s|]+/, "");
+  }
+
   return {
     ...truck,
     type: cleanType.trim(),
-    registrationDueDate
+    registrationDueDate,
+    ...(lat !== undefined && !isNaN(lat) ? { lat } : {}),
+    ...(lng !== undefined && !isNaN(lng) ? { lng } : {})
   };
 }
 
@@ -889,7 +911,7 @@ app.use("/uploads", express.static(uploadsDir));
             console.warn("Supabase trucks table is missing 'registrationDueDate' column. Retrying upsert with serialized fallback...");
             const strippedTrucks = sanitizedTrucks.map((t: any) => {
               const { registrationDueDate, ...rest } = t;
-              (rest as any).type = serializeToType(t.type, t.registrationDueDate);
+              (rest as any).type = serializeToType(t.type, t.registrationDueDate, t.lat, t.lng);
               return rest;
             });
             const { error: retryErr } = await supabase.from("trucks").upsert(strippedTrucks);
