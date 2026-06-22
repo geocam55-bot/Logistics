@@ -2,12 +2,12 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/index.ts"
+      "source": "/api/(.*)",
+      "destination": "/api"
     },
     {
-      "source": "/uploads/:path*",
-      "destination": "/api/uploads/:path*"
+      "source": "/uploads/(.*)",
+      "destination": "/uploads/$1"
     },
     {
       "source": "/((?!assets/|vite.svg|favicon.ico).*)*",
