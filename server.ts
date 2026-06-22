@@ -283,34 +283,36 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Support Vercel routing where the path might omit or include /api
-app.use((req, res, next) => {
-  const originalUrl = req.url;
-  
-  // 1. Remove "/api/index.ts" or "/api/index.js" or "/api/index" if present at the start of req.url
-  if (req.url.startsWith("/api/index.ts")) {
-    req.url = req.url.substring(13);
-  } else if (req.url.startsWith("/api/index.js")) {
-    req.url = req.url.substring(13);
-  } else if (req.url.startsWith("/api/index")) {
-    req.url = req.url.substring(10);
-  }
-  
-  // Ensure we have a leading slash after stripping
-  if (!req.url.startsWith("/")) {
-    req.url = "/" + req.url;
-  }
-  
-  // 2. If it is an operational route (not static asset/root) and missing /api prefix, prepend /api
-  if (!req.url.startsWith("/api") && !req.url.startsWith("/uploads") && req.url !== "/" && !req.url.includes(".")) {
-    req.url = "/api" + req.url;
-  }
-  
-  if (originalUrl !== req.url) {
-    console.log(`[Vercel Routing Sync] Path normalized: ${originalUrl} -> ${req.url}`);
-  }
-  
-  next();
-});
+if (process.env.VERCEL) {
+  app.use((req, res, next) => {
+    const originalUrl = req.url;
+    
+    // 1. Remove "/api/index.ts" or "/api/index.js" or "/api/index" if present at the start of req.url
+    if (req.url.startsWith("/api/index.ts")) {
+      req.url = req.url.substring(13);
+    } else if (req.url.startsWith("/api/index.js")) {
+      req.url = req.url.substring(13);
+    } else if (req.url.startsWith("/api/index")) {
+      req.url = req.url.substring(10);
+    }
+    
+    // Ensure we have a leading slash after stripping
+    if (!req.url.startsWith("/")) {
+      req.url = "/" + req.url;
+    }
+    
+    // 2. If it is an operational route (not static asset/root) and missing /api prefix, prepend /api
+    if (!req.url.startsWith("/api") && !req.url.startsWith("/uploads") && req.url !== "/" && !req.url.includes(".")) {
+      req.url = "/api" + req.url;
+    }
+    
+    if (originalUrl !== req.url) {
+      console.log(`[Vercel Routing Sync] Path normalized: ${originalUrl} -> ${req.url}`);
+    }
+    
+    next();
+  });
+}
 
 // Ensure and serve static uploads directory for PDFs link creation
 const uploadsDir = path.join(process.cwd(), "uploads");
