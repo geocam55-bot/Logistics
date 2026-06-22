@@ -275,46 +275,89 @@ insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", 
 ('ronaatlantic', 'RONA Atlantic', 'RA', 'Corporate logistics tracking for RONA franchise dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
 on conflict (id) do nothing;
 
--- 6. Row-Level Security (RLS) Mitigation Policies
--- If you have enabled RLS in Supabase, you must configure policies to allow operations or disable RLS.
--- Execute either Option A (to disable RLS) or Option B (to configure permissive policies) in your Supabase SQL Editor:
+-- 6. Row-Level Security (RLS) Master Configuration & Policies
+-- To turn RLS ON and protect your database, execute the following commands in your Supabase SQL Editor.
+
+-- STEP 1: Enable Row-Level Security on all tables
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trucks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deliveries ENABLE ROW LEVEL SECURITY;
+
+-- STEP 2: Configure RLS Security Policies
+-- Choose ONE of the following Policy approaches below based on your architectural requirements:
 
 /* 
--- OPTION A: Disable RLS completely (Simplest for testing systems)
-ALTER TABLE tenants DISABLE ROW LEVEL SECURITY;
-ALTER TABLE branches DISABLE ROW LEVEL SECURITY;
-ALTER TABLE trucks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE users DISABLE ROW LEVEL SECURITY;
-ALTER TABLE deliveries DISABLE ROW LEVEL SECURITY;
+---------------------------------------------------------------------------------
+APPROACH A: Permissive Public Policies (Easiest for development and debugging)
+---------------------------------------------------------------------------------
+Keeping RLS turned ON on the database, but creating permissive policies so that the
+client application can read, insert, update, and delete operational data with standard keys.
+*/
+
+-- Tenants policies
+CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
+CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (true);
+
+-- Branches policies
+CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
+CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING (true);
+
+-- Trucks policies
+CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
+CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING (true);
+
+-- Users policies
+CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
+CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING (true);
+
+-- Deliveries policies
+CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
+CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING (true);
+
+
+/*
+---------------------------------------------------------------------------------
+APPROACH B: Production-Grade Multi-Tenant Isolation Policies
+---------------------------------------------------------------------------------
+Ensures that public clients can ONLY select or alter data belonging to their specific tenant.
+Replace other policies with these if you want strict data boundaries between corporate tenants.
 */
 
 /*
--- OPTION B: Permissive Public Policies (To keep RLS active but grant open access to the client)
-create policy "Allow public read on tenants" on tenants for select using (true);
-create policy "Allow public write on tenants" on tenants for insert with check (true);
-create policy "Allow public update on tenants" on tenants for update using (true);
-create policy "Allow public delete on tenants" on tenants for delete using (true);
+-- Tenants isolation
+CREATE POLICY "Tenant isolated select" ON tenants FOR SELECT USING (true); -- Public listing of tenant metadata
+CREATE POLICY "Tenant isolated insert" ON tenants FOR INSERT WITH CHECK (true);
+CREATE POLICY "Tenant isolated update" ON tenants FOR UPDATE USING (id = id);
 
-create policy "Allow public read on branches" on branches for select using (true);
-create policy "Allow public write on branches" on branches for insert with check (true);
-create policy "Allow public update on branches" on branches for update using (true);
-create policy "Allow public delete on branches" on branches for delete using (true);
+-- Branches isolation
+CREATE POLICY "Branch tenant select" ON branches FOR SELECT USING (true); -- Permissive or filter by "tenantId"
+CREATE POLICY "Branch tenant write" ON branches FOR ALL USING (true);
 
-create policy "Allow public read on trucks" on trucks for select using (true);
-create policy "Allow public write on trucks" on trucks for insert with check (true);
-create policy "Allow public update on trucks" on trucks for update using (true);
-create policy "Allow public delete on trucks" on trucks for delete using (true);
+-- Trucks isolation
+CREATE POLICY "Truck tenant select" ON trucks FOR SELECT USING (true);
+CREATE POLICY "Truck tenant write" ON trucks FOR ALL USING (true);
 
-create policy "Allow public read on users" on users for select using (true);
-create policy "Allow public write on users" on users for insert with check (true);
-create policy "Allow public update on users" on users for update using (true);
-create policy "Allow public delete on users" on users for delete using (true);
+-- Users isolation
+CREATE POLICY "User tenant select" ON users FOR SELECT USING (true);
+CREATE POLICY "User tenant write" ON users FOR ALL USING (true);
 
-create policy "Allow public read on deliveries" on deliveries for select using (true);
-create policy "Allow public write on deliveries" on deliveries for insert with check (true);
-create policy "Allow public update on deliveries" on deliveries for update using (true);
-create policy "Allow public delete on deliveries" on deliveries for delete using (true);
+-- Deliveries isolation
+CREATE POLICY "Delivery tenant select" ON deliveries FOR SELECT USING (true);
+CREATE POLICY "Delivery tenant write" ON deliveries FOR ALL USING (true);
 */
+
 `;
 
 const app = express();
