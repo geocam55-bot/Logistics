@@ -6,6 +6,17 @@
 import { useState, useEffect } from 'react';
 import { DeliveryRecord, Truck, Branch, User, Tenant } from './types';
 import { TENANTS } from './data';
+import { 
+  getFrontendSupabase, 
+  checkSupabaseStatusDirect, 
+  fetchTenantsDirect, 
+  saveTenantDirect, 
+  deleteTenantDirect, 
+  fetchTenantStateDirect, 
+  saveTenantStateDirect, 
+  deleteRecordDirect, 
+  clearAllDirect 
+} from './lib/supabaseClient';
 import Dashboard from './components/Dashboard';
 import ScanStation from './components/ScanStation';
 import DeliveryQueue from './components/DeliveryQueue';
@@ -126,8 +137,17 @@ export default function App() {
       setSupabaseStatus(data);
       return data;
     } catch (e: any) {
-      console.warn("Failed checking Supabase connection diagnostics:", e.message || e);
-      return null;
+      console.warn("Express endpoint /api/supabase-status offline. Trying direct client lookup:", e.message || e);
+      const direct = await checkSupabaseStatusDirect();
+      const fallbackState = {
+        configured: !!direct.active,
+        connected: !!direct.success,
+        error: direct.error || null,
+        url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "Default",
+        schemaSql: ""
+      };
+      setSupabaseStatus(fallbackState);
+      return fallbackState;
     }
   };
 
@@ -168,12 +188,23 @@ export default function App() {
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
         }
       } else {
-        setSyncStatus('ERROR');
+        throw new Error(`Server returned ${res.status}`);
       }
     } catch (e) {
-      console.warn("Offline/Local Sync mode is currently operational:", e);
-      setSyncStatus('IDLE');
-      setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
+      console.warn("Express backend save-state offline, trying direct client-side save fallback:", e);
+      try {
+        const directResult = await saveTenantStateDirect(tenantId, d, t, b, u);
+        setSyncStatus('IDLE');
+        if (directResult.supabaseActive) {
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Direct Sync Connected)`);
+        } else {
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Saved Locally Only)`);
+        }
+      } catch (directErr) {
+        console.error("Direct Supabase write fallback failed as well:", directErr);
+        setSyncStatus('ERROR');
+        setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
+      }
     }
   };
 
@@ -189,33 +220,26 @@ export default function App() {
         // Run connectivity diagnostics in background to keep UI stats updated
         checkSupabaseStatus().catch(() => {});
 
-        const res = await fetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
-        if (!res.ok) {
-          const text = await res.text();
-          let parsedErr = `Server returned error status ${res.status}.`;
-          try {
-            const json = JSON.parse(text);
-            parsedErr = json.error || parsedErr;
-          } catch (_) {
-            const cleanText = text.trim();
-            if (cleanText) {
-              const preview = cleanText.slice(0, 120).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-              parsedErr = `HTTP ${res.status}: ${preview || 'Non-JSON fallback response'}`;
-            }
+        let data: any;
+        try {
+          const res = await fetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
+          if (!res.ok) {
+            throw new Error(`Server returned error status ${res.status}`);
           }
-          throw new Error(parsedErr);
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            throw new Error("non-JSON response");
+          }
+          data = await res.json();
+        } catch (apiErr) {
+          console.warn("Express backend endpoint /api/tenant/state offline or 404. Trying direct client lookup:", apiErr);
+          const directData = await fetchTenantStateDirect(tenantId);
+          if (directData && directData.supabaseActive) {
+            data = directData;
+          } else {
+            throw apiErr;
+          }
         }
-        
-        const contentType = res.headers.get("content-type") || "";
-        if (!contentType.includes("application/json")) {
-          let text = "";
-          try { text = await res.text(); } catch (_) {}
-          const cleanText = text.trim();
-          const preview = cleanText ? cleanText.slice(0, 120).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : "";
-          throw new Error(`Server returned non-JSON configuration content (Type: ${contentType}). ${preview ? 'Preview: ' + preview : 'Please reload the page'}`);
-        }
-        
-        const data = await res.json();
 
         if (data.supabaseActive) {
           // Populate React state directly from live Supabase Tables
@@ -287,7 +311,16 @@ export default function App() {
           localStorage.setItem('prospaces_all_tenants', JSON.stringify(data.tenants));
         }
       } catch (err: any) {
-        console.warn("Failed retrieving tenants from database on mount:", err.message || err);
+        console.warn("Failed retrieving tenants from API, trying direct client lookup:", err.message || err);
+        try {
+          const directTenants = await fetchTenantsDirect();
+          if (directTenants && directTenants.length > 0) {
+            setAllTenants(directTenants);
+            localStorage.setItem('prospaces_all_tenants', JSON.stringify(directTenants));
+          }
+        } catch (directErr) {
+          console.error("Direct tenants lookup failed as well:", directErr);
+        }
       }
     };
     loadTenants();
@@ -301,15 +334,22 @@ export default function App() {
         body: JSON.stringify({ tenant: newTenant })
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Could not register tenant on live server.");
+        throw new Error(`Server returned status ${res.status}`);
       }
       const updated = [...allTenants, newTenant];
       setAllTenants(updated);
       localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
     } catch (err) {
-      console.error(err);
-      throw err;
+      console.warn("Express backend register tenant offline, performing direct Supabase upsert:", err);
+      try {
+        await saveTenantDirect(newTenant);
+        const updated = [...allTenants, newTenant];
+        setAllTenants(updated);
+        localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
+      } catch (directErr: any) {
+        console.error("Direct tenant creation failed:", directErr);
+        throw directErr;
+      }
     }
   };
 
@@ -321,15 +361,22 @@ export default function App() {
         body: JSON.stringify({ tenant: updatedTenant })
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Could not save tenant modifications on live server.");
+        throw new Error(`Server returned status ${res.status}`);
       }
       const updated = allTenants.map(t => t.id === updatedTenant.id ? updatedTenant : t);
       setAllTenants(updated);
       localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
     } catch (err) {
-      console.error(err);
-      throw err;
+      console.warn("Express backend save tenant offline, performing direct Supabase upsert:", err);
+      try {
+        await saveTenantDirect(updatedTenant);
+        const updated = allTenants.map(t => t.id === updatedTenant.id ? updatedTenant : t);
+        setAllTenants(updated);
+        localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
+      } catch (directErr: any) {
+        console.error("Direct tenant save failed:", directErr);
+        throw directErr;
+      }
     }
   };
 
@@ -339,15 +386,22 @@ export default function App() {
         method: "DELETE"
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Could not delete tenant on live server.");
+        throw new Error(`Server returned status ${res.status}`);
       }
       const updated = allTenants.filter(t => t.id !== id);
       setAllTenants(updated);
       localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
     } catch (err) {
-      console.error(err);
-      throw err;
+      console.warn("Express backend delete tenant offline, executing direct Supabase deletion:", err);
+      try {
+        await deleteTenantDirect(id);
+        const updated = allTenants.filter(t => t.id !== id);
+        setAllTenants(updated);
+        localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
+      } catch (directErr: any) {
+        console.error("Direct tenant delete failed:", directErr);
+        throw directErr;
+      }
     }
   };
 
@@ -365,12 +419,27 @@ export default function App() {
     syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
   };
 
+  const deleteRecordWithFallback = async (table: string, id: string, tenantId: string) => {
+    try {
+      const res = await fetch(`/api/tenant/delete-record?table=${table}&id=${id}&tenantId=${tenantId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+    } catch (err) {
+      console.warn(`API record deletion failed, attempting direct Supabase query fallback:`, err);
+      try {
+        await deleteRecordDirect(table, id, tenantId);
+      } catch (directErr) {
+        console.error("Direct Supabase record deletion failed as well:", directErr);
+      }
+    }
+  };
+
   const handleDeleteDelivery = (id: string) => {
     if (!currentTenant) return;
     const updated = deliveries.filter(d => d.id !== id);
     setDeliveries(updated);
-    // Trigger remote deletion
-    fetch(`/api/tenant/delete-record?table=deliveries&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
+    deleteRecordWithFallback('deliveries', id, currentTenant.id);
     syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
   };
 
@@ -393,8 +462,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = trucks.filter(t => t.id !== id);
     setTrucks(updated);
-    // Trigger remote deletion
-    fetch(`/api/tenant/delete-record?table=trucks&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
+    deleteRecordWithFallback('trucks', id, currentTenant.id);
     syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
@@ -417,8 +485,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = branches.filter(b => b.id !== id);
     setBranches(updated);
-    // Trigger remote deletion
-    fetch(`/api/tenant/delete-record?table=branches&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
+    deleteRecordWithFallback('branches', id, currentTenant.id);
     syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
@@ -441,8 +508,7 @@ export default function App() {
     if (!currentTenant) return;
     const updated = users.filter(u => u.id !== id);
     setUsers(updated);
-    // Trigger remote deletion
-    fetch(`/api/tenant/delete-record?table=users&id=${id}&tenantId=${currentTenant.id}`, { method: 'DELETE' }).catch(() => {});
+    deleteRecordWithFallback('users', id, currentTenant.id);
     syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
@@ -487,10 +553,18 @@ export default function App() {
         }
       } catch (err) {
         console.error("Failed to delete live records via API, fallback to manual syncing:", err);
-        // Fallback: sync state consisting of empty arrays + preserved admin
-        await syncStateToSupabase(tenantId, emptyDeliveries, emptyTrucks, emptyBranches, preservedUsers);
-        setSyncStatus('SUCCESS');
-        alert("Wiped local cache. Remote database has been queued for synchronization.");
+        try {
+          await clearAllDirect(tenantId);
+          // Re-save preserved user to Supabase
+          await saveTenantStateDirect(tenantId, emptyDeliveries, emptyTrucks, emptyBranches, preservedUsers);
+          setSyncStatus('SUCCESS');
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Direct Clean Sync Completed)`);
+          alert("All operational and test data has been successfully deleted from Supabase!");
+        } catch (directErr) {
+          console.error("Direct clear operation failed too:", directErr);
+          setSyncStatus('ERROR');
+          alert("Could not clear live tables directly. Verify Supabase schema and network connection.");
+        }
       }
     }
   };
