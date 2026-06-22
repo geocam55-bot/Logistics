@@ -276,19 +276,18 @@ insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", 
 on conflict (id) do nothing;
 `;
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
+const PORT = 3000;
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // Ensure and serve static uploads directory for PDFs link creation
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  app.use("/uploads", express.static(uploadsDir));
+// Ensure and serve static uploads directory for PDFs link creation
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use("/uploads", express.static(uploadsDir));
 
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
@@ -1220,6 +1219,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
     }
   });
 
+async function startServer() {
   // Serve static assets and frontend index inside our middleware stack
   // In the deployed container, we want to serve the bundled production files from `dist` if they exist.
   let isProduction = process.env.NODE_ENV === "production" || process.argv.some(arg => arg.includes("dist/server.cjs") || arg.includes("dist\\server.cjs"));
@@ -1303,4 +1303,8 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
