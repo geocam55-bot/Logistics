@@ -29,7 +29,7 @@ import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
-  Database, RefreshCw, FileDown, AlertTriangle
+  Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
 
@@ -114,6 +114,7 @@ export default function App() {
   const [supabaseStatus, setSupabaseStatus] = useState<{
     configured: boolean;
     connected: boolean;
+    isServiceRoleKeyAnon?: boolean | null;
     error: string | null;
     url: string;
     schemaSql: string;
@@ -142,6 +143,7 @@ export default function App() {
       const fallbackState = {
         configured: !!direct.active,
         connected: !!direct.success,
+        isServiceRoleKeyAnon: true, // safe default fallback
         error: direct.error || null,
         url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "Default",
         schemaSql: ""
@@ -885,6 +887,36 @@ export default function App() {
               <RefreshCw className={`h-3 w-3 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
               <span>Retry Connection</span>
             </button>
+          </div>
+        )}
+
+        {supabaseStatus?.isServiceRoleKeyAnon && (
+          <div className="bg-amber-950/40 border border-amber-500/30 rounded-2xl p-5 text-amber-200 shadow-lg animate-fade-in space-y-4" id="rls-bypass-warning-box">
+            <div className="flex items-start space-x-3.5 text-xs">
+              <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-extrabold text-sm text-amber-300 block tracking-tight">Row Level Security (RLS) Configuration Required</strong>
+                <p className="mt-1.5 leading-relaxed text-slate-300 font-sans font-medium">
+                  We detected that you enabled Row-Level Security (RLS) in Supabase. In order for your Express Node backend to bypass security and safely synchronize multi-tenant database records (avoiding <code className="bg-amber-950/80 text-amber-400 px-1 py-0.5 rounded font-mono font-bold text-[10px]">new row violates row-level security policy</code> errors), you have two straightforward options:
+                </p>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans text-slate-200">
+                  <div className="bg-slate-950/80 p-4 rounded-xl border border-amber-500/10 space-y-2">
+                    <span className="font-bold text-amber-400 text-[10px] uppercase tracking-widest block">Option A (Highly Recommended)</span>
+                    <strong className="text-slate-100 block text-[11.5px]">Provide the Service Role Secret Key</strong>
+                    <p className="text-slate-400 leading-normal text-[11px]">
+                      Go to your Supabase Dashboard &rarr; <span className="font-extrabold text-slate-300">Project Settings &rarr; API</span>. Copy the private <code className="text-amber-400 font-mono text-[10.5px]">service_role</code> secret key (starts with <code className="text-amber-300">sb_se_</code> or <code className="text-amber-300">eyJ...</code>), and set it as the <strong className="font-extrabold text-amber-400">SUPABASE_SERVICE_ROLE_KEY</strong> secret in AI Studio Build's <span className="font-semibold text-slate-300">Settings &rarr; Secrets</span>.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/80 p-4 rounded-xl border border-amber-500/10 space-y-2">
+                    <span className="font-bold text-amber-400 text-[10px] uppercase tracking-widest block">Option B (Zero-Config Database Query)</span>
+                    <strong className="text-slate-100 block text-[11.5px]">Run Mitigation Policies or Disable RLS</strong>
+                    <p className="text-slate-400 leading-normal text-[11px]">
+                      If you'd like to continue testing using only the public anon key, navigate to the <button onClick={() => setActiveTab('architecture')} className="text-sky-400 underline font-black hover:text-sky-300 focus:outline-none cursor-pointer">Overall Architecture</button> tab, copy our schema SQL script containing permissive security policies, and run it in your Supabase SQL Editor.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

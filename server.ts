@@ -274,6 +274,47 @@ create table if not exists deliveries (
 insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
 ('ronaatlantic', 'RONA Atlantic', 'RA', 'Corporate logistics tracking for RONA franchise dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
 on conflict (id) do nothing;
+
+-- 6. Row-Level Security (RLS) Mitigation Policies
+-- If you have enabled RLS in Supabase, you must configure policies to allow operations or disable RLS.
+-- Execute either Option A (to disable RLS) or Option B (to configure permissive policies) in your Supabase SQL Editor:
+
+/* 
+-- OPTION A: Disable RLS completely (Simplest for testing systems)
+ALTER TABLE tenants DISABLE ROW LEVEL SECURITY;
+ALTER TABLE branches DISABLE ROW LEVEL SECURITY;
+ALTER TABLE trucks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE deliveries DISABLE ROW LEVEL SECURITY;
+*/
+
+/*
+-- OPTION B: Permissive Public Policies (To keep RLS active but grant open access to the client)
+create policy "Allow public read on tenants" on tenants for select using (true);
+create policy "Allow public write on tenants" on tenants for insert with check (true);
+create policy "Allow public update on tenants" on tenants for update using (true);
+create policy "Allow public delete on tenants" on tenants for delete using (true);
+
+create policy "Allow public read on branches" on branches for select using (true);
+create policy "Allow public write on branches" on branches for insert with check (true);
+create policy "Allow public update on branches" on branches for update using (true);
+create policy "Allow public delete on branches" on branches for delete using (true);
+
+create policy "Allow public read on trucks" on trucks for select using (true);
+create policy "Allow public write on trucks" on trucks for insert with check (true);
+create policy "Allow public update on trucks" on trucks for update using (true);
+create policy "Allow public delete on trucks" on trucks for delete using (true);
+
+create policy "Allow public read on users" on users for select using (true);
+create policy "Allow public write on users" on users for insert with check (true);
+create policy "Allow public update on users" on users for update using (true);
+create policy "Allow public delete on users" on users for delete using (true);
+
+create policy "Allow public read on deliveries" on deliveries for select using (true);
+create policy "Allow public write on deliveries" on deliveries for insert with check (true);
+create policy "Allow public update on deliveries" on deliveries for update using (true);
+create policy "Allow public delete on deliveries" on deliveries for delete using (true);
+*/
 `;
 
 const app = express();
@@ -326,10 +367,15 @@ app.use("/uploads", express.static(uploadsDir));
     try {
       const supabase = getSupabase();
       const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+      const roleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+      const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pu");
+
       if (!supabase) {
         return res.json({
           configured: false,
           connected: false,
+          isServiceRoleKeyAnon,
           error: "Supabase database credentials are unconfigured or placeholder. A live Supabase database is strictly required for this application in both development and production. Please open the 'Settings > Secrets' panel and configure SUPABASE_URL and SUPABASE_ANON_KEY.",
           url: resolvedUrl,
           schemaSql: SH_SQL
@@ -344,6 +390,7 @@ app.use("/uploads", express.static(uploadsDir));
         return res.json({
           configured: true,
           connected: false,
+          isServiceRoleKeyAnon,
           error: `Supabase database is connected, but the schema tables have not been created yet: "${error.message}". Go to your Supabase SQL Editor and run the provided SQL setup script below.`,
           url: resolvedUrl,
           schemaSql: SH_SQL
@@ -353,6 +400,7 @@ app.use("/uploads", express.static(uploadsDir));
       res.json({
         configured: true,
         connected: true,
+        isServiceRoleKeyAnon,
         error: null,
         url: resolvedUrl,
         schemaSql: SH_SQL
@@ -360,9 +408,13 @@ app.use("/uploads", express.static(uploadsDir));
     } catch (e: any) {
       console.error("Diagnosis Exception:", e);
       const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+      const roleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+      const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pu");
       res.json({
         configured: !!resolvedUrl,
         connected: false,
+        isServiceRoleKeyAnon,
         error: e.message || "An unresolved error occurred diagnostic check.",
         url: resolvedUrl,
         schemaSql: SH_SQL
