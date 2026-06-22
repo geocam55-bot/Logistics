@@ -71,8 +71,8 @@ const getGpsForLocation = (id: string, nameOrAddress: string): { lat: number; ln
   }
   
   // Fallback hash logic:
-  // If the string contains CA, California, or known Bay Area names, place it in Silicon Valley
-  const isCalifornia = norm.includes('CA') || norm.includes('CALIFORNIA') || norm.includes('BAY AREA') || norm.includes('SILICON');
+  // If the string contains CA (isolated word), California, or known Bay Area names, place it in Silicon Valley (but not if it contains Canada)
+  const isCalifornia = (/\bCA\b/.test(norm) || norm.includes('CALIFORNIA') || norm.includes('BAY AREA') || norm.includes('SILICON')) && !norm.includes('CANADA');
   
   let score = 0;
   for (let i = 0; i < norm.length; i++) {
@@ -333,12 +333,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
 
   // Automatically adjust default HQ coordinates and center based on the active branches' region
   useEffect(() => {
-    const hasCaliforniaBranch = activeBranches.some(b => 
-      (b.address || '').toUpperCase().includes('CA') || 
-      (b.address || '').toUpperCase().includes('CALIFORNIA') ||
-      (b.name || '').toUpperCase().includes('CAMPBELL') ||
-      (b.name || '').toUpperCase().includes('SAN JOSE')
-    );
+    const hasCaliforniaBranch = activeBranches.some(b => {
+      const addr = (b.address || '').toUpperCase();
+      const name = (b.name || '').toUpperCase();
+      const hasCal = (/\bCA\b/.test(addr) || addr.includes('CALIFORNIA') || name.includes('CAMPBELL') || name.includes('SAN JOSE') || name.includes('CALIFORNIA') || /\bCA\b/.test(name));
+      const hasCan = addr.includes('CANADA') || name.includes('CANADA');
+      return hasCal && !hasCan;
+    });
     
     if (hasCaliforniaBranch) {
       setHqCoords({ lat: 37.3382, lng: -121.8863 }); // California default HQ
@@ -351,12 +352,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const hasCaliforniaBranch = activeBranches.some(b => 
-      (b.address || '').toUpperCase().includes('CA') || 
-      (b.address || '').toUpperCase().includes('CALIFORNIA') ||
-      (b.name || '').toUpperCase().includes('CAMPBELL') ||
-      (b.name || '').toUpperCase().includes('SAN JOSE')
-    );
+    const hasCaliforniaBranch = activeBranches.some(b => {
+      const addr = (b.address || '').toUpperCase();
+      const name = (b.name || '').toUpperCase();
+      const hasCal = (/\bCA\b/.test(addr) || addr.includes('CALIFORNIA') || name.includes('CAMPBELL') || name.includes('SAN JOSE') || name.includes('CALIFORNIA') || /\bCA\b/.test(name));
+      const hasCan = addr.includes('CANADA') || name.includes('CANADA');
+      return hasCal && !hasCan;
+    });
 
     const initialCenter: L.LatLngExpression = hasCaliforniaBranch
       ? [37.3382, -121.8863]
