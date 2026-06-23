@@ -422,8 +422,12 @@ if (process.env.VERCEL) {
 
 // Ensure and serve static uploads directory for PDFs link creation
 const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn("Could not ensure uploads directory (may be in a read-only serverless environment like Vercel):", e);
 }
 app.use("/uploads", express.static(uploadsDir));
 
