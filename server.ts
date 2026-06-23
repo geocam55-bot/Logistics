@@ -36,7 +36,7 @@ let lastSupabaseKey = "";
 
 function getSupabase() {
   let url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
+  let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
   
   if (!url || !key) {
     return null;
@@ -115,6 +115,9 @@ function formatDatabaseError(err: any): string {
     msg.includes("42P01")
   ) {
     return "Your Supabase database is connected, but the required database tables do not exist yet. Please go to the 'System Architecture' dashboard, copy the SQL setup schema script, and run it in the SQL Editor within your Supabase workspace to initialize the tables.";
+  }
+  if (msg.toLowerCase().includes("row-level security") || msg.toLowerCase().includes("violates row-level security") || msg.toLowerCase().includes("rls")) {
+    return "A Row-Level Security (RLS) policy violation occurred. This means RLS is enabled on your Supabase tables but your connection is restricted. Please add the SUPABASE_SERVICE_ROLE_KEY to your AI Studio Secrets (bypasses RLS on the server-side), or execute the permissive SQL policies block from the System Architecture tab in your Supabase SQL Editor.";
   }
   return msg;
 }
@@ -620,9 +623,9 @@ app.use((req, res, next) => {
     try {
       const supabase = getSupabase();
       const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-      const roleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-      const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pu");
+      const roleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
+      const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pub") || roleKey.startsWith("sb_publishable");
 
       if (!supabase) {
         return res.json({

@@ -147,7 +147,7 @@ export function getFrontendSupabase() {
   if (cachedClient) return cachedClient;
 
   let url = currentUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  let key = currentKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+  let key = currentKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
 
   if (!url || !key) {
     return null;

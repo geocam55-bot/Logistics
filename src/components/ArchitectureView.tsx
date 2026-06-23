@@ -78,6 +78,7 @@ interface ArchitectureViewProps {
     error: string | null;
     url: string;
     schemaSql: string;
+    isServiceRoleKeyAnon?: boolean;
   } | null;
   syncStatus?: 'IDLE' | 'SYNCING' | 'ERROR';
   lastSyncTime?: string | null;
@@ -1959,6 +1960,30 @@ export default function ArchitectureView({
 {`SUPABASE_URL=your-supabase-url
 SUPABASE_ANON_KEY=your-supabase-key`}
                   </pre>
+                </div>
+              )}
+
+              {/* RLS Warning if using anon key on backend */}
+              {supabaseStatus?.configured && supabaseStatus?.isServiceRoleKeyAnon && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-950 rounded-xl p-3.5 text-xs leading-relaxed space-y-2">
+                  <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    Row-Level Security (RLS) Warning
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-normal">
+                    Your database is configured, but you are using the public <code className="bg-white/60 font-mono px-1 rounded text-amber-950 text-[10px]">SUPABASE_ANON_KEY</code> on the server. If Row-Level Security (RLS) is enabled in your Supabase workspace, reads and writes will be blocked unless you add permissive policies or provide a service role key.
+                  </p>
+                  <p className="text-[11px] font-bold text-amber-900 leading-normal">
+                    How to fix:
+                  </p>
+                  <ul className="list-disc pl-4 text-[10.5px] text-amber-800 space-y-1 leading-normal">
+                    <li>
+                      <strong>Option A (Recommended):</strong> Add <code className="bg-white/60 font-mono px-1 rounded text-amber-950 text-[10px]">SUPABASE_SERVICE_ROLE_KEY</code> in your AI Studio <em>Settings &gt; Secrets</em> to safely bypass RLS on the server.
+                    </li>
+                    <li>
+                      <strong>Option B:</strong> Copy the SQL blueprint on the right and run the <em>Row-Level Security (RLS) Master Configuration &amp; Policies</em> block in your Supabase SQL Editor.
+                    </li>
+                  </ul>
                 </div>
               )}
 
