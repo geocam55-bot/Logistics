@@ -263,9 +263,10 @@ interface DashboardProps {
   trucks: TruckType[];
   onAddOrUpdateDelivery?: (newRecord: DeliveryRecord) => void;
   branches?: Branch[];
+  onUpdateTruck?: (truck: TruckType) => void;
 }
 
-export default function Dashboard({ deliveries, onSelectTab, trucks, branches }: DashboardProps) {
+export default function Dashboard({ deliveries, onSelectTab, trucks, branches, onUpdateTruck }: DashboardProps) {
   const activeBranches = branches || [];
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
@@ -314,6 +315,64 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
     "Fleet control server connected. Latency: 12ms",
     "Live GPS coordinate streams initialized."
   ]);
+
+  const handleGpsSubmit = (truck: TruckType, searchVal: string | undefined) => {
+    if (!searchVal || !searchVal.trim()) return;
+    const norm = searchVal.trim().toUpperCase();
+    
+    // Check if user manually entered coords like "lat, lng"
+    const coordsMatch = norm.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+    if (coordsMatch) {
+      const lat = parseFloat(coordsMatch[1]);
+      const lng = parseFloat(coordsMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        if (onUpdateTruck) {
+          onUpdateTruck({
+            ...truck,
+            lat,
+            lng
+          });
+          setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Live GPS override applied for ${truck.name} at Custom Coords: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, ...prev.slice(0, 4)]);
+        }
+        return;
+      }
+    }
+
+    // Try KNOWN_COORDS matching
+    let found = false;
+    for (const [key, value] of Object.entries(KNOWN_COORDS)) {
+      if (norm.includes(key)) {
+        if (onUpdateTruck) {
+          onUpdateTruck({
+            ...truck,
+            lat: value.lat,
+            lng: value.lng
+          });
+          setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Live GPS override applied for ${truck.name} at matches '${key}': ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}`, ...prev.slice(0, 4)]);
+          found = true;
+        }
+        break;
+      }
+    }
+
+    if (!found) {
+      // Fallback geocode using hash score so any address gets placed somewhere in Halifax region rather than crashing
+      let score = 0;
+      for (let i = 0; i < norm.length; i++) {
+        score += norm.charCodeAt(i);
+      }
+      const lat = 44.55 + ((score % 30) / 30) * 0.15;
+      const lng = -63.65 + (((score * 17) % 30) / 30) * 0.20;
+      if (onUpdateTruck) {
+        onUpdateTruck({
+          ...truck,
+          lat,
+          lng
+        });
+        setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Live GPS fallback applied for ${truck.name} at: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, ...prev.slice(0, 4)]);
+      }
+    }
+  };
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -620,7 +679,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
           isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation;
         } else {
           const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-          const orig = homeBranch ? getBranchCoordinates(homeBranch.id, homeBranch.name) : { lat: 37.2872, lng: -121.9500 };
+          const isRona = truck.tenantId === 'ronaatlantic';
+          const orig = homeBranch 
+            ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+            : isRona 
+              ? { lat: 44.6488, lng: -63.5752 } 
+              : { lat: 37.2872, lng: -121.9500 };
           origLat = orig.lat;
           origLng = orig.lng;
           destLat = orig.lat + 0.003;
@@ -1201,7 +1265,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                   destLat = dest.lat; destLng = dest.lng;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === matchedTruck.branchId);
-                  const orig = homeBranch ? getBranchCoordinates(homeBranch.id, homeBranch.name) : { lat: 37.2872, lng: -121.9500 };
+                  const isRona = matchedTruck.tenantId === 'ronaatlantic';
+                  const orig = homeBranch 
+                    ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+                    : isRona 
+                      ? { lat: 44.6488, lng: -63.5752 } 
+                      : { lat: 37.2872, lng: -121.9500 };
                   origLat = orig.lat; origLng = orig.lng;
                   destLat = orig.lat + 0.003; destLng = orig.lng + 0.003;
                 }
@@ -1260,7 +1329,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                   destLat = dest.lat; destLng = dest.lng;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-                  const orig = homeBranch ? getBranchCoordinates(homeBranch.id, homeBranch.name) : { lat: 37.2872, lng: -121.9500 };
+                  const isRona = truck.tenantId === 'ronaatlantic';
+                  const orig = homeBranch 
+                    ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+                    : isRona 
+                      ? { lat: 44.6488, lng: -63.5752 } 
+                      : { lat: 37.2872, lng: -121.9500 };
                   origLat = orig.lat; origLng = orig.lng;
                   destLat = orig.lat + 0.003; destLng = orig.lng + 0.003;
                 }
@@ -1411,7 +1485,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                   isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-                  const orig = homeBranch ? getBranchCoordinates(homeBranch.id, homeBranch.name) : { lat: 37.2872, lng: -121.9500 };
+                  const isRona = truck.tenantId === 'ronaatlantic';
+                  const orig = homeBranch 
+                    ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+                    : isRona 
+                      ? { lat: 44.6488, lng: -63.5752 } 
+                      : { lat: 37.2872, lng: -121.9500 };
                   origLat = orig.lat; origLng = orig.lng;
                   destLat = orig.lat + 0.003; destLng = orig.lng + 0.003;
                   isMoving = false;
@@ -1542,6 +1621,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
                     const speedValue = assignedDelivery && isLoaded && isPlayingSimulation ? 45 : 0;
                     return {
+                      ...t,
                       id: t.id,
                       name: t.name,
                       driver: t.driver || 'No Driver',
@@ -1749,6 +1829,79 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches }:
                                 </div>
                               </div>
                             )}
+
+                            {/* Live GPS Dispatch Override Panel */}
+                            <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5 mt-2 bg-amber-50/20 p-2.5 rounded-xl border border-dashed border-amber-200">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-850 flex items-center justify-between">
+                                <span className="flex items-center gap-1">📍 Live Dispatch GPS Override</span>
+                                {((truckRow as any).lat !== undefined || (truckRow as any).lng !== undefined) && (
+                                  <button
+                                    onClick={() => {
+                                      if (onUpdateTruck) {
+                                        const updated = { ...truckRow };
+                                        delete (updated as any).lat;
+                                        delete (updated as any).lng;
+                                        onUpdateTruck(updated);
+                                        setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Reset ${truckRow.name} to automatic branch GPS.`, ...prev.slice(0, 4)]);
+                                      }
+                                    }}
+                                    className="text-[9px] text-red-500 hover:underline font-semibold"
+                                  >
+                                    Reset GPS
+                                  </button>
+                                )}
+                              </span>
+                              
+                              <p className="text-[9.5px] text-slate-500 leading-tight">
+                                Broadcast this driver's coordinates manually. Auto-resolves names like <strong>137 Chain Lake Drive</strong>:
+                              </p>
+
+                              <div className="flex gap-1.5 mt-1">
+                                <input
+                                  type="text"
+                                  id={`override-address-${truckRow.id}`}
+                                  placeholder="e.g. 137 Chain Lake Drive"
+                                  className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-500 outline-hidden bg-white text-slate-800"
+                                  defaultValue={((truckRow as any).lat !== undefined || (truckRow as any).lng !== undefined) ? `${(truckRow as any).lat?.toFixed(5)}, ${(truckRow as any).lng?.toFixed(5)}` : ""}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const inputVal = (e.currentTarget as HTMLInputElement).value;
+                                      handleGpsSubmit(truckRow, inputVal);
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`override-address-${truckRow.id}`) as HTMLInputElement | null;
+                                    if (input) {
+                                      handleGpsSubmit(truckRow, input.value);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 bg-amber-600 text-white hover:bg-amber-700 rounded font-bold text-xs transition-colors"
+                                >
+                                  Apply
+                                </button>
+                              </div>
+
+                              {/* Quick selector chips */}
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleGpsSubmit(truckRow, "137 Chain Lake Drive")}
+                                  className="px-1.5 py-0.5 bg-white/80 border border-amber-200/50 hover:bg-amber-100/50 hover:text-amber-700 text-[9px] text-slate-700 rounded transition-colors font-semibold"
+                                >
+                                  📍 137 Chain Lake (Currently At)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGpsSubmit(truckRow, "500 Windmill Road")}
+                                  className="px-1.5 py-0.5 bg-white/80 border border-slate-200 hover:bg-blue-100/50 hover:text-blue-700 text-[9px] text-slate-700 rounded transition-colors font-semibold"
+                                >
+                                  📍 500 Windmill Rd
+                                </button>
+                              </div>
+                            </div>
 
                             {/* Simulation settings toggle directly inside card for awesome utility */}
                             <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2.5 text-[10px] text-slate-500 font-mono">

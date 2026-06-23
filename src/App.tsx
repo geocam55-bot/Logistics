@@ -923,6 +923,7 @@ export default function App() {
               trucks={trucks} 
               onAddOrUpdateDelivery={handleAddOrUpdateDelivery}
               branches={branches}
+              onUpdateTruck={handleUpdateTruck}
             />
           )}
           {activeTab === 'scanner' && (

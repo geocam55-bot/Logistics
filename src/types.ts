@@ -28,6 +28,7 @@ export interface DeliveryRecord {
   deliveryPhoto?: string; // Mock image description or actual mock URL
   pdfUrl?: string; // Link to the uploaded physical invoice/receipt PDF
   history: HistoryEvent[];
+  tenantId?: string;
 }
 
 export interface HistoryEvent {
@@ -43,6 +44,7 @@ export interface Branch {
   name: string;
   type: 'STORE' | 'DC';
   address: string;
+  tenantId?: string;
 }
 
 export interface Truck {
@@ -52,6 +54,9 @@ export interface Truck {
   driver: string;
   branchId: string; // Associated branch/DC (e.g. WINDMILL_DC or 01075_TANTALLON)
   registrationDueDate?: string;
+  lat?: number;
+  lng?: number;
+  tenantId?: string;
 }
 
 export type UserRole = 'Driver' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';
@@ -66,6 +71,7 @@ export interface User {
   password?: string;
   status?: 'Active' | 'Inactive';
   driverLicenseExpire?: string;
+  tenantId?: string;
 }
 
 export interface Tenant {
