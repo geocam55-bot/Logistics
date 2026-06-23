@@ -4,7 +4,6 @@ import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import Tesseract from "tesseract.js";
 
 dotenv.config();
 
@@ -430,6 +429,191 @@ try {
   console.warn("Could not ensure uploads directory (may be in a read-only serverless environment like Vercel):", e);
 }
 app.use("/uploads", express.static(uploadsDir));
+
+let selfHealingPromise: Promise<void> | null = null;
+async function runSelfHealingOnce() {
+  if (selfHealingPromise) return selfHealingPromise;
+  selfHealingPromise = (async () => {
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        console.log("Starting lazy database self-healing and alignment process...");
+        
+        // 1. Ensure ronaatlantic tenant is seeded
+        const ronaTenant = {
+          id: "ronaatlantic",
+          name: "RONA Atlantic",
+          code: "RA",
+          description: "Corporate logistics tracking for RONA franchise dealer stores.",
+          logoBadge: "🏢",
+          regionalFocus: "Atlantic Canada (Dartmouth, Tantallon, Halifax)",
+          primaryColor: "blue"
+        };
+        await supabase.from("tenants").upsert([ronaTenant]);
+        console.log("Seeded/validated 'ronaatlantic' tenant.");
+
+        // 2. Migrate users from agfydicwfv8u0rqr5apc to ronaatlantic
+        const { data: usersToMigrate } = await supabase
+          .from("users")
+          .select("*")
+          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          
+        if (usersToMigrate && usersToMigrate.length > 0) {
+          for (const user of usersToMigrate) {
+            await supabase
+              .from("users")
+              .update({ tenantId: "ronaatlantic" })
+              .eq("id", user.id);
+            console.log(`Migrated user ${user.name} (${user.email}) to 'ronaatlantic' tenant.`);
+          }
+        }
+
+        // Also check if any user with joshua.campbell email has wrong tenantId
+        const { data: joshuaUsers } = await supabase
+          .from("users")
+          .select("*")
+          .ilike("email", "joshua.campbell@ronaatlantic.ca");
+          
+        if (joshuaUsers && joshuaUsers.length > 0) {
+          for (const user of joshuaUsers) {
+            if (user.tenantId !== "ronaatlantic") {
+              await supabase
+                .from("users")
+                .update({ tenantId: "ronaatlantic" })
+                .eq("id", user.id);
+              console.log(`Reconciled Joshua Campbell's tenantId to 'ronaatlantic'.`);
+            }
+          }
+        }
+
+        // 3. Migrate branches from agfydicwfv8u0rqr5apc to ronaatlantic
+        const { data: branchesToMigrate } = await supabase
+          .from("branches")
+          .select("*")
+          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          
+        if (branchesToMigrate && branchesToMigrate.length > 0) {
+          for (const branch of branchesToMigrate) {
+            await supabase
+              .from("branches")
+              .update({ tenantId: "ronaatlantic" })
+              .eq("id", branch.id);
+            console.log(`Migrated branch ${branch.name} to 'ronaatlantic' tenant.`);
+          }
+        }
+
+        // 4. Migrate trucks from agfydicwfv8u0rqr5apc to ronaatlantic
+        const { data: trucksToMigrate } = await supabase
+          .from("trucks")
+          .select("*")
+          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          
+        if (trucksToMigrate && trucksToMigrate.length > 0) {
+          for (const truck of trucksToMigrate) {
+            const baseType = (truck.type || "").split("||")[0].trim();
+            const updatedType = `${baseType} ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651`;
+            
+            await supabase
+              .from("trucks")
+              .update({ 
+                tenantId: "ronaatlantic",
+                type: updatedType
+              })
+              .eq("id", truck.id);
+            console.log(`Migrated truck ${truck.name} to 'ronaatlantic' and set coordinates to 137 Chain Lake Drive.`);
+          }
+        }
+
+        // Also check any trucks with driver Joshua Campbell specifically
+        const { data: joshuaTrucks } = await supabase
+          .from("trucks")
+          .select("*")
+          .eq("driver", "Joshua Campbell");
+          
+        if (joshuaTrucks && joshuaTrucks.length > 0) {
+          for (const truck of joshuaTrucks) {
+            const baseType = (truck.type || "").split("||")[0].trim();
+            const updatedType = `${baseType} ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651`;
+            await supabase
+              .from("trucks")
+              .update({ 
+                tenantId: "ronaatlantic",
+                type: updatedType
+              })
+              .eq("id", truck.id);
+            console.log(`Set Joshua Campbell's truck (${truck.name}) coordinates specifically to 137 Chain Lake Drive.`);
+          }
+        }
+
+        // 5. Migrate deliveries from agfydicwfv8u0rqr5apc to ronaatlantic
+        const { data: deliveriesToMigrate } = await supabase
+          .from("deliveries")
+          .select("*")
+          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          
+        if (deliveriesToMigrate && deliveriesToMigrate.length > 0) {
+          for (const del of deliveriesToMigrate) {
+            await supabase
+              .from("deliveries")
+              .update({ tenantId: "ronaatlantic" })
+              .eq("id", del.id);
+            console.log(`Migrated delivery ${del.invoiceNumber} to 'ronaatlantic' tenant.`);
+          }
+        }
+
+        // 6. Delete temporary tenant agfydicwfv8u0rqr5apc to keep DB clean
+        await supabase
+          .from("tenants")
+          .delete()
+          .eq("id", "agfydicwfv8u0rqr5apc");
+        console.log("Cleaned up temporary tenant 'agfydicwfv8u0rqr5apc'.");
+
+        console.log("Database self-healing and alignment complete.");
+
+        // Database Diagnostic helper
+        try {
+          const [rUsers, rTenants, rBranches, rTrucks, rDeliveries] = await Promise.all([
+            supabase.from("users").select("*"),
+            supabase.from("tenants").select("*"),
+            supabase.from("branches").select("*"),
+            supabase.from("trucks").select("*"),
+            supabase.from("deliveries").select("*")
+          ]);
+          fs.writeFileSync(
+            path.join(process.cwd(), "debug-database-diagnostic.json"),
+            JSON.stringify({
+              timestamp: new Date().toISOString(),
+              users: rUsers.data || [],
+              tenants: rTenants.data || [],
+              branches: rBranches.data || [],
+              trucks: rTrucks.data || [],
+              deliveries: rDeliveries.data || [],
+              usersError: rUsers.error,
+              tenantsError: rTenants.error,
+              branchesError: rBranches.error,
+              trucksError: rTrucks.error,
+              deliveriesError: rDeliveries.error
+            }, null, 2)
+          );
+          console.log("Database diagnosis dump complete in lazy handler.");
+        } catch (diagErr) {
+          console.warn("Database diagnosis write skipped in lazy handler:", diagErr);
+        }
+      }
+    } catch (healErr) {
+      console.error("Database self-healing error:", healErr);
+    }
+  })();
+  return selfHealingPromise;
+}
+
+// Lazy triggers self-healing on any incoming /api request
+app.use((req, res, next) => {
+  if (req.url.startsWith("/api")) {
+    runSelfHealingOnce().catch(() => {});
+  }
+  next();
+});
 
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
@@ -1156,6 +1340,8 @@ app.use("/uploads", express.static(uploadsDir));
       const buffer = Buffer.from(base64Data, "base64");
 
       console.log("Server OCR: Initiating Tesseract engine processing...");
+      const TesseractModule = await import("tesseract.js");
+      const Tesseract = TesseractModule.default || TesseractModule;
       const result = await Tesseract.recognize(buffer, "eng");
       
       const dataObj = result.data as any;
@@ -1432,186 +1618,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", async () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Express server running on http://0.0.0.0:${PORT}`);
-    
-    // Self-healing database alignment for RONA Atlantic and Joshua Campbell
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        console.log("Starting database self-healing and alignment process...");
-        
-        // 1. Ensure ronaatlantic tenant is seeded
-        const ronaTenant = {
-          id: "ronaatlantic",
-          name: "RONA Atlantic",
-          code: "RA",
-          description: "Corporate logistics tracking for RONA franchise dealer stores.",
-          logoBadge: "🏢",
-          regionalFocus: "Atlantic Canada (Dartmouth, Tantallon, Halifax)",
-          primaryColor: "blue"
-        };
-        await supabase.from("tenants").upsert([ronaTenant]);
-        console.log("Seeded/validated 'ronaatlantic' tenant.");
-
-        // 2. Migrate users from agfydicwfv8u0rqr5apc to ronaatlantic
-        const { data: usersToMigrate } = await supabase
-          .from("users")
-          .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
-          
-        if (usersToMigrate && usersToMigrate.length > 0) {
-          for (const user of usersToMigrate) {
-            await supabase
-              .from("users")
-              .update({ tenantId: "ronaatlantic" })
-              .eq("id", user.id);
-            console.log(`Migrated user ${user.name} (${user.email}) to 'ronaatlantic' tenant.`);
-          }
-        }
-
-        // Also check if any user with joshua.campbell email has wrong tenantId
-        const { data: joshuaUsers } = await supabase
-          .from("users")
-          .select("*")
-          .ilike("email", "joshua.campbell@ronaatlantic.ca");
-          
-        if (joshuaUsers && joshuaUsers.length > 0) {
-          for (const user of joshuaUsers) {
-            if (user.tenantId !== "ronaatlantic") {
-              await supabase
-                .from("users")
-                .update({ tenantId: "ronaatlantic" })
-                .eq("id", user.id);
-              console.log(`Reconciled Joshua Campbell's tenantId to 'ronaatlantic'.`);
-            }
-          }
-        }
-
-        // 3. Migrate branches from agfydicwfv8u0rqr5apc to ronaatlantic
-        const { data: branchesToMigrate } = await supabase
-          .from("branches")
-          .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
-          
-        if (branchesToMigrate && branchesToMigrate.length > 0) {
-          for (const branch of branchesToMigrate) {
-            await supabase
-              .from("branches")
-              .update({ tenantId: "ronaatlantic" })
-              .eq("id", branch.id);
-            console.log(`Migrated branch ${branch.name} to 'ronaatlantic' tenant.`);
-          }
-        }
-
-        // 4. Migrate trucks from agfydicwfv8u0rqr5apc to ronaatlantic
-        const { data: trucksToMigrate } = await supabase
-          .from("trucks")
-          .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
-          
-        if (trucksToMigrate && trucksToMigrate.length > 0) {
-          for (const truck of trucksToMigrate) {
-            // Update truck to 'ronaatlantic' and inject 137 Chain Lake Drive location in 'type'
-            const baseType = (truck.type || "").split("||")[0].trim();
-            const updatedType = `${baseType} ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651`;
-            
-            await supabase
-              .from("trucks")
-              .update({ 
-                tenantId: "ronaatlantic",
-                type: updatedType
-              })
-              .eq("id", truck.id);
-            console.log(`Migrated truck ${truck.name} to 'ronaatlantic' and set coordinates to 137 Chain Lake Drive.`);
-          }
-        }
-
-        // Also check any trucks with driver Joshua Campbell specifically
-        const { data: joshuaTrucks } = await supabase
-          .from("trucks")
-          .select("*")
-          .eq("driver", "Joshua Campbell");
-          
-        if (joshuaTrucks && joshuaTrucks.length > 0) {
-          for (const truck of joshuaTrucks) {
-            const baseType = (truck.type || "").split("||")[0].trim();
-            const updatedType = `${baseType} ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651`;
-            await supabase
-              .from("trucks")
-              .update({ 
-                tenantId: "ronaatlantic",
-                type: updatedType
-              })
-              .eq("id", truck.id);
-            console.log(`Set Joshua Campbell's truck (${truck.name}) coordinates specifically to 137 Chain Lake Drive.`);
-          }
-        }
-
-        // 5. Migrate deliveries from agfydicwfv8u0rqr5apc to ronaatlantic
-        const { data: deliveriesToMigrate } = await supabase
-          .from("deliveries")
-          .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
-          
-        if (deliveriesToMigrate && deliveriesToMigrate.length > 0) {
-          for (const del of deliveriesToMigrate) {
-            await supabase
-              .from("deliveries")
-              .update({ tenantId: "ronaatlantic" })
-              .eq("id", del.id);
-            console.log(`Migrated delivery ${del.invoiceNumber} to 'ronaatlantic' tenant.`);
-          }
-        }
-
-        // 6. Delete temporary tenant agfydicwfv8u0rqr5apc to keep DB clean
-        await supabase
-          .from("tenants")
-          .delete()
-          .eq("id", "agfydicwfv8u0rqr5apc");
-        console.log("Cleaned up temporary tenant 'agfydicwfv8u0rqr5apc'.");
-
-        console.log("Database self-healing and alignment complete.");
-      }
-    } catch (healErr) {
-      console.error("Database self-healing error:", healErr);
-    }
-
-    // Database Diagnostic helper
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        const [rUsers, rTenants, rBranches, rTrucks, rDeliveries] = await Promise.all([
-          supabase.from("users").select("*"),
-          supabase.from("tenants").select("*"),
-          supabase.from("branches").select("*"),
-          supabase.from("trucks").select("*"),
-          supabase.from("deliveries").select("*")
-        ]);
-        const fs = await import("fs");
-        fs.writeFileSync(
-          path.join(process.cwd(), "debug-database-diagnostic.json"),
-          JSON.stringify({
-            timestamp: new Date().toISOString(),
-            users: rUsers.data || [],
-            tenants: rTenants.data || [],
-            branches: rBranches.data || [],
-            trucks: rTrucks.data || [],
-            deliveries: rDeliveries.data || [],
-            usersError: rUsers.error,
-            tenantsError: rTenants.error,
-            branchesError: rBranches.error,
-            trucksError: rTrucks.error,
-            deliveriesError: rDeliveries.error
-          }, null, 2)
-        );
-        console.log("Database diagnosis dump complete: debug-database-diagnostic.json successfully created.");
-      } else {
-        console.log("Database diagnosis skipped: Supabase not configured.");
-      }
-    } catch (err) {
-      console.error("Database diagnosis block error:", err);
-    }
   });
 }
 
