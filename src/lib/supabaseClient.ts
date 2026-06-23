@@ -100,12 +100,54 @@ export function deserializeType(truck: any): any {
 }
 
 let cachedClient: any = null;
+let currentUrl = "";
+let currentKey = "";
+
+export function initializeFrontendSupabase(url: string, key: string) {
+  if (!url || !key) return null;
+
+  // Trim and strip surrounding quotes
+  const cleanUrl = url.trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '').replace(/\/rest\/v1\/?$/i, '').replace(/\/rest\/?$/i, '').replace(/\/+$/, '');
+  const cleanKey = key.trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+
+  if (
+    cleanUrl === "" || 
+    cleanKey === "" || 
+    cleanUrl === "undefined" || 
+    cleanKey === "undefined" || 
+    cleanUrl === "null" || 
+    cleanKey === "null" || 
+    cleanUrl.includes("PLACEHOLDER") || 
+    cleanKey.includes("PLACEHOLDER")
+  ) {
+    return null;
+  }
+
+  if (cleanUrl !== currentUrl || cleanKey !== currentKey) {
+    cachedClient = null;
+  }
+
+  if (!cachedClient) {
+    try {
+      cachedClient = createClient(cleanUrl, cleanKey, {
+        auth: {
+          persistSession: false
+        }
+      });
+      currentUrl = cleanUrl;
+      currentKey = cleanKey;
+    } catch (e) {
+      console.error("Failed to initialize dynamic frontend Supabase:", e);
+    }
+  }
+  return cachedClient;
+}
 
 export function getFrontendSupabase() {
   if (cachedClient) return cachedClient;
 
-  let url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  let key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+  let url = currentUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  let key = currentKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 
   if (!url || !key) {
     return null;
@@ -140,6 +182,8 @@ export function getFrontendSupabase() {
         persistSession: false
       }
     });
+    currentUrl = url;
+    currentKey = key;
     return cachedClient;
   } catch (e) {
     console.error("Failed to initialize frontend Supabase client:", e);

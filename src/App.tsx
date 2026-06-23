@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DeliveryRecord, Truck, Branch, User, Tenant } from './types';
 import { TENANTS } from './data';
 import { 
   getFrontendSupabase, 
+  initializeFrontendSupabase,
   checkSupabaseStatusDirect, 
   fetchTenantsDirect, 
   saveTenantDirect, 
@@ -79,6 +80,12 @@ export default function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [isFleetDropdownOpen, setIsFleetDropdownOpen] = useState(false);
 
+  // Keep a ref of live states for the geolocation watchPosition callback to avoid stale closures and constant watcher restarts
+  const stateRef = useRef({ deliveries, trucks, branches, users, currentTenant });
+  useEffect(() => {
+    stateRef.current = { deliveries, trucks, branches, users, currentTenant };
+  }, [deliveries, trucks, branches, users, currentTenant]);
+
   // Fallback state redirect for restricted role views
   useEffect(() => {
     if (!currentUser) return;
@@ -96,14 +103,7 @@ export default function App() {
 
   // Driver Live GPS Geolocation Sync to database
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'Driver' || !currentTenant) return;
-
-    // Find the truck assigned to this driver
-    const driverTruck = trucks.find(t => t.driver === currentUser.name);
-    if (!driverTruck) {
-      console.warn("No registered vehicle matches driver profile name:", currentUser.name);
-      return;
-    }
+    if (!currentUser || currentUser.role !== 'Driver') return;
 
     if (!navigator.geolocation) {
       console.warn("Device geolocation is not supported by this browser.");
@@ -111,6 +111,15 @@ export default function App() {
     }
 
     const successHandler = (position: GeolocationPosition) => {
+      const { deliveries: latestDeliveries, trucks: latestTrucks, branches: latestBranches, users: latestUsers, currentTenant: latestTenant } = stateRef.current;
+      if (!latestTenant) return;
+
+      const driverTruck = latestTrucks.find(t => t.driver === currentUser.name);
+      if (!driverTruck) {
+        console.warn("No registered vehicle matches driver profile name:", currentUser.name);
+        return;
+      }
+
       const { latitude, longitude } = position.coords;
       const previousLat = (driverTruck as any).lat;
       const previousLng = (driverTruck as any).lng;
@@ -126,7 +135,11 @@ export default function App() {
           lat: latitude,
           lng: longitude
         };
-        handleUpdateTruck(updatedTruck);
+        
+        // Update local state and sync to Supabase
+        const updatedTrucks = latestTrucks.map(t => t.id === updatedTruck.id ? updatedTruck : t);
+        setTrucks(updatedTrucks);
+        syncStateToSupabase(latestTenant.id, latestDeliveries, updatedTrucks, latestBranches, latestUsers);
       }
     };
 
@@ -141,7 +154,7 @@ export default function App() {
     });
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [currentUser, trucks, currentTenant]);
+  }, [currentUser]);
 
   // Trigger login session handlers
   const handleLoginSuccess = (tenant: Tenant, user: User) => {
@@ -185,6 +198,9 @@ export default function App() {
       }
       const data = await res.json();
       setSupabaseStatus(data);
+      if (data.configured && data.anonKey) {
+        initializeFrontendSupabase(data.url, data.anonKey);
+      }
       return data;
     } catch (e: any) {
       console.warn("Express endpoint /api/supabase-status offline. Trying direct client lookup:", e.message || e);
@@ -343,6 +359,19 @@ export default function App() {
 
     loadState();
   }, [currentTenant, loadTrigger]);
+
+  // Periodic state polling to retrieve live driver GPS and order updates on desktop/other mobiles
+  useEffect(() => {
+    if (!currentTenant) return;
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        setLoadTrigger(prev => prev + 1);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [currentTenant]);
 
   // Load corporate tenants on boot
   useEffect(() => {

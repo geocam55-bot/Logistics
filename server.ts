@@ -458,6 +458,7 @@ app.use("/uploads", express.static(uploadsDir));
           isServiceRoleKeyAnon,
           error: `Supabase database is connected, but the schema tables have not been created yet: "${error.message}". Go to your Supabase SQL Editor and run the provided SQL setup script below.`,
           url: resolvedUrl,
+          anonKey,
           schemaSql: SH_SQL
         });
       }
@@ -468,6 +469,7 @@ app.use("/uploads", express.static(uploadsDir));
         isServiceRoleKeyAnon,
         error: null,
         url: resolvedUrl,
+        anonKey,
         schemaSql: SH_SQL
       });
     } catch (e: any) {
@@ -482,6 +484,7 @@ app.use("/uploads", express.static(uploadsDir));
         isServiceRoleKeyAnon,
         error: e.message || "An unresolved error occurred diagnostic check.",
         url: resolvedUrl,
+        anonKey,
         schemaSql: SH_SQL
       });
     }
@@ -903,22 +906,36 @@ app.use("/uploads", express.static(uploadsDir));
       // 2. Trucks
       if (sanitizedTrucks.length > 0) {
         try {
-          const { error } = await supabase.from("trucks").upsert(sanitizedTrucks);
-          if (error) throw error;
-        } catch (dbErr: any) {
-          const errMsg = dbErr.message || String(dbErr);
-          if (errMsg.includes("column") && (errMsg.includes("registrationDueDate") || errMsg.includes("42703"))) {
-            console.warn("Supabase trucks table is missing 'registrationDueDate' column. Retrying upsert with serialized fallback...");
-            const strippedTrucks = sanitizedTrucks.map((t: any) => {
-              const { registrationDueDate, ...rest } = t;
-              (rest as any).type = serializeToType(t.type, t.registrationDueDate, t.lat, t.lng);
-              return rest;
-            });
-            const { error: retryErr } = await supabase.from("trucks").upsert(strippedTrucks);
-            if (retryErr) throw new Error(`Trucks Sync Retry Error: ${retryErr.message}`);
-          } else {
-            throw new Error(`Trucks Sync Error: ${dbErr.message}`);
+          // Prepare trucks for DB by serializing extra fields into type column
+          // and stripping them so they don't cause "column does not exist" errors on upsert.
+          const trucksToUpsert = sanitizedTrucks.map((t: any) => {
+            const { lat, lng, registrationDueDate, ...rest } = t;
+            rest.type = serializeToType(t.type, t.registrationDueDate, t.lat, t.lng);
+            return {
+              ...rest,
+              registrationDueDate: t.registrationDueDate || null
+            };
+          });
+
+          try {
+            const { error } = await supabase.from("trucks").upsert(trucksToUpsert);
+            if (error) throw error;
+          } catch (dbErr: any) {
+            const errMsg = dbErr.message || String(dbErr);
+            if (errMsg.includes("column") && (errMsg.includes("registrationDueDate") || errMsg.includes("42703") || dbErr.code === "42703")) {
+              console.warn("Supabase trucks table is missing 'registrationDueDate' column. Retrying upsert with serialized fallback...");
+              const strippedTrucks = trucksToUpsert.map((t: any) => {
+                const { registrationDueDate, ...rest } = t;
+                return rest;
+              });
+              const { error: retryErr } = await supabase.from("trucks").upsert(strippedTrucks);
+              if (retryErr) throw new Error(`Trucks Sync Retry Error: ${retryErr.message}`);
+            } else {
+              throw dbErr;
+            }
           }
+        } catch (dbErr: any) {
+          throw new Error(`Trucks Sync Error: ${dbErr.message}`);
         }
       }
 
