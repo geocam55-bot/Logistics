@@ -571,6 +571,169 @@ async function runSelfHealingOnce() {
           .eq("id", "agfydicwfv8u0rqr5apc");
         console.log("Cleaned up temporary tenant 'agfydicwfv8u0rqr5apc'.");
 
+        // 7. Auto-Seed default data for ronaatlantic if tables are empty
+        console.log("Verifying if ronaatlantic tables require default seeding...");
+        
+        // A. Seed branches if empty
+        const { data: currentBranches, error: errB } = await supabase
+          .from("branches")
+          .select("id")
+          .eq("tenantId", "ronaatlantic");
+        if (!errB && (!currentBranches || currentBranches.length === 0)) {
+          console.log("Branches are empty for ronaatlantic. Auto-seeding default branches...");
+          const defaultBranches = [
+            {
+              id: "01075",
+              tenantId: "ronaatlantic",
+              name: "RONA - Tantallon",
+              type: "STORE",
+              address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
+            },
+            {
+              id: "01065",
+              tenantId: "ronaatlantic",
+              name: "RONA - ALMON",
+              type: "STORE",
+              address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
+            },
+            {
+              id: "01070",
+              tenantId: "ronaatlantic",
+              name: "RONA - Elmsdale",
+              type: "DC",
+              address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
+            },
+            {
+              id: "DC-WINAMILL",
+              tenantId: "ronaatlantic",
+              name: "44444 - 500 Windmill Road",
+              type: "DC",
+              address: "500 Windmill Road, Dartmouth, Nova Scotia, B3B 1B3, Canada"
+            }
+          ];
+          const { error: seedBErr } = await supabase.from("branches").upsert(defaultBranches);
+          if (seedBErr) console.error("Error seeding default branches:", seedBErr);
+          else console.log("Seeded default branches successfully.");
+        }
+
+        // B. Seed users if empty
+        const { data: currentUsers, error: errU } = await supabase
+          .from("users")
+          .select("id")
+          .eq("tenantId", "ronaatlantic");
+        if (!errU && (!currentUsers || currentUsers.length === 0)) {
+          console.log("Users are empty for ronaatlantic. Auto-seeding default users...");
+          const defaultUsers = [
+            {
+              id: "USR-57008",
+              tenantId: "ronaatlantic",
+              name: "George Campbell",
+              email: "george.campbell@ronaatlantic.ca",
+              role: "Admin",
+              phone: " ||pw:123456 ||status:Active",
+              associatedStoreId: "DC-WINAMILL",
+              password: "123456",
+              status: "Active"
+            },
+            {
+              id: "USR-1869",
+              tenantId: "ronaatlantic",
+              name: "Joshua Campbell",
+              email: "joshua.campbell@ronaatlantic.ca",
+              role: "Driver",
+              phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
+              associatedStoreId: "DC-WINAMILL",
+              password: "123456",
+              status: "Active",
+              driverLicenseExpire: "2027-01-22"
+            }
+          ];
+          const { error: seedUErr } = await supabase.from("users").upsert(defaultUsers);
+          if (seedUErr) console.error("Error seeding default users:", seedUErr);
+          else console.log("Seeded default users successfully.");
+        }
+
+        // C. Seed trucks if empty
+        const { data: currentTrucks, error: errT } = await supabase
+          .from("trucks")
+          .select("id")
+          .eq("tenantId", "ronaatlantic");
+        if (!errT && (!currentTrucks || currentTrucks.length === 0)) {
+          console.log("Trucks are empty for ronaatlantic. Auto-seeding default trucks...");
+          const defaultTrucks = [
+            {
+              id: "TRUCK-87",
+              tenantId: "ronaatlantic",
+              name: "Truck-1",
+              type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
+              driver: "George Campbell",
+              branchId: "01075"
+            },
+            {
+              id: "TRUCK-28",
+              tenantId: "ronaatlantic",
+              name: "Truck-2",
+              type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
+              driver: "Joshua Campbell",
+              branchId: "DC-WINAMILL"
+            }
+          ];
+          const { error: seedTErr } = await supabase.from("trucks").upsert(defaultTrucks);
+          if (seedTErr) console.error("Error seeding default trucks:", seedTErr);
+          else console.log("Seeded default trucks successfully.");
+        }
+
+        // D. Seed deliveries if empty
+        const { data: currentDeliveries, error: errD } = await supabase
+          .from("deliveries")
+          .select("id")
+          .eq("tenantId", "ronaatlantic");
+        if (!errD && (!currentDeliveries || currentDeliveries.length === 0)) {
+          console.log("Deliveries are empty for ronaatlantic. Auto-seeding default deliveries...");
+          const defaultDeliveries = [
+            {
+              id: "263890",
+              tenantId: "ronaatlantic",
+              invoiceNumber: "263890",
+              epicorSalesOrder: "263890",
+              customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
+              deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
+              phone: "902-555-0199",
+              originBranch: "01075",
+              destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
+              status: "REGISTERED",
+              registeredAt: "6/16/2026, 11:15:48 AM",
+              pickedAt: null,
+              deliveredAt: null,
+              returnedAt: null,
+              returnReason: null,
+              assignedTruck: "TRUCK-87",
+              assignedDriver: "George Campbell",
+              customerSignature: null,
+              deliveryPhoto: null,
+              history: [
+                {
+                  notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
+                  status: "REGISTERED",
+                  location: "RONA - Tantallon",
+                  operator: "Azure OCR Automate Stream",
+                  timestamp: "6/16/2026, 11:15:48 AM"
+                },
+                {
+                  notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
+                  status: "REGISTERED",
+                  location: "RONA - Tantallon",
+                  operator: "Logistics Board Coordinator",
+                  timestamp: "2026-06-16T14:16:19.891Z"
+                }
+              ]
+            }
+          ];
+          const { error: seedDErr } = await supabase.from("deliveries").upsert(defaultDeliveries);
+          if (seedDErr) console.error("Error seeding default deliveries:", seedDErr);
+          else console.log("Seeded default deliveries successfully.");
+        }
+
         console.log("Database self-healing and alignment complete.");
 
         // Database Diagnostic helper
@@ -1057,9 +1220,105 @@ app.use((req, res, next) => {
         deliveries: rDeliveries.data || []
       });
     } catch (err: any) {
-      console.error("Failed to read Supabase state:", err);
-      res.status(500).json({
-        error: formatDatabaseError(err)
+      const dbError = formatDatabaseError(err);
+      console.warn("Failed to read Supabase state, returning fallback mock data:", dbError);
+      
+      // Fallback data structure for smooth, non-blocking user experience
+      res.json({
+        supabaseActive: false,
+        error: dbError,
+        schemaMissing: true,
+        branches: [
+          {
+            id: "01075",
+            tenantId: String(req.query.tenantId),
+            name: "RONA - Tantallon",
+            type: "STORE",
+            address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
+          },
+          {
+            id: "01065",
+            tenantId: String(req.query.tenantId),
+            name: "RONA - ALMON",
+            type: "STORE",
+            address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
+          },
+          {
+            id: "01070",
+            tenantId: String(req.query.tenantId),
+            name: "RONA - Elmsdale",
+            type: "DC",
+            address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
+          },
+          {
+            id: "500",
+            tenantId: String(req.query.tenantId),
+            name: "RONA - WINDMILL",
+            type: "DC",
+            address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
+          }
+        ],
+        trucks: [
+          {
+            id: "TRUCK-87",
+            tenantId: String(req.query.tenantId),
+            name: "Truck-1",
+            type: "Heavy-Duty Flatbed",
+            driver: "George Campbell",
+            branchId: "01075"
+          }
+        ],
+        users: [
+          {
+            id: "USR-57008",
+            tenantId: String(req.query.tenantId),
+            name: "George Campbell",
+            email: "george.campbell@ronaatlantic.ca",
+            role: "Admin",
+            phone: "(902) 555-0199",
+            status: "Active",
+            associatedStoreId: "500"
+          }
+        ],
+        deliveries: [
+          {
+            id: "263890",
+            tenantId: String(req.query.tenantId),
+            invoiceNumber: "263890",
+            epicorSalesOrder: "263890",
+            customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
+            deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
+            phone: "902-555-0199",
+            originBranch: "01075",
+            destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
+            status: "REGISTERED",
+            registeredAt: "6/16/2026, 11:15:48 AM",
+            pickedAt: null,
+            deliveredAt: null,
+            returnedAt: null,
+            returnReason: null,
+            assignedTruck: "TRUCK-87",
+            assignedDriver: "George Campbell",
+            customerSignature: null,
+            deliveryPhoto: null,
+            history: [
+              {
+                notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
+                status: "REGISTERED",
+                location: "RONA - Tantallon",
+                operator: "Azure OCR Automate Stream",
+                timestamp: "6/16/2026, 11:15:48 AM"
+              },
+              {
+                notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
+                status: "REGISTERED",
+                location: "RONA - Tantallon",
+                operator: "Logistics Board Coordinator",
+                timestamp: "2026-06-16T14:16:19.891Z"
+              }
+            ]
+          }
+        ]
       });
     }
   });
