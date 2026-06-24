@@ -392,6 +392,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const mapRef = useRef<L.Map | null>(null);
   const lastBoundsKeyRef = useRef<string>('');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const lastFlownTruckIdRef = useRef<string | null>(null);
   const layersRef = useRef<{
     hq: L.LayerGroup | null;
     branches: L.LayerGroup | null;
@@ -437,7 +438,17 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   // Smoothly pan map to selected truck's active coordinates
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !selectedTruck) return;
+    if (!map || !selectedTrackTruckId || !selectedTruck) {
+      if (!selectedTrackTruckId) {
+        lastFlownTruckIdRef.current = null;
+      }
+      return;
+    }
+
+    if (lastFlownTruckIdRef.current === selectedTrackTruckId) {
+      return;
+    }
+    lastFlownTruckIdRef.current = selectedTrackTruckId;
 
     const hasRealGps = (selectedTruck as any).lat !== undefined && 
                         (selectedTruck as any).lng !== undefined && 
@@ -765,9 +776,15 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           isMoving = false;
         }
 
+        const progress = simProgress[truck.id] ?? 0.15;
         const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined && !isNaN((truck as any).lat) && !isNaN((truck as any).lng);
-        const truckLat = hasRealGps ? (truck as any).lat : origLat;
-        const truckLng = hasRealGps ? (truck as any).lng : origLng;
+        let truckLat = hasRealGps ? (truck as any).lat : (isMoving ? (origLat + (destLat - origLat) * progress) : origLat);
+        let truckLng = hasRealGps ? (truck as any).lng : (isMoving ? (origLng + (destLng - origLng) * progress) : origLng);
+
+        if (isNaN(truckLat) || isNaN(truckLng)) {
+          truckLat = origLat;
+          truckLng = origLng;
+        }
         
         if (!isNaN(truckLat) && !isNaN(truckLng)) {
           allPlottedCoords.push([truckLat, truckLng]);
@@ -776,6 +793,16 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         const isSelected = selectedTrackTruckId === truck.id;
         if (isSelected || (!selectedTrackTruckId && trucks[0]?.id === truck.id)) {
           activeTruckGps = { lat: truckLat, lng: truckLng };
+        }
+
+        // Draw route line if delivery is active
+        if (assignedDelivery && !isNaN(origLat) && !isNaN(origLng) && !isNaN(destLat) && !isNaN(destLng)) {
+          L.polyline([[origLat, origLng], [destLat, destLng]], {
+            color: isSelected ? '#f59e0b' : '#64748b',
+            weight: isSelected ? 3.5 : 2,
+            dashArray: isSelected ? '6,6' : '4,4',
+            opacity: isSelected ? 0.95 : 0.6
+          }).addTo(rGroup);
         }
 
         const truckIcon = L.divIcon({
@@ -1698,7 +1725,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   const combinedFleetList = trucks.map(t => {
                     const assignedDelivery = deliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
-                    const speedValue = assignedDelivery && isLoaded && isPlayingSimulation ? 45 : 0;
+                    const hasRealGps = (t as any).lat !== undefined && (t as any).lng !== undefined && !isNaN((t as any).lat) && !isNaN((t as any).lng);
+                    const speedValue = assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps ? 45 : 0;
                     return {
                       ...t,
                       id: t.id,
