@@ -264,15 +264,46 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           primaryColor: 'blue'
         };
 
-        const fallbackUser: User = {
-          id: "USR-57008",
-          name: fallbackEmail.includes("george") ? "George Campbell" : (fallbackEmail.split("@")[0].charAt(0).toUpperCase() + fallbackEmail.split("@")[0].slice(1) || "Demo User"),
-          email: fallbackEmail || "george.campbell@ronaatlantic.ca",
-          role: "Admin",
-          phone: "(902) 555-0199",
-          status: "Active",
-          associatedStoreId: "500"
-        };
+        let fallbackUser: User;
+        if (fallbackEmail.includes("joshua")) {
+          fallbackUser = {
+            id: "USR-1869",
+            name: "Joshua Campbell",
+            email: "joshua.campbell@ronaatlantic.ca",
+            role: "Driver",
+            phone: "(902) 555-1869",
+            status: "Active",
+            associatedStoreId: "DC-WINAMILL"
+          };
+        } else if (fallbackEmail.includes("george")) {
+          fallbackUser = {
+            id: "USR-57008",
+            name: "George Campbell",
+            email: "george.campbell@ronaatlantic.ca",
+            role: "Admin",
+            phone: "(902) 555-0199",
+            status: "Active",
+            associatedStoreId: "DC-WINAMILL"
+          };
+        } else {
+          const username = fallbackEmail.split("@")[0] || "user";
+          const cleanName = username
+            .split(/[\._\-]/)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(" ");
+
+          const isDriver = fallbackEmail.includes("driver") || fallbackEmail.includes("campbell") || fallbackEmail.includes("josh");
+
+          fallbackUser = {
+            id: `USR-${Math.floor(10000 + Math.random() * 90000)}`,
+            name: cleanName,
+            email: fallbackEmail,
+            role: isDriver ? "Driver" : "Admin",
+            phone: "(902) 555-0000",
+            status: "Active",
+            associatedStoreId: "DC-WINAMILL"
+          };
+        }
 
         // Complete the login successfully in offline demo mode!
         onLoginSuccess(fallbackTenant, fallbackUser);
@@ -595,6 +626,21 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                       <span className="text-[10px] text-slate-400 font-mono">george.campbell@ronaatlantic.ca</span>
                     </div>
                     <span className="text-[11px] font-bold text-blue-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setEmail("joshua.campbell@ronaatlantic.ca");
+                      setPassword("•••••••••");
+                    }} 
+                    className="w-full text-left bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg p-2.5 transition-all outline-none flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="space-y-0.5">
+                      <span className="font-extrabold text-[11px] text-emerald-700 block group-hover:text-emerald-800">Fleet Driver (RONA)</span>
+                      <span className="text-[10px] text-slate-400 font-mono">joshua.campbell@ronaatlantic.ca</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
                   </button>
                 </div>
               </div>
