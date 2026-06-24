@@ -122,7 +122,7 @@ function formatDatabaseError(err: any): string {
   return msg;
 }
 
-function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined): string {
+function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined): string {
   const basePhone = (phone || "").trim();
   let res = basePhone;
   if (password) {
@@ -134,6 +134,9 @@ function serializeToPhone(phone: string | undefined, password: string | undefine
   if (driverLicenseExpire) {
     res += ` ||licexp:${driverLicenseExpire}`;
   }
+  if (lastActive) {
+    res += ` ||lastact:${lastActive}`;
+  }
   return res;
 }
 
@@ -144,6 +147,7 @@ function deserializeFromPhone(user: any): any {
   let password = user.password || "123456";
   let status = user.status || "Active";
   let driverLicenseExpire = user.driverLicenseExpire || "";
+  let lastActive = "";
 
   const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
   if (pwMatch) {
@@ -160,13 +164,19 @@ function deserializeFromPhone(user: any): any {
     driverLicenseExpire = licexpMatch[1];
     cleanPhone = cleanPhone.replace(/\|\|licexp:[^\s|]+/, "");
   }
+  const lastactMatch = phone.match(/\|\|lastact:([^\s|]+)/);
+  if (lastactMatch) {
+    lastActive = lastactMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|lastact:[^\s|]+/, "");
+  }
 
   return {
     ...user,
     phone: cleanPhone.trim(),
     password,
     status,
-    driverLicenseExpire
+    driverLicenseExpire,
+    lastActive
   };
 }
 
@@ -1399,11 +1409,11 @@ app.use((req, res, next) => {
           if (error) throw error;
         } catch (dbErr: any) {
           const errMsg = dbErr.message || String(dbErr);
-          if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("driverLicenseExpire") || errMsg.includes("42703"))) {
-            console.warn("Supabase users table is missing 'password', 'status' or 'driverLicenseExpire' columns. Retrying upsert with serialized fallback...");
+          if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("driverLicenseExpire") || errMsg.includes("lastActive") || errMsg.includes("42703"))) {
+            console.warn("Supabase users table is missing some columns. Retrying upsert with serialized fallback...");
             const strippedUsers = sanitizedUsers.map((u: any) => {
-              const { password, status, driverLicenseExpire, ...rest } = u;
-              (rest as any).phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire);
+              const { password, status, driverLicenseExpire, lastActive, ...rest } = u;
+              (rest as any).phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive);
               return rest;
             });
             const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);

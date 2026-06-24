@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 // Serialization and Deserialization helpers matching the backend implementation
-export function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined): string {
+export function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined): string {
   const basePhone = (phone || "").trim();
   let res = basePhone;
   if (password) {
@@ -13,6 +13,9 @@ export function serializeToPhone(phone: string | undefined, password: string | u
   if (driverLicenseExpire) {
     res += ` ||licexp:${driverLicenseExpire}`;
   }
+  if (lastActive) {
+    res += ` ||lastact:${lastActive}`;
+  }
   return res;
 }
 
@@ -23,6 +26,7 @@ export function deserializeFromPhone(user: any): any {
   let password = user.password || "123456";
   let status = user.status || "Active";
   let driverLicenseExpire = user.driverLicenseExpire || "";
+  let lastActive = "";
 
   const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
   if (pwMatch) {
@@ -39,13 +43,19 @@ export function deserializeFromPhone(user: any): any {
     driverLicenseExpire = licexpMatch[1];
     cleanPhone = cleanPhone.replace(/\|\|licexp:[^\s|]+/, "");
   }
+  const lastactMatch = phone.match(/\|\|lastact:([^\s|]+)/);
+  if (lastactMatch) {
+    lastActive = lastactMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|lastact:[^\s|]+/, "");
+  }
 
   return {
     ...user,
     phone: cleanPhone.trim(),
     password,
     status,
-    driverLicenseExpire
+    driverLicenseExpire,
+    lastActive
   };
 }
 
@@ -291,7 +301,7 @@ export async function saveTenantStateDirect(
     name: u.name,
     email: u.email,
     role: u.role,
-    phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire),
+    phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive),
     associatedStoreId: u.associatedStoreId
   }));
 

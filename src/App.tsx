@@ -162,9 +162,19 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('prospaces_active_tenant', JSON.stringify(tenant));
     localStorage.setItem('prospaces_active_user', JSON.stringify(user));
+    if (users.length > 0) {
+      const updatedUsers = users.map(u => u.id === user.id ? { ...u, lastActive: new Date().toISOString() } : u);
+      setUsers(updatedUsers);
+      syncStateToSupabase(tenant.id, deliveries, trucks, branches, updatedUsers);
+    }
   };
 
   const handleLogout = () => {
+    if (currentUser && currentTenant && users.length > 0) {
+      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, lastActive: "1970-01-01T00:00:00.000Z" } : u);
+      setUsers(updatedUsers);
+      syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updatedUsers);
+    }
     setCurrentTenant(null);
     setCurrentUser(null);
     localStorage.removeItem('prospaces_active_tenant');
@@ -372,6 +382,24 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [currentTenant]);
+
+  const lastHeartbeatRef = useRef<number>(0);
+
+  // Periodic user online heartbeat
+  useEffect(() => {
+    if (!currentUser || !currentTenant) return;
+    const now = Date.now();
+    // Throttle heartbeat to once every 10 seconds
+    if (now - lastHeartbeatRef.current < 10000) return;
+    lastHeartbeatRef.current = now;
+
+    const { users: currentUsers, deliveries: currentDeliveries, trucks: currentTrucks, branches: currentBranches } = stateRef.current;
+    if (currentUsers.length === 0) return;
+
+    const updatedUsers = currentUsers.map(u => u.id === currentUser.id ? { ...u, lastActive: new Date().toISOString() } : u);
+    setUsers(updatedUsers);
+    syncStateToSupabase(currentTenant.id, currentDeliveries, currentTrucks, currentBranches, updatedUsers);
+  }, [currentUser, currentTenant, loadTrigger]);
 
   // Load corporate tenants on boot
   useEffect(() => {
@@ -953,6 +981,7 @@ export default function App() {
               onAddOrUpdateDelivery={handleAddOrUpdateDelivery}
               branches={branches}
               onUpdateTruck={handleUpdateTruck}
+              users={users}
             />
           )}
           {activeTab === 'scanner' && (

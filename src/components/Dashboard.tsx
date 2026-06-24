@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { DeliveryRecord, DeliveryStatus, Branch, Truck as TruckType } from '../types';
+import { DeliveryRecord, DeliveryStatus, Branch, Truck as TruckType, User as UserType } from '../types';
 import { 
   Truck as TruckIcon, 
   CheckCircle2, 
@@ -264,10 +264,20 @@ interface DashboardProps {
   onAddOrUpdateDelivery?: (newRecord: DeliveryRecord) => void;
   branches?: Branch[];
   onUpdateTruck?: (truck: TruckType) => void;
+  users?: UserType[];
 }
 
-export default function Dashboard({ deliveries, onSelectTab, trucks, branches, onUpdateTruck }: DashboardProps) {
+export default function Dashboard({ deliveries, onSelectTab, trucks, branches, onUpdateTruck, users }: DashboardProps) {
   const activeBranches = branches || [];
+  const activeUsers = users || [];
+
+  const isDriverOnline = (driverName: string): boolean => {
+    if (!driverName) return false;
+    const u = activeUsers.find(user => user.name.toLowerCase() === driverName.toLowerCase());
+    if (!u || !u.lastActive) return false;
+    const diffMs = Date.now() - new Date(u.lastActive).getTime();
+    return diffMs < 45000;
+  };
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
   const selectedTruck = selectedTrackTruckId ? trucks.find(t => t.id === selectedTrackTruckId) : trucks[0];
@@ -684,9 +694,18 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     // Plot Customer Delivery Destinations
     if (dGroup) {
       deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
+        const isAssigned = !!delivery.assignedTruck;
+        if (isAssigned) {
+          const matchedTruck = trucks.find(t => t.id === delivery.assignedTruck);
+          if (matchedTruck) {
+            const online = isDriverOnline(matchedTruck.driver);
+            if (!online) {
+              return; // Hide destination if driver is offline
+            }
+          }
+        }
         const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
         const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
-        const isAssigned = !!delivery.assignedTruck;
 
         const deliveryIcon = L.divIcon({
           className: 'custom-delivery-marker',
@@ -737,6 +756,14 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     });
 
     deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
+      const isAssigned = !!delivery.assignedTruck;
+      if (isAssigned) {
+        const matchedTruck = trucks.find(t => t.id === delivery.assignedTruck);
+        if (matchedTruck) {
+          const online = isDriverOnline(matchedTruck.driver);
+          if (!online) return; // Skip bounds plotting if driver is offline
+        }
+      }
       const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
       const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
       if (destCoords && !isNaN(destCoords.lat) && !isNaN(destCoords.lng)) {
@@ -751,6 +778,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         let destLat: number;
         let destLng: number;
         let isMoving = false;
+        const isOnline = isDriverOnline(truck.driver);
 
         const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
         if (assignedDelivery) {
@@ -760,7 +788,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           origLng = isNaN(orig.lng) ? -63.5752 : orig.lng;
           destLat = isNaN(dest.lat) ? 44.6488 : dest.lat;
           destLng = isNaN(dest.lng) ? -63.5752 : dest.lng;
-          isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation;
+          isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
         } else {
           const homeBranch = activeBranches.find(b => b.id === truck.branchId);
           const isRona = truck.tenantId === 'ronaatlantic';
@@ -795,8 +823,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           activeTruckGps = { lat: truckLat, lng: truckLng };
         }
 
-        // Draw route line if delivery is active
-        if (assignedDelivery && !isNaN(origLat) && !isNaN(origLng) && !isNaN(destLat) && !isNaN(destLng)) {
+        // Draw route line if delivery is active and driver is online
+        if (assignedDelivery && isOnline && !isNaN(origLat) && !isNaN(origLng) && !isNaN(destLat) && !isNaN(destLng)) {
           L.polyline([[origLat, origLng], [destLat, destLng]], {
             color: isSelected ? '#f59e0b' : '#64748b',
             weight: isSelected ? 3.5 : 2,
@@ -822,11 +850,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           iconAnchor: [14, 14]
         });
 
-        const popupMessage = hasRealGps 
-          ? `Broadcasting Live Coordinates (Currently at 137 Chain Lake Drive / Bayer's Lake)`
-          : assignedDelivery
-            ? `Delivering order ${assignedDelivery.invoiceNumber}`
-            : 'Standby / Refueling';
+        const popupMessage = !isOnline
+          ? `Driver Offline (Stationary)`
+          : hasRealGps 
+            ? `Broadcasting Live Coordinates (Currently at 137 Chain Lake Drive / Bayer's Lake)`
+            : assignedDelivery
+              ? `Delivering order ${assignedDelivery.invoiceNumber}`
+              : 'Standby / Refueling';
 
         const markerInstance = L.marker([truckLat, truckLng], {
           icon: truckIcon,
@@ -1543,7 +1573,17 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               })}
 
               {/* 3. Customer Delivery Destination Pins */}
-              {deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).map(delivery => {
+              {deliveries.filter(d => {
+                if (d.status === DeliveryStatus.DELIVERED) return false;
+                if (d.assignedTruck) {
+                  const matchedTruck = trucks.find(t => t.id === d.assignedTruck);
+                  if (matchedTruck) {
+                    const online = isDriverOnline(matchedTruck.driver);
+                    if (!online) return false; // Filter out destinations of offline drivers
+                  }
+                }
+                return true;
+              }).map(delivery => {
                 const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
                 const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
                 const isAssigned = !!delivery.assignedTruck;
@@ -1580,6 +1620,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 let destLat: number;
                 let destLng: number;
                 let isMoving = false;
+                const isOnline = isDriverOnline(truck.driver);
 
                 const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
                 if (assignedDelivery) {
@@ -1587,7 +1628,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
                   origLat = orig.lat; origLng = orig.lng;
                   destLat = dest.lat; destLng = dest.lng;
-                  isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation;
+                  isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
                   const isRona = truck.tenantId === 'ronaatlantic';
@@ -1603,8 +1644,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
                 const progress = simProgress[truck.id] ?? 0.15;
                 const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined;
-                const truckLat = hasRealGps ? (truck as any).lat : (origLat + (destLat - origLat) * progress);
-                const truckLng = hasRealGps ? (truck as any).lng : (origLng + (destLng - origLng) * progress);
+                const truckLat = hasRealGps ? (truck as any).lat : (isMoving ? (origLat + (destLat - origLat) * progress) : origLat);
+                const truckLng = hasRealGps ? (truck as any).lng : (isMoving ? (origLng + (destLng - origLng) * progress) : origLng);
                 const percentCoords = getPercentCoordsFromGps(truckLat, truckLng);
                 const xPosition = percentCoords.x;
                 const yPosition = percentCoords.y;
@@ -1718,7 +1759,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 )}
               </div>
 
-              {/* 3. Listed Active Fleet Vehicles */}
+               {/* 3. Listed Active Fleet Vehicles */}
               <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 max-h-[500px]">
                 {(() => {
                   const currentIdlingMinutes = Math.floor((Date.now() - idlingStartTime) / 60000);
@@ -1726,7 +1767,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     const assignedDelivery = deliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
                     const hasRealGps = (t as any).lat !== undefined && (t as any).lng !== undefined && !isNaN((t as any).lat) && !isNaN((t as any).lng);
-                    const speedValue = assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps ? 45 : 0;
+                    const isOnline = isDriverOnline(t.driver);
+                    const speedValue = assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0;
                     return {
                       ...t,
                       id: t.id,
@@ -1822,8 +1864,19 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                               <p className="text-[10px] text-slate-400 font-mono mt-0.5 leading-none">
                                 Current Speed: <span className={truckRow.activeSpeed > 0 ? "text-emerald-600 font-bold" : "text-slate-500"}>{speedText}</span>
                               </p>
-                              <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                              <p className="text-[11px] text-slate-500 font-semibold mt-1 flex items-center gap-1.5">
                                 {truckRow.driver}
+                                {isDriverOnline(truckRow.driver) ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.25 rounded-full border border-emerald-100">
+                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                    Active / Online
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.25 rounded-full border border-slate-100">
+                                    <span className="w-1.5 h-1.5 bg-slate-350 rounded-full" />
+                                    Offline / Stationary
+                                  </span>
+                                )}
                               </p>
                             </div>
 

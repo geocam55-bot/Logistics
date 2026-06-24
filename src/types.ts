@@ -72,6 +72,7 @@ export interface User {
   status?: 'Active' | 'Inactive';
   driverLicenseExpire?: string;
   tenantId?: string;
+  lastActive?: string;
 }
 
 export interface Tenant {
