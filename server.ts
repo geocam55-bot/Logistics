@@ -1359,10 +1359,13 @@ app.use((req, res, next) => {
           // Prepare trucks for DB by serializing extra fields into type column
           // and stripping them so they don't cause "column does not exist" errors on upsert.
           const trucksToUpsert = sanitizedTrucks.map((t: any) => {
-            const { lat, lng, registrationDueDate, ...rest } = t;
-            rest.type = serializeToType(t.type, t.registrationDueDate, t.lat, t.lng);
             return {
-              ...rest,
+              id: t.id,
+              tenantId: t.tenantId,
+              name: t.name,
+              type: serializeToType(t.type, t.registrationDueDate, t.lat, t.lng),
+              driver: t.driver,
+              branchId: t.branchId,
               registrationDueDate: t.registrationDueDate || null
             };
           });

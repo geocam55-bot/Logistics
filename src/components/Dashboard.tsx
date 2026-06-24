@@ -275,6 +275,19 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const [lastRadarPingTime, setLastRadarPingTime] = useState<string>(() => new Date().toLocaleTimeString());
   const [isPinging, setIsPinging] = useState<boolean>(false);
   const [pingPulseLocation, setPingPulseLocation] = useState<{ x: number, y: number } | null>(null);
+
+  // Persistent tracking for vehicle idling duration to prevent the metric from being hardcoded
+  const [idlingStartTime] = useState<number>(() => {
+    const saved = localStorage.getItem("rona_idling_start_time");
+    if (saved) {
+      return parseInt(saved, 10);
+    } else {
+      // Set to 45 minutes ago initially so it starts at exactly 45 minutes
+      const fortyFiveMinsAgo = Date.now() - (45 * 60 * 1000);
+      localStorage.setItem("rona_idling_start_time", String(fortyFiveMinsAgo));
+      return fortyFiveMinsAgo;
+    }
+  });
   
   // Custom Map Visual Themes
   const [mapTheme, setMapTheme] = useState<'daylight' | 'cyber' | 'satellite'>('daylight');
@@ -443,8 +456,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     layersRef.current.trucks = L.layerGroup().addTo(map);
     layersRef.current.routes = L.layerGroup().addTo(map);
 
-    // Map click handler to relocate Dispatcher HQ coordinates
+    // Map click handler to relocate Dispatcher HQ coordinates - only if Shift key is held to prevent accidental relocation!
     map.on('click', (e: L.LeafletMouseEvent) => {
+      const isShiftKey = e.originalEvent && e.originalEvent.shiftKey;
+      if (!isShiftKey) {
+        return; // Ignored to avoid accidental relocations while interacting with the map
+      }
+
       setIsWatchingGps(isWatch => {
         if (isWatch) {
           setSysLogs(prev => [
@@ -559,7 +577,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         <div class="font-sans text-xs p-1">
           <p class="font-bold text-slate-800">Dispatch Headquarters</p>
           <p class="text-[10px] text-slate-500">Location: ${hqCoords.lat.toFixed(4)}N, ${hqCoords.lng.toFixed(4)}W</p>
-          <p class="text-[9px] text-blue-600 mt-1 font-semibold">${isWatchingGps ? "🛰️ Live GPS Connected" : "📍 Anchored Point (Click map to move)"}</p>
+          <p class="text-[9px] text-blue-600 mt-1 font-semibold">${isWatchingGps ? "🛰️ Live GPS Connected" : "📍 Anchored Point (Shift + Click map to relocate)"}</p>
         </div>
       `);
     }
@@ -1616,6 +1634,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               {/* 3. Listed Active Fleet Vehicles */}
               <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 max-h-[500px]">
                 {(() => {
+                  const currentIdlingMinutes = Math.floor((Date.now() - idlingStartTime) / 60000);
                   const combinedFleetList = trucks.map(t => {
                     const assignedDelivery = deliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
@@ -1644,7 +1663,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         accels: 0,
                         excessiveSpeed: '0',
                         harshBrakes: 0,
-                        idling: speedValue > 0 ? '5' : '45'
+                        idling: speedValue > 0 ? '5' : String(currentIdlingMinutes)
                       }
                     };
                   });
