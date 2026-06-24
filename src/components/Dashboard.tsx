@@ -434,6 +434,45 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     }
   }, [activeBranches, selectedTruck]);
 
+  // Smoothly pan map to selected truck's active coordinates
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedTruck) return;
+
+    const hasRealGps = (selectedTruck as any).lat !== undefined && 
+                        (selectedTruck as any).lng !== undefined && 
+                        !isNaN((selectedTruck as any).lat) && 
+                        !isNaN((selectedTruck as any).lng);
+    let targetLat = (selectedTruck as any).lat;
+    let targetLng = (selectedTruck as any).lng;
+
+    if (!hasRealGps) {
+      const assignedDelivery = deliveries.find(d => d.assignedTruck === selectedTruck.id && d.status !== DeliveryStatus.DELIVERED);
+      if (assignedDelivery) {
+        const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+        targetLat = orig.lat;
+        targetLng = orig.lng;
+      } else {
+        const homeBranch = activeBranches.find(b => b.id === selectedTruck.branchId);
+        const isRona = selectedTruck.tenantId === 'ronaatlantic';
+        const orig = homeBranch 
+          ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+          : isRona 
+            ? { lat: 44.6488, lng: -63.5752 } 
+            : { lat: 37.2872, lng: -121.9500 };
+        targetLat = orig.lat;
+        targetLng = orig.lng;
+      }
+    }
+
+    if (targetLat !== undefined && targetLng !== undefined && !isNaN(targetLat) && !isNaN(targetLng)) {
+      map.flyTo([targetLat, targetLng], 13.5, {
+        animate: true,
+        duration: 1.2
+      });
+    }
+  }, [selectedTrackTruckId, selectedTruck, activeBranches, deliveries]);
+
   // 1. Initialize Leaflet map instance on mount
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -675,19 +714,23 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     let activeTruckGps: { lat: number; lng: number } | null = null;
     const allPlottedCoords: L.LatLngExpression[] = [];
 
-    if (hqCoords) {
+    if (hqCoords && !isNaN(hqCoords.lat) && !isNaN(hqCoords.lng)) {
       allPlottedCoords.push([hqCoords.lat, hqCoords.lng]);
     }
 
     activeBranches.forEach(branch => {
       const coords = getBranchCoordinates(branch.id, branch.name);
-      allPlottedCoords.push([coords.lat, coords.lng]);
+      if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) {
+        allPlottedCoords.push([coords.lat, coords.lng]);
+      }
     });
 
     deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
       const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
       const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
-      allPlottedCoords.push([destCoords.lat, destCoords.lng]);
+      if (destCoords && !isNaN(destCoords.lat) && !isNaN(destCoords.lng)) {
+        allPlottedCoords.push([destCoords.lat, destCoords.lng]);
+      }
     });
 
     if (tGroup && rGroup) {
@@ -702,10 +745,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         if (assignedDelivery) {
           const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
           const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
-          origLat = orig.lat;
-          origLng = orig.lng;
-          destLat = dest.lat;
-          destLng = dest.lng;
+          origLat = isNaN(orig.lat) ? 44.6488 : orig.lat;
+          origLng = isNaN(orig.lng) ? -63.5752 : orig.lng;
+          destLat = isNaN(dest.lat) ? 44.6488 : dest.lat;
+          destLng = isNaN(dest.lng) ? -63.5752 : dest.lng;
           isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation;
         } else {
           const homeBranch = activeBranches.find(b => b.id === truck.branchId);
@@ -715,31 +758,25 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             : isRona 
               ? { lat: 44.6488, lng: -63.5752 } 
               : { lat: 37.2872, lng: -121.9500 };
-          origLat = orig.lat;
-          origLng = orig.lng;
-          destLat = orig.lat + 0.003;
-          destLng = orig.lng + 0.003;
+          origLat = isNaN(orig.lat) ? 44.6488 : orig.lat;
+          origLng = isNaN(orig.lng) ? -63.5752 : orig.lng;
+          destLat = origLat + 0.003;
+          destLng = origLng + 0.003;
           isMoving = false;
         }
 
-        const progress = simProgress[truck.id] ?? 0.15;
-        const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined;
-        const truckLat = hasRealGps ? (truck as any).lat : (origLat + (destLat - origLat) * progress);
-        const truckLng = hasRealGps ? (truck as any).lng : (origLng + (destLng - origLng) * progress);
-        allPlottedCoords.push([truckLat, truckLng]);
+        const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined && !isNaN((truck as any).lat) && !isNaN((truck as any).lng);
+        const truckLat = hasRealGps ? (truck as any).lat : origLat;
+        const truckLng = hasRealGps ? (truck as any).lng : origLng;
+        
+        if (!isNaN(truckLat) && !isNaN(truckLng)) {
+          allPlottedCoords.push([truckLat, truckLng]);
+        }
 
         const isSelected = selectedTrackTruckId === truck.id;
         if (isSelected || (!selectedTrackTruckId && trucks[0]?.id === truck.id)) {
           activeTruckGps = { lat: truckLat, lng: truckLng };
         }
-
-        // Route line: From start depot to customer address
-        L.polyline([[origLat, origLng], [destLat, destLng]], {
-          color: isSelected ? '#f59e0b' : '#64748b',
-          weight: isSelected ? 3.5 : 2,
-          dashArray: isSelected ? '6,6' : '4,4',
-          opacity: isSelected ? 0.95 : 0.6
-        }).addTo(rGroup);
 
         const truckIcon = L.divIcon({
           className: 'custom-truck-marker',
@@ -761,7 +798,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         const popupMessage = hasRealGps 
           ? `Broadcasting Live Coordinates (Currently at 137 Chain Lake Drive / Bayer's Lake)`
           : assignedDelivery
-            ? `Delivering order ${assignedDelivery.invoiceNumber} (${Math.round(progress * 100)}% complete)`
+            ? `Delivering order ${assignedDelivery.invoiceNumber}`
             : 'Standby / Refueling';
 
         const markerInstance = L.marker([truckLat, truckLng], {
@@ -769,21 +806,32 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           zIndexOffset: isSelected ? 1000 : 100
         })
         .addTo(tGroup)
+        .bindTooltip(`${truck.name} (${truck.driver || 'No Driver'})`, {
+          permanent: false,
+          direction: 'top',
+          offset: [0, -10],
+          className: 'bg-slate-900 border border-slate-800 text-white font-semibold text-[11px] rounded px-2 py-0.5 shadow-md font-sans'
+        })
         .bindPopup(`
           <div class="font-sans text-xs p-1.5 space-y-1">
             <div class="flex items-center gap-1.5 border-b border-slate-105 pb-1 font-sans">
               <span class="w-1.5 h-1.5 rounded-full ${isMoving ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}"></span>
               <p class="font-bold text-slate-900">${truck.name}</p>
             </div>
+            <p class="text-[10.5px] text-slate-700 font-medium font-sans">Driver: <strong class="text-blue-600">${truck.driver || 'No Driver'}</strong></p>
             <p class="text-[10px] text-slate-500">ID: ${truck.id} &bull; Type: ${truck.type || 'Flatbed'}</p>
             <p class="text-[9px] text-slate-400 font-mono font-sans">GPS: ${truckLat.toFixed(5)}N, ${truckLng.toFixed(5)}W</p>
             <p class="text-[9.5px] text-amber-600 font-bold mt-1 font-sans">${popupMessage}</p>
           </div>
         `);
 
-        // Update selected truck in state when clicking on marker
+        // Update selected truck and expanded sidebar truck in state when clicking on marker
         markerInstance.on('click', () => {
-          setSelectedTrackTruckId(prev => prev === truck.id ? null : truck.id);
+          setSelectedTrackTruckId(prev => {
+            const next = prev === truck.id ? null : truck.id;
+            setExpandedTruckId(next);
+            return next;
+          });
         });
       });
     }
@@ -1891,6 +1939,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                 <input
                                   type="text"
                                   id={`override-address-${truckRow.id}`}
+                                  key={`override-address-${truckRow.id}-${(truckRow as any).lat || 'empty'}-${(truckRow as any).lng || 'empty'}`}
                                   placeholder="e.g. 137 Chain Lake Drive"
                                   className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-500 outline-hidden bg-white text-slate-800"
                                   defaultValue={((truckRow as any).lat !== undefined || (truckRow as any).lng !== undefined) ? `${(truckRow as any).lat?.toFixed(5)}, ${(truckRow as any).lng?.toFixed(5)}` : ""}
