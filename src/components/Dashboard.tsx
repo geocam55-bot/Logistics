@@ -270,6 +270,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const activeBranches = branches || [];
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
+  const selectedTruck = selectedTrackTruckId ? trucks.find(t => t.id === selectedTrackTruckId) : trucks[0];
   const [isPlayingSimulation, setIsPlayingSimulation] = useState<boolean>(true);
   const [simProgress, setSimProgress] = useState<Record<string, number>>({});
   const [lastRadarPingTime, setLastRadarPingTime] = useState<string>(() => new Date().toLocaleTimeString());
@@ -405,8 +406,19 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     routes: null
   });
 
-  // Automatically adjust default HQ coordinates and center based on the active branches' region
+  // Automatically adjust default HQ coordinates and center based on the active branches' region and current selected driver/truck's branch
   useEffect(() => {
+    if (selectedTruck) {
+      const homeBranch = activeBranches.find(b => b.id === selectedTruck.branchId);
+      if (homeBranch) {
+        const coords = getGpsForLocation(homeBranch.id, homeBranch.name);
+        if (coords && coords.lat !== 0 && coords.lng !== 0) {
+          setHqCoords(coords);
+          return;
+        }
+      }
+    }
+
     const hasCaliforniaBranch = activeBranches.some(b => {
       const addr = (b.address || '').toUpperCase();
       const name = (b.name || '').toUpperCase();
@@ -420,7 +432,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     } else {
       setHqCoords({ lat: 44.6488, lng: -63.5752 }); // Halifax default HQ
     }
-  }, [activeBranches]);
+  }, [activeBranches, selectedTruck]);
 
   // 1. Initialize Leaflet map instance on mount
   useEffect(() => {
