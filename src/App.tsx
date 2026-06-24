@@ -162,11 +162,44 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('prospaces_active_tenant', JSON.stringify(tenant));
     localStorage.setItem('prospaces_active_user', JSON.stringify(user));
-    if (users.length > 0) {
-      const updatedUsers = users.map(u => u.id === user.id ? { ...u, lastActive: new Date().toISOString() } : u);
-      setUsers(updatedUsers);
-      syncStateToSupabase(tenant.id, deliveries, trucks, branches, updatedUsers);
+    
+    // Auto-heal / force user insertion and vehicle association on login
+    let updatedUsers = [...users];
+    const userExists = updatedUsers.some(u => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
+    if (userExists) {
+      updatedUsers = updatedUsers.map(u => u.email.toLowerCase() === user.email.toLowerCase() ? { ...u, lastActive: new Date().toISOString() } : u);
+    } else {
+      updatedUsers.push({
+        ...user,
+        tenantId: tenant.id,
+        lastActive: new Date().toISOString()
+      });
     }
+
+    let updatedTrucks = [...trucks];
+    if (user.role === 'Driver') {
+      const truckExists = updatedTrucks.some(t => t.driver.toLowerCase() === user.name.toLowerCase());
+      if (!truckExists) {
+        const isJoshua = user.name.toLowerCase().includes("joshua");
+        const defaultTruckId = isJoshua ? "TRUCK-28" : `TRUCK-${Math.floor(10 + Math.random() * 90)}`;
+        const defaultTruckName = isJoshua ? "Truck-2" : `Truck-Custom`;
+        const defaultType = isJoshua 
+          ? "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651" 
+          : "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938";
+        updatedTrucks.push({
+          id: defaultTruckId,
+          tenantId: tenant.id,
+          name: defaultTruckName,
+          type: defaultType,
+          driver: user.name,
+          branchId: user.associatedStoreId || "DC-WINAMILL"
+        });
+      }
+    }
+
+    setUsers(updatedUsers);
+    setTrucks(updatedTrucks);
+    syncStateToSupabase(tenant.id, deliveries, updatedTrucks, branches, updatedUsers);
   };
 
   const handleLogout = () => {
@@ -400,6 +433,80 @@ export default function App() {
     setUsers(updatedUsers);
     syncStateToSupabase(currentTenant.id, currentDeliveries, currentTrucks, currentBranches, updatedUsers);
   }, [currentUser, currentTenant, loadTrigger]);
+
+  // Auto-heal/reconcile state to ensure logged-in user and driver vehicles are always present and properly linked
+  useEffect(() => {
+    if (!currentUser || !currentTenant) return;
+    
+    // We only heal if state has finished loading (i.e. branches is populated, indicating we have state)
+    if (branches.length === 0) return;
+
+    let stateUpdated = false;
+    let newUsers = [...users];
+    let newTrucks = [...trucks];
+
+    // 1. Ensure current user exists in users list
+    const userExists = newUsers.some(u => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (!userExists) {
+      const newUserRecord: User = {
+        id: currentUser.id || `USR-${Math.floor(10000 + Math.random() * 90000)}`,
+        tenantId: currentTenant.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
+        phone: currentUser.phone || " ||pw:123456 ||status:Active",
+        status: "Active",
+        associatedStoreId: currentUser.associatedStoreId || "DC-WINAMILL",
+        driverLicenseExpire: currentUser.driverLicenseExpire || (currentUser.role === 'Driver' ? "2027-01-22" : undefined),
+        lastActive: new Date().toISOString()
+      };
+      newUsers.push(newUserRecord);
+      stateUpdated = true;
+    } else {
+      // Update lastActive timestamp if it's too old or not set to maintain online status
+      newUsers = newUsers.map(u => {
+        if (u.email.toLowerCase() === currentUser.email.toLowerCase()) {
+          const nowStr = new Date().toISOString();
+          const lastActiveTime = u.lastActive ? new Date(u.lastActive).getTime() : 0;
+          if (Date.now() - lastActiveTime > 15000) {
+            stateUpdated = true;
+            return { ...u, lastActive: nowStr };
+          }
+        }
+        return u;
+      });
+    }
+
+    // 2. If Driver is logged in, ensure their truck exists in the trucks list
+    if (currentUser.role === 'Driver') {
+      const truckExists = newTrucks.some(t => t.driver.toLowerCase() === currentUser.name.toLowerCase());
+      if (!truckExists) {
+        const isJoshua = currentUser.name.toLowerCase().includes("joshua");
+        const defaultTruckId = isJoshua ? "TRUCK-28" : `TRUCK-${Math.floor(10 + Math.random() * 90)}`;
+        const defaultTruckName = isJoshua ? "Truck-2" : `Truck-Custom`;
+        const defaultType = isJoshua 
+          ? "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651" 
+          : "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938";
+        
+        const newTruckRecord: Truck = {
+          id: defaultTruckId,
+          tenantId: currentTenant.id,
+          name: defaultTruckName,
+          type: defaultType,
+          driver: currentUser.name,
+          branchId: currentUser.associatedStoreId || "DC-WINAMILL"
+        };
+        newTrucks.push(newTruckRecord);
+        stateUpdated = true;
+      }
+    }
+
+    if (stateUpdated) {
+      setUsers(newUsers);
+      setTrucks(newTrucks);
+      syncStateToSupabase(currentTenant.id, deliveries, newTrucks, branches, newUsers);
+    }
+  }, [currentUser, currentTenant, branches.length, users.length, trucks.length]);
 
   // Load corporate tenants on boot
   useEffect(() => {

@@ -1092,6 +1092,9 @@ app.use((req, res, next) => {
     }
   });
 
+  // In-memory tenant state store fallback for when Supabase is unconfigured, keeping multi-device sessions perfectly in sync!
+  const inMemoryTenantStates: { [tenantId: string]: { branches?: any[], trucks?: any[], users?: any[], deliveries?: any[] } } = {};
+
   // Fetch full state for a specific tenant from Supabase (or return premium mock fallback arrays when database is unconfigured)
   app.get("/api/tenant/state", async (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -1105,100 +1108,131 @@ app.use((req, res, next) => {
 
       const supabase = getSupabase();
       if (!supabase) {
-        // Return highly polished realistic seed fallback datasets for instant non-blocking prototype viewing
+        const tid = String(tenantId);
+        if (!inMemoryTenantStates[tid]) {
+          inMemoryTenantStates[tid] = {
+            branches: [
+              {
+                id: "01075",
+                tenantId: tid,
+                name: "RONA - Tantallon",
+                type: "STORE",
+                address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
+              },
+              {
+                id: "01065",
+                tenantId: tid,
+                name: "RONA - ALMON",
+                type: "STORE",
+                address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
+              },
+              {
+                id: "01070",
+                tenantId: tid,
+                name: "RONA - Elmsdale",
+                type: "DC",
+                address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
+              },
+              {
+                id: "500",
+                tenantId: tid,
+                name: "RONA - WINDMILL",
+                type: "DC",
+                address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
+              }
+            ],
+            trucks: [
+              {
+                id: "TRUCK-87",
+                tenantId: tid,
+                name: "Truck-1",
+                type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938",
+                driver: "George Campbell",
+                branchId: "01075"
+              },
+              {
+                id: "TRUCK-28",
+                tenantId: tid,
+                name: "Truck-2",
+                type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
+                driver: "Joshua Campbell",
+                branchId: "DC-WINAMILL"
+              }
+            ],
+            users: [
+              {
+                id: "USR-57008",
+                tenantId: tid,
+                name: "George Campbell",
+                email: "george.campbell@ronaatlantic.ca",
+                role: "Admin",
+                phone: " ||pw:123456 ||status:Active",
+                password: "123456",
+                status: "Active",
+                associatedStoreId: "DC-WINAMILL"
+              },
+              {
+                id: "USR-1869",
+                tenantId: tid,
+                name: "Joshua Campbell",
+                email: "joshua.campbell@ronaatlantic.ca",
+                role: "Driver",
+                phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
+                password: "123456",
+                status: "Active",
+                driverLicenseExpire: "2027-01-22",
+                associatedStoreId: "DC-WINAMILL"
+              }
+            ],
+            deliveries: [
+              {
+                id: "263890",
+                tenantId: tid,
+                invoiceNumber: "263890",
+                epicorSalesOrder: "263890",
+                customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
+                deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
+                phone: "902-555-0199",
+                originBranch: "01075",
+                destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
+                status: "REGISTERED",
+                registeredAt: "6/16/2026, 11:15:48 AM",
+                pickedAt: null,
+                deliveredAt: null,
+                returnedAt: null,
+                returnReason: null,
+                assignedTruck: "TRUCK-87",
+                assignedDriver: "George Campbell",
+                customerSignature: null,
+                deliveryPhoto: null,
+                history: [
+                  {
+                    notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
+                    status: "REGISTERED",
+                    location: "RONA - Tantallon",
+                    operator: "Azure OCR Automate Stream",
+                    timestamp: "6/16/2026, 11:15:48 AM"
+                  },
+                  {
+                    notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
+                    status: "REGISTERED",
+                    location: "RONA - Tantallon",
+                    operator: "Logistics Board Coordinator",
+                    timestamp: "2026-06-16T14:16:19.891Z"
+                  }
+                ]
+              }
+            ]
+          };
+        }
+
+        const state = inMemoryTenantStates[tid];
         return res.json({
           supabaseActive: false,
-          branches: [
-            {
-              id: "01075",
-              tenantId: String(tenantId),
-              name: "RONA - Tantallon",
-              type: "STORE",
-              address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
-            },
-            {
-              id: "01065",
-              tenantId: String(tenantId),
-              name: "RONA - ALMON",
-              type: "STORE",
-              address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
-            },
-            {
-              id: "01070",
-              tenantId: String(tenantId),
-              name: "RONA - Elmsdale",
-              type: "DC",
-              address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
-            },
-            {
-              id: "500",
-              tenantId: String(tenantId),
-              name: "RONA - WINDMILL",
-              type: "DC",
-              address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
-            }
-          ],
-          trucks: [
-            {
-              id: "TRUCK-87",
-              tenantId: String(tenantId),
-              name: "Truck-1",
-              type: "Heavy-Duty Flatbed",
-              driver: "George Campbell",
-              branchId: "01075"
-            }
-          ],
-          users: [
-            {
-              id: "USR-57008",
-              tenantId: String(tenantId),
-              name: "George Campbell",
-              email: "george.campbell@ronaatlantic.ca",
-              role: "Admin",
-              phone: "(902) 555-0199",
-              status: "Active",
-              associatedStoreId: "500"
-            }
-          ],
-          deliveries: [
-            {
-              id: "263890",
-              tenantId: String(tenantId),
-              invoiceNumber: "263890",
-              epicorSalesOrder: "263890",
-              customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
-              deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
-              phone: "902-555-0199",
-              originBranch: "01075",
-              destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
-              status: "REGISTERED",
-              registeredAt: "6/16/2026, 11:15:48 AM",
-              pickedAt: null,
-              deliveredAt: null,
-              returnedAt: null,
-              returnReason: null,
-              assignedTruck: "TRUCK-87",
-              assignedDriver: "George Campbell",
-              customerSignature: null,
-              deliveryPhoto: null,
-              history: [
-                {
-                  notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
-                  status: "REGISTERED",
-                  location: "RONA - Tantallon",
-                  operator: "Azure OCR Automate Stream",
-                  timestamp: "6/16/2026, 11:15:48 AM"
-                },
-                {
-                  notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
-                  status: "REGISTERED",
-                  location: "RONA - Tantallon",
-                  operator: "Logistics Board Coordinator",
-                  timestamp: "2026-06-16T14:16:19.891Z"
-                }
-              ]
-            }
-          ]
+          branches: state.branches || [],
+          trucks: state.trucks || [],
+          users: state.users || [],
+          deliveries: state.deliveries || []
         });
       }
 
@@ -1273,9 +1307,17 @@ app.use((req, res, next) => {
             id: "TRUCK-87",
             tenantId: String(req.query.tenantId),
             name: "Truck-1",
-            type: "Heavy-Duty Flatbed",
+            type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938",
             driver: "George Campbell",
             branchId: "01075"
+          },
+          {
+            id: "TRUCK-28",
+            tenantId: String(req.query.tenantId),
+            name: "Truck-2",
+            type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
+            driver: "Joshua Campbell",
+            branchId: "DC-WINAMILL"
           }
         ],
         users: [
@@ -1285,9 +1327,22 @@ app.use((req, res, next) => {
             name: "George Campbell",
             email: "george.campbell@ronaatlantic.ca",
             role: "Admin",
-            phone: "(902) 555-0199",
+            phone: " ||pw:123456 ||status:Active",
+            password: "123456",
             status: "Active",
-            associatedStoreId: "500"
+            associatedStoreId: "DC-WINAMILL"
+          },
+          {
+            id: "USR-1869",
+            tenantId: String(req.query.tenantId),
+            name: "Joshua Campbell",
+            email: "joshua.campbell@ronaatlantic.ca",
+            role: "Driver",
+            phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
+            password: "123456",
+            status: "Active",
+            driverLicenseExpire: "2027-01-22",
+            associatedStoreId: "DC-WINAMILL"
           }
         ],
         deliveries: [
@@ -1343,10 +1398,17 @@ app.use((req, res, next) => {
 
       const supabase = getSupabase();
       if (!supabase) {
+        const tid = String(tenantId);
+        inMemoryTenantStates[tid] = {
+          branches: branches || [],
+          trucks: trucks || [],
+          users: users || [],
+          deliveries: deliveries || []
+        };
         return res.json({
           supabaseActive: false,
           success: true,
-          message: "Database unconfigured, state saved inside browser storage sandbox."
+          message: "Database unconfigured, state saved inside backend in-memory store and synchronized across all active sessions."
         });
       }
 
@@ -1492,9 +1554,21 @@ app.use((req, res, next) => {
 
       const supabase = getSupabase();
       if (!supabase) {
-        return res.status(503).json({
-          error: "Supabase database is inactive or unconfigured. Cannot perform deletion."
-        });
+        const tid = String(tenantId);
+        const state = inMemoryTenantStates[tid];
+        if (state) {
+          const tableName = table as string;
+          if (tableName === "branches" && state.branches) {
+            state.branches = state.branches.filter((item: any) => item.id !== id);
+          } else if (tableName === "trucks" && state.trucks) {
+            state.trucks = state.trucks.filter((item: any) => item.id !== id);
+          } else if (tableName === "users" && state.users) {
+            state.users = state.users.filter((item: any) => item.id !== id);
+          } else if (tableName === "deliveries" && state.deliveries) {
+            state.deliveries = state.deliveries.filter((item: any) => item.id !== id);
+          }
+        }
+        return res.json({ success: true, supabaseActive: false });
       }
 
       // Ensure we only delete matching ids belonging to the authenticated tenant
@@ -1522,9 +1596,19 @@ app.use((req, res, next) => {
 
       const supabase = getSupabase();
       if (!supabase) {
-        return res.status(503).json({
-          error: "Supabase database is inactive or unconfigured. Cannot clear data."
-        });
+        const tid = String(tenantId);
+        const state = inMemoryTenantStates[tid];
+        if (state) {
+          state.deliveries = [];
+          state.trucks = [];
+          state.branches = [];
+          if (keepUserEmail) {
+            state.users = (state.users || []).filter((u: any) => u.email.toLowerCase() === keepUserEmail.toLowerCase());
+          } else {
+            state.users = [];
+          }
+        }
+        return res.json({ success: true, supabaseActive: false });
       }
 
       // 1. Delete all deliveries
