@@ -1003,6 +1003,11 @@ export default function App() {
                   Error: {lastFetchError}
                 </p>
               )}
+              {dbActive && supabaseStatus?.isServiceRoleKeyAnon && (
+                <p className="text-amber-800 text-[10.5px] font-medium mt-1 leading-tight max-w-2xl bg-amber-50 border border-amber-200/50 rounded-lg p-2">
+                  ⚠️ <strong>Row-Level Security (RLS) Warning:</strong> You are using the public Anon Key on the server. If RLS is enabled on your Supabase tables, reads and writes will return 0 rows. Please add your <code className="bg-white/80 font-mono px-1 rounded text-amber-950 font-bold">SUPABASE_SERVICE_ROLE_KEY</code> in Settings &gt; Secrets to bypass RLS securely.
+                </p>
+              )}
             </div>
           </div>
 

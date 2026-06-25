@@ -331,33 +331,53 @@ client application can read, insert, update, and delete operational data with st
 */
 
 -- Tenants policies
+DROP POLICY IF EXISTS "Allow public read on tenants" ON tenants;
 CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on tenants" ON tenants;
 CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on tenants" ON tenants;
 CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on tenants" ON tenants;
 CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (true);
 
 -- Branches policies
+DROP POLICY IF EXISTS "Allow public read on branches" ON branches;
 CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on branches" ON branches;
 CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on branches" ON branches;
 CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on branches" ON branches;
 CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING (true);
 
 -- Trucks policies
+DROP POLICY IF EXISTS "Allow public read on trucks" ON trucks;
 CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on trucks" ON trucks;
 CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on trucks" ON trucks;
 CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on trucks" ON trucks;
 CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING (true);
 
 -- Users policies
+DROP POLICY IF EXISTS "Allow public read on users" ON users;
 CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on users" ON users;
 CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on users" ON users;
 CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on users" ON users;
 CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING (true);
 
 -- Deliveries policies
+DROP POLICY IF EXISTS "Allow public read on deliveries" ON deliveries;
 CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on deliveries" ON deliveries;
 CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on deliveries" ON deliveries;
 CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on deliveries" ON deliveries;
 CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING (true);
 
 
@@ -1229,6 +1249,7 @@ app.use((req, res, next) => {
         const state = inMemoryTenantStates[tid];
         return res.json({
           supabaseActive: false,
+          error: "Supabase credentials are not configured or active on the production server. Please go to AI Studio Settings > Secrets and ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are added, then redeploy or restart.",
           branches: state.branches || [],
           trucks: state.trucks || [],
           users: state.users || [],
