@@ -1140,18 +1140,16 @@ export default function App() {
               <span>{syncStatus === 'SYNCING' ? 'Syncing...' : 'Clear Cache & Live Refresh'}</span>
             </button>
 
-            {/* Push Local Changes to DB button (only visible/enabled when running in offline/sandbox fallback to help them push their data!) */}
-            {(!dbActive || !supabaseStatus?.connected) && (
-              <button
-                onClick={handlePushLocalToSupabase}
-                disabled={syncStatus === 'SYNCING'}
-                title="Write all local sandbox changes, registers, vehicles, and shipments directly into live Supabase tables"
-                className="flex-1 md:flex-none text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 border border-blue-500/30 px-3.5 py-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-sm shadow-blue-500/10 active:scale-95 animate-fade-in"
-              >
-                <FileDown className="h-3.5 w-3.5 text-blue-100" />
-                <span>Upload Sandbox Data to Live DB</span>
-              </button>
-            )}
+            {/* Push Local Changes to DB button (always available so users can push local sandbox data to their live database whenever they wish!) */}
+            <button
+              onClick={handlePushLocalToSupabase}
+              disabled={syncStatus === 'SYNCING'}
+              title="Write all local sandbox changes, registers, vehicles, and shipments directly into live Supabase tables"
+              className="flex-1 md:flex-none text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 border border-blue-500/30 px-3.5 py-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-sm shadow-blue-500/10 active:scale-95 animate-fade-in"
+            >
+              <FileDown className="h-3.5 w-3.5 text-blue-100" />
+              <span>Upload Sandbox Data to Live DB</span>
+            </button>
           </div>
         </div>
 

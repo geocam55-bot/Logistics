@@ -1152,6 +1152,146 @@ app.use((req, res, next) => {
     }
   });
 
+  // Helper to construct the premium default mock and seed state for a given tenant ID
+  function getDefaultTenantState(tid: string) {
+    return {
+      branches: [
+        {
+          id: "01075",
+          tenantId: tid,
+          name: "RONA - Tantallon",
+          type: "STORE",
+          address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
+        },
+        {
+          id: "01065",
+          tenantId: tid,
+          name: "RONA - ALMON",
+          type: "STORE",
+          address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
+        },
+        {
+          id: "01070",
+          tenantId: tid,
+          name: "RONA - Elmsdale",
+          type: "DC",
+          address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
+        },
+        {
+          id: "500",
+          tenantId: tid,
+          name: "RONA - WINDMILL",
+          type: "DC",
+          address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
+        }
+      ],
+      trucks: [
+        {
+          id: "TRUCK-87",
+          tenantId: tid,
+          name: "Truck-1",
+          type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938",
+          driver: "George Campbell",
+          branchId: "01075"
+        },
+        {
+          id: "TRUCK-28",
+          tenantId: tid,
+          name: "Truck-2",
+          type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
+          driver: "Joshua Campbell",
+          branchId: "DC-WINAMILL"
+        }
+      ],
+      users: [
+        {
+          id: "USR-57008",
+          tenantId: tid,
+          name: "George Campbell",
+          email: "george.campbell@ronaatlantic.ca",
+          role: "Admin",
+          phone: " ||pw:123456 ||status:Active",
+          associatedStoreId: "DC-WINAMILL"
+        },
+        {
+          id: "USR-1869",
+          tenantId: tid,
+          name: "Joshua Campbell",
+          email: "joshua.campbell@ronaatlantic.ca",
+          role: "Driver",
+          phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
+          associatedStoreId: "DC-WINAMILL"
+        }
+      ],
+      deliveries: [
+        {
+          id: "263890",
+          tenantId: tid,
+          invoiceNumber: "263890",
+          epicorSalesOrder: "263890",
+          customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
+          deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
+          phone: "902-555-0199",
+          originBranch: "01075",
+          destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
+          status: "REGISTERED",
+          registeredAt: "6/16/2026, 11:15:48 AM",
+          pickedAt: null,
+          deliveredAt: null,
+          returnedAt: null,
+          returnReason: null,
+          assignedTruck: "TRUCK-87",
+          assignedDriver: "George Campbell",
+          customerSignature: null,
+          deliveryPhoto: null,
+          history: [
+            {
+              notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
+              status: "REGISTERED",
+              location: "RONA - Tantallon",
+              operator: "Azure OCR Automate Stream",
+              timestamp: "6/16/2026, 11:15:48 AM"
+            },
+            {
+              notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
+              status: "REGISTERED",
+              location: "RONA - Tantallon",
+              operator: "Logistics Board Coordinator",
+              timestamp: "2026-06-16T14:16:19.891Z"
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  // Helper to upsert seed state records into the live Supabase database
+  async function seedDefaultState(supabase: any, tenantId: string) {
+    const defaults = getDefaultTenantState(tenantId);
+    console.log(`[SEED] Seeding live database with default templates for tenant '${tenantId}'...`);
+    
+    if (defaults.branches.length > 0) {
+      const { error } = await supabase.from("branches").upsert(defaults.branches);
+      if (error) throw new Error(`Seeding branches failed: ${error.message}`);
+    }
+
+    if (defaults.trucks.length > 0) {
+      const { error } = await supabase.from("trucks").upsert(defaults.trucks);
+      if (error) throw new Error(`Seeding trucks failed: ${error.message}`);
+    }
+
+    if (defaults.users.length > 0) {
+      const { error } = await supabase.from("users").upsert(defaults.users);
+      if (error) throw new Error(`Seeding users failed: ${error.message}`);
+    }
+
+    if (defaults.deliveries.length > 0) {
+      const { error } = await supabase.from("deliveries").upsert(defaults.deliveries);
+      if (error) throw new Error(`Seeding deliveries failed: ${error.message}`);
+    }
+    console.log(`[SEED] Seeding completed successfully for tenant '${tenantId}'.`);
+  }
+
   // In-memory tenant state store fallback for when Supabase is unconfigured, keeping multi-device sessions perfectly in sync!
   const inMemoryTenantStates: { [tenantId: string]: { branches?: any[], trucks?: any[], users?: any[], deliveries?: any[] } } = {};
 
@@ -1170,120 +1310,7 @@ app.use((req, res, next) => {
       if (!supabase) {
         const tid = String(tenantId);
         if (!inMemoryTenantStates[tid]) {
-          inMemoryTenantStates[tid] = {
-            branches: [
-              {
-                id: "01075",
-                tenantId: tid,
-                name: "RONA - Tantallon",
-                type: "STORE",
-                address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
-              },
-              {
-                id: "01065",
-                tenantId: tid,
-                name: "RONA - ALMON",
-                type: "STORE",
-                address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
-              },
-              {
-                id: "01070",
-                tenantId: tid,
-                name: "RONA - Elmsdale",
-                type: "DC",
-                address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
-              },
-              {
-                id: "500",
-                tenantId: tid,
-                name: "RONA - WINDMILL",
-                type: "DC",
-                address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
-              }
-            ],
-            trucks: [
-              {
-                id: "TRUCK-87",
-                tenantId: tid,
-                name: "Truck-1",
-                type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938",
-                driver: "George Campbell",
-                branchId: "01075"
-              },
-              {
-                id: "TRUCK-28",
-                tenantId: tid,
-                name: "Truck-2",
-                type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
-                driver: "Joshua Campbell",
-                branchId: "DC-WINAMILL"
-              }
-            ],
-            users: [
-              {
-                id: "USR-57008",
-                tenantId: tid,
-                name: "George Campbell",
-                email: "george.campbell@ronaatlantic.ca",
-                role: "Admin",
-                phone: " ||pw:123456 ||status:Active",
-                password: "123456",
-                status: "Active",
-                associatedStoreId: "DC-WINAMILL"
-              },
-              {
-                id: "USR-1869",
-                tenantId: tid,
-                name: "Joshua Campbell",
-                email: "joshua.campbell@ronaatlantic.ca",
-                role: "Driver",
-                phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
-                password: "123456",
-                status: "Active",
-                driverLicenseExpire: "2027-01-22",
-                associatedStoreId: "DC-WINAMILL"
-              }
-            ],
-            deliveries: [
-              {
-                id: "263890",
-                tenantId: tid,
-                invoiceNumber: "263890",
-                epicorSalesOrder: "263890",
-                customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
-                deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
-                phone: "902-555-0199",
-                originBranch: "01075",
-                destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
-                status: "REGISTERED",
-                registeredAt: "6/16/2026, 11:15:48 AM",
-                pickedAt: null,
-                deliveredAt: null,
-                returnedAt: null,
-                returnReason: null,
-                assignedTruck: "TRUCK-87",
-                assignedDriver: "George Campbell",
-                customerSignature: null,
-                deliveryPhoto: null,
-                history: [
-                  {
-                    notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
-                    status: "REGISTERED",
-                    location: "RONA - Tantallon",
-                    operator: "Azure OCR Automate Stream",
-                    timestamp: "6/16/2026, 11:15:48 AM"
-                  },
-                  {
-                    notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
-                    status: "REGISTERED",
-                    location: "RONA - Tantallon",
-                    operator: "Logistics Board Coordinator",
-                    timestamp: "2026-06-16T14:16:19.891Z"
-                  }
-                ]
-              }
-            ]
-          };
+          inMemoryTenantStates[tid] = getDefaultTenantState(tid);
         }
 
         const state = inMemoryTenantStates[tid];
@@ -1298,7 +1325,7 @@ app.use((req, res, next) => {
       }
 
       // Fetch all tables in parallel with a timeout to prevent hanging
-      const [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
+      let [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
         Promise.all([
           supabase.from("branches").select("*").eq("tenantId", tenantId),
           supabase.from("trucks").select("*").eq("tenantId", tenantId),
@@ -1312,6 +1339,30 @@ app.use((req, res, next) => {
       if (rBranches.error || rTrucks.error || rUsers.error || rDeliveries.error) {
         const primaryError = rBranches.error || rTrucks.error || rUsers.error || rDeliveries.error;
         throw new Error(primaryError?.message || "Error pulling multi-tenant tables from Supabase.");
+      }
+
+      // Automatically seed the live tables if they are active but contain 0 records for this tenant
+      if ((rBranches.data || []).length === 0) {
+        console.log(`Live database has 0 registers/branches for tenant '${tenantId}'. Automatically seeding default templates...`);
+        try {
+          await seedDefaultState(supabase, String(tenantId));
+          // Re-fetch to load the seeded records from the database
+          const [fBranches, fTrucks, fUsers, fDeliveries] = await withTimeout<any>(
+            Promise.all([
+              supabase.from("branches").select("*").eq("tenantId", tenantId),
+              supabase.from("trucks").select("*").eq("tenantId", tenantId),
+              supabase.from("users").select("*").eq("tenantId", tenantId),
+              supabase.from("deliveries").select("*").eq("tenantId", tenantId)
+            ]),
+            5000
+          );
+          rBranches = fBranches;
+          rTrucks = fTrucks;
+          rUsers = fUsers;
+          rDeliveries = fDeliveries;
+        } catch (seedErr: any) {
+          console.error("Auto-seeding failed, continuing with empty result set:", seedErr);
+        }
       }
 
       const deserializedUsers = (rUsers.data || []).map((u: any) => deserializeFromPhone(u));
