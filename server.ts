@@ -1249,7 +1249,7 @@ app.use((req, res, next) => {
         const state = inMemoryTenantStates[tid];
         return res.json({
           supabaseActive: false,
-          error: "Supabase credentials are not configured or active on the production server. Please go to AI Studio Settings > Secrets and ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are added, then redeploy or restart.",
+          error: "Supabase credentials are not configured or active on the production server. Please go to AI Studio Settings > Secrets, ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are added, and then click the 'Share' button at the top right of AI Studio to redeploy the shared application with these secrets.",
           branches: state.branches || [],
           trucks: state.trucks || [],
           users: state.users || [],
