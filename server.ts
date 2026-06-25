@@ -30,13 +30,15 @@ function getGeminiClient(): GoogleGenAI {
 }
 
 // Supabase Lazy Initialization
+let customSupabaseUrl = "";
+let customSupabaseKey = "";
 let supabaseClient: any = null;
 let lastSupabaseUrl = "";
 let lastSupabaseKey = "";
 
 function getSupabase() {
-  let url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
+  let url = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  let key = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
   
   if (!url || !key) {
     return null;
@@ -811,13 +813,27 @@ app.use((req, res, next) => {
   next();
 });
 
+  // Endpoint to set custom Supabase credentials at runtime in server memory
+  app.post("/api/setup-custom-supabase", express.json(), (req, res) => {
+    try {
+      const { url, key } = req.body;
+      customSupabaseUrl = (url || "").trim();
+      customSupabaseKey = (key || "").trim();
+      supabaseClient = null; // force recreation of client with new credentials
+      console.log("Custom Supabase credentials set in server memory. URL size:", customSupabaseUrl.length, "Key size:", customSupabaseKey.length);
+      res.json({ success: true, message: "Custom Supabase credentials updated in server memory successfully." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to update custom Supabase credentials." });
+    }
+  });
+
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
     try {
       const supabase = getSupabase();
-      const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-      const roleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
-      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
+      const resolvedUrl = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+      const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+      const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
       const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pub") || roleKey.startsWith("sb_publishable");
 
       if (!supabase) {

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DeliveryRecord, Truck, Branch, User, Tenant } from './types';
 import { TENANTS } from './data';
 import { 
@@ -79,6 +79,31 @@ export default function App() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isFleetDropdownOpen, setIsFleetDropdownOpen] = useState(false);
+
+  // Custom Supabase Database credentials state
+  const [showDbConfig, setShowDbConfig] = useState(false);
+  const [customDbUrl, setCustomDbUrl] = useState(() => localStorage.getItem('prospaces_custom_supabase_url') || '');
+  const [customDbKey, setCustomDbKey] = useState(() => localStorage.getItem('prospaces_custom_supabase_key') || '');
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configMsg, setConfigMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Load custom credentials from localStorage on mount and register them with the backend memory store
+  useEffect(() => {
+    const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
+    const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
+    if (savedUrl && savedKey) {
+      initializeFrontendSupabase(savedUrl, savedKey);
+      fetch('/api/setup-custom-supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: savedUrl, key: savedKey })
+      }).then(() => {
+        checkSupabaseStatus().catch(() => {});
+      }).catch(err => {
+        console.warn("Failed to notify backend server of custom Supabase credentials:", err);
+      });
+    }
+  }, []);
 
   // Keep a ref of live states for the geolocation watchPosition callback to avoid stale closures and constant watcher restarts
   const stateRef = useRef({ deliveries, trucks, branches, users, currentTenant });
@@ -243,6 +268,86 @@ export default function App() {
     
     // Trigger load state fresh
     setLoadTrigger(prev => prev + 1);
+  };
+
+  const handleSaveDbConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConfigSaving(true);
+    setConfigMsg(null);
+    try {
+      const url = customDbUrl.trim();
+      const key = customDbKey.trim();
+
+      if (!url || !key) {
+        throw new Error("Both Supabase API URL and Supabase Key are required.");
+      }
+
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        throw new Error("Supabase API URL must start with http:// or https://");
+      }
+
+      // Initialize frontend client
+      initializeFrontendSupabase(url, key);
+
+      // Save to localStorage
+      localStorage.setItem('prospaces_custom_supabase_url', url);
+      localStorage.setItem('prospaces_custom_supabase_key', key);
+
+      // Send to backend server
+      const res = await fetch('/api/setup-custom-supabase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url, key })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to update backend configuration. Server status: ${res.status}`);
+      }
+
+      // Re-run status check
+      const status = await checkSupabaseStatus();
+      if (status.connected) {
+        setConfigMsg({ type: 'success', text: "Successfully connected to your live Supabase database! Cache has been refreshed." });
+        setLoadTrigger(prev => prev + 1);
+      } else {
+        setConfigMsg({ type: 'error', text: `Saved configuration, but connection test failed: ${status.error || 'Check credentials'}` });
+      }
+    } catch (err: any) {
+      setConfigMsg({ type: 'error', text: err.message || "An unexpected error occurred during configuration." });
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const handleResetDbConfig = async () => {
+    setConfigSaving(true);
+    setConfigMsg(null);
+    try {
+      localStorage.removeItem('prospaces_custom_supabase_url');
+      localStorage.removeItem('prospaces_custom_supabase_key');
+      setCustomDbUrl('');
+      setCustomDbKey('');
+      
+      // Reset frontend
+      initializeFrontendSupabase('', '');
+
+      // Reset backend
+      await fetch('/api/setup-custom-supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: '', key: '' })
+      });
+
+      const status = await checkSupabaseStatus();
+      setConfigMsg({ type: 'success', text: "Reset connection to environment defaults." });
+      setLoadTrigger(prev => prev + 1);
+    } catch (err: any) {
+      setConfigMsg({ type: 'error', text: err.message || "Reset failed." });
+    } finally {
+      setConfigSaving(false);
+    }
   };
 
   const handlePushLocalToSupabase = async () => {
@@ -1015,6 +1120,15 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+            {/* Custom Database Config Toggle Button */}
+            <button
+              onClick={() => setShowDbConfig(!showDbConfig)}
+              title="Configure Custom Live Supabase Database Connection Details"
+              className="flex-1 md:flex-none text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3.5 py-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+            >
+              <span>⚙️ {showDbConfig ? 'Hide DB Config' : 'Live DB Config'}</span>
+            </button>
+
             {/* Force Sync from Live DB button */}
             <button
               onClick={handleForceRefreshLive}
@@ -1040,6 +1154,95 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* Collapsible Custom Database Connection Setup Panel */}
+        {showDbConfig && (
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-inner space-y-4 animate-fade-in" id="custom-supabase-config-drawer">
+            <div className="flex items-start justify-between border-b border-slate-250 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>⚡ Custom Live Supabase Database Connection Setup</span>
+                </h3>
+                <p className="text-slate-500 text-[11px] font-medium mt-1 leading-relaxed max-w-3xl">
+                  Connect this workspace dynamically to your own live Supabase project! This bypasses environment variable replication delays and guarantees instant full-stack connectivity in both development and shared builds.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowDbConfig(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDbConfig} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5 text-left col-span-1 md:col-span-2">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Supabase API Project URL
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://your-project-id.supabase.co"
+                  value={customDbUrl}
+                  onChange={(e) => setCustomDbUrl(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-950 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition-all font-mono"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Found in your Supabase Dashboard under <strong>Project Settings &gt; API &gt; Project URL</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 text-left col-span-1 md:col-span-2">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Supabase API Service Role Key (or Anon Key)
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  value={customDbKey}
+                  onChange={(e) => setCustomDbKey(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-950 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition-all font-mono"
+                />
+                <p className="text-[10px] text-slate-400 leading-normal">
+                  Found under <strong>Project Settings &gt; API &gt; Project API Keys</strong>.
+                  <br />
+                  💡 <em>Recommendation:</em> Use your project's <strong>service_role</strong> key to automatically bypass Row-Level Security (RLS) on the backend and ensure reads &amp; writes succeed.
+                </p>
+              </div>
+
+              {configMsg && (
+                <div className={`col-span-1 md:col-span-2 p-3 rounded-lg text-xs leading-normal font-medium ${
+                  configMsg.type === 'success' 
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
+                    : 'bg-rose-50 border border-rose-150 text-rose-800'
+                }`}>
+                  {configMsg.type === 'success' ? '✅' : '⚠️'} {configMsg.text}
+                </div>
+              )}
+
+              <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2.5 pt-1">
+                <button
+                  type="submit"
+                  disabled={configSaving}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
+                >
+                  {configSaving ? 'Testing Connection...' : 'Save and Connect Live'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetDbConfig}
+                  disabled={configSaving}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                >
+                  Reset to Environment Defaults
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Navigation Tabs bar */}
         <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-wrap gap-1 shadow-sm w-full" id="prospaces-nav">
