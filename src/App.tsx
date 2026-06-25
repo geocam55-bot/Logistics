@@ -386,6 +386,9 @@ export default function App() {
         } else {
           // Supabase is unconfigured/inactive. Fallback to Local/Session Storage mode with the backend-provided sample seed data.
           console.warn("Database dashboard reports unconfigured backend connector. Using local sandbox fallback.");
+          if (data.error) {
+            setLastFetchError(data.error);
+          }
           const cachedDeliveries = localStorage.getItem(`prospaces_deliveries_tenant_${tenantId}`);
           const cachedTrucks = localStorage.getItem(`prospaces_trucks_tenant_${tenantId}`);
           const cachedBranches = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
