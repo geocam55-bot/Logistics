@@ -30,6 +30,22 @@ function getGeminiClient(): GoogleGenAI {
 }
 
 // Supabase Lazy Initialization
+function isServiceRoleKey(key: string): boolean {
+  if (!key) return false;
+  try {
+    const parts = key.split('.');
+    if (parts.length === 3) {
+      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const decodedPayload = Buffer.from(payloadBase64, 'base64').toString('utf8');
+      const payload = JSON.parse(decodedPayload);
+      return payload.role === 'service_role';
+    }
+  } catch (e) {
+    // ignore
+  }
+  return key.includes("service_role") || (!key.includes("anon") && !key.startsWith("sb_pub") && !key.startsWith("sb_publishable") && key.length > 100);
+}
+
 let customSupabaseUrl = "";
 let customSupabaseKey = "";
 let supabaseClient: any = null;
@@ -834,7 +850,7 @@ app.use((req, res, next) => {
       const resolvedUrl = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
       const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
-      const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pub") || roleKey.startsWith("sb_publishable");
+      const isServiceRoleKeyAnon = !isServiceRoleKey(roleKey);
 
       if (!supabase) {
         return res.json({
@@ -848,7 +864,15 @@ app.use((req, res, next) => {
       }
 
       // Perform a ping / select test query against the database to check if schema is constructed
-      const { data, error } = await supabase.from("tenants").select("id").limit(1);
+      let { data, error } = await supabase.from("tenants").select("id").limit(1);
+
+      if (error) {
+        console.warn("Supabase connection: tenants table query failed, trying branches table fallback...");
+        const { error: branchesErr } = await supabase.from("branches").select("id").limit(1);
+        if (!branchesErr) {
+          error = null;
+        }
+      }
 
       if (error) {
         console.warn("Supabase connection is alive, but table query failed (schema probably missing):", error);
@@ -875,9 +899,9 @@ app.use((req, res, next) => {
     } catch (e: any) {
       console.error("Diagnosis Exception:", e);
       const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-      const roleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-      const isServiceRoleKeyAnon = roleKey === "" || roleKey === anonKey || roleKey.startsWith("sb_pu");
+      const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+      const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || "";
+      const isServiceRoleKeyAnon = !isServiceRoleKey(roleKey);
       res.json({
         configured: !!resolvedUrl,
         connected: false,
