@@ -226,8 +226,30 @@ export default function App() {
   } | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'ERROR'>('IDLE');
+  const [dbActive, setDbActive] = useState<boolean>(true);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const [loadTrigger, setLoadTrigger] = useState<number>(0);
+
+  const handleForceRefreshLive = async () => {
+    if (!currentTenant) return;
+    const tenantId = currentTenant.id;
+    setSyncStatus('SYNCING');
+    
+    // Clear local storage cache for this tenant
+    localStorage.removeItem(`prospaces_deliveries_tenant_${tenantId}`);
+    localStorage.removeItem(`prospaces_trucks_tenant_${tenantId}`);
+    localStorage.removeItem(`prospaces_branches_tenant_${tenantId}`);
+    localStorage.removeItem(`prospaces_users_tenant_${tenantId}`);
+    
+    // Trigger load state fresh
+    setLoadTrigger(prev => prev + 1);
+  };
+
+  const handlePushLocalToSupabase = async () => {
+    if (!currentTenant) return;
+    await syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, users);
+    setLoadTrigger(prev => prev + 1);
+  };
 
   const checkSupabaseStatus = async () => {
     try {
@@ -358,6 +380,8 @@ export default function App() {
           setBranches(data.branches || []);
           setUsers(data.users || []);
           setLastSyncTime(new Date().toLocaleTimeString());
+          setDbActive(true);
+          setSyncStatus('IDLE');
           return;
         } else {
           // Supabase is unconfigured/inactive. Fallback to Local/Session Storage mode with the backend-provided sample seed data.
@@ -372,10 +396,14 @@ export default function App() {
           setBranches(cachedBranches ? JSON.parse(cachedBranches) : (data.branches || []));
           setUsers(cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : []));
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox)`);
+          setDbActive(false);
+          setSyncStatus('IDLE');
         }
       } catch (err: any) {
         console.error("Failed to fetch live Supabase tenant state:", err);
         setLastFetchError(err.message || String(err));
+        setDbActive(false);
+        setSyncStatus('ERROR');
         
         // Upgrade: Graceful, non-blocking local storage cache hydration so that the user is NOT stuck with a frozen/blank UI
         try {
@@ -943,6 +971,65 @@ export default function App() {
       {/* Main Core Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="prospaces-body">
         
+        {/* Database Connection & Sync Status Widget */}
+        <div className="bg-white border border-slate-200/85 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4" id="supabase-sync-manager-widget">
+          <div className="flex items-center space-x-3.5 w-full md:w-auto">
+            <div className={`p-2.5 rounded-xl flex items-center justify-center ${
+              dbActive && supabaseStatus?.connected
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
+                : 'bg-amber-50 text-amber-600 border border-amber-200/50'
+            }`}>
+              <Database className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-slate-800 text-sm">
+                  {dbActive && supabaseStatus?.connected ? 'Live Database Active' : 'Offline / Local Sandbox Fallback'}
+                </span>
+                <span className={`h-2 w-2 rounded-full ${
+                  dbActive && supabaseStatus?.connected ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'
+                }`} />
+              </div>
+              <p className="text-slate-500 text-[11px] font-medium mt-0.5 leading-tight">
+                {dbActive && supabaseStatus?.connected 
+                  ? `Your changes are written in real-time directly to Supabase tables. (Synced: ${lastSyncTime || 'Just Now'})` 
+                  : `Using local offline browser cache (${branches.length} Registers, ${trucks.length} Vehicles, ${deliveries.length} Shipments). Changes will persist locally.`}
+              </p>
+              {lastFetchError && (
+                <p className="text-red-500 text-[10px] font-mono mt-1 font-semibold">
+                  Error: {lastFetchError}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+            {/* Force Sync from Live DB button */}
+            <button
+              onClick={handleForceRefreshLive}
+              disabled={syncStatus === 'SYNCING'}
+              title="Clear all local caches for this tenant and load fresh data from the live database"
+              className="flex-1 md:flex-none text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 disabled:bg-slate-100/50 border border-slate-200 px-3.5 py-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
+              <span>{syncStatus === 'SYNCING' ? 'Syncing...' : 'Clear Cache & Live Refresh'}</span>
+            </button>
+
+            {/* Push Local Changes to DB button (only visible/enabled when running in offline/sandbox fallback to help them push their data!) */}
+            {(!dbActive || !supabaseStatus?.connected) && (
+              <button
+                onClick={handlePushLocalToSupabase}
+                disabled={syncStatus === 'SYNCING'}
+                title="Write all local sandbox changes, registers, vehicles, and shipments directly into live Supabase tables"
+                className="flex-1 md:flex-none text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 border border-blue-500/30 px-3.5 py-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-sm shadow-blue-500/10 active:scale-95 animate-fade-in"
+              >
+                <FileDown className="h-3.5 w-3.5 text-blue-100" />
+                <span>Upload Sandbox Data to Live DB</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Navigation Tabs bar */}
         <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-wrap gap-1 shadow-sm w-full" id="prospaces-nav">
           

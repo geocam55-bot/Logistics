@@ -1464,25 +1464,25 @@ app.use((req, res, next) => {
         }
       }
 
-      // 3. Users
+      // 3. Users - Proactively map and serialize user payloads to prevent "column does not exist" schema mismatches
       if (sanitizedUsers.length > 0) {
         try {
-          const { error } = await supabase.from("users").upsert(sanitizedUsers);
+          const usersToUpsert = sanitizedUsers.map((u: any) => {
+            return {
+              id: u.id,
+              tenantId: u.tenantId,
+              name: u.name,
+              email: u.email,
+              role: u.role,
+              phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive),
+              associatedStoreId: u.associatedStoreId || null
+            };
+          });
+
+          const { error } = await supabase.from("users").upsert(usersToUpsert);
           if (error) throw error;
         } catch (dbErr: any) {
-          const errMsg = dbErr.message || String(dbErr);
-          if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("driverLicenseExpire") || errMsg.includes("lastActive") || errMsg.includes("42703"))) {
-            console.warn("Supabase users table is missing some columns. Retrying upsert with serialized fallback...");
-            const strippedUsers = sanitizedUsers.map((u: any) => {
-              const { password, status, driverLicenseExpire, lastActive, ...rest } = u;
-              (rest as any).phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive);
-              return rest;
-            });
-            const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);
-            if (retryErr) throw new Error(`Users Sync Retry Error: ${retryErr.message}`);
-          } else {
-            throw new Error(`Users Sync Error: ${dbErr.message}`);
-          }
+          throw new Error(`Users Sync Error: ${dbErr.message}`);
         }
       }
 
