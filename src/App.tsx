@@ -543,6 +543,9 @@ export default function App() {
   useEffect(() => {
     const loadTenants = async () => {
       try {
+        // Run connectivity diagnostics on mount to initialize the frontend Supabase client early
+        checkSupabaseStatus().catch(() => {});
+
         const res = await fetch("/api/tenants");
         if (!res.ok) {
           throw new Error(`Server returned non-ok status: ${res.status}`);
