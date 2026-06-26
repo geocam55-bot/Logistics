@@ -32,7 +32,7 @@ import {
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
   Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert
 } from 'lucide-react';
-import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
+import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
 
 // Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
 async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

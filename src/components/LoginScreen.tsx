@@ -3,7 +3,7 @@ import { Tenant, User } from '../types';
 import { TENANTS } from '../data';
 import { getFrontendSupabase, deserializeFromPhone, serializeToPhone } from '../lib/supabaseClient';
 import { Shield, Key, CheckCircle2, ArrowRight, Mail, Lock, Building2, UserCheck, HelpCircle, Loader2 } from 'lucide-react';
-import prospacesLogo from '../assets/images/prospaces_logo_1781387785955.jpg';
+import prospacesLogo from '../assets/images/prospaces_logo_1782485612854.jpg';
 
 interface LoginScreenProps {
   onLoginSuccess: (tenant: Tenant, user: User) => void;
