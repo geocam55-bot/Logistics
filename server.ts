@@ -52,7 +52,22 @@ let supabaseClient: any = null;
 let lastSupabaseUrl = "";
 let lastSupabaseKey = "";
 
-function getSupabase() {
+// Circuit Breaker for Supabase connections to prevent hanging on invalid/paused credentials
+let supabaseConsecutiveFailures = 0;
+let supabaseTemporarilyDisabled = false;
+let supabaseDisabledUntil = 0;
+
+function getSupabase(bypassCircuitBreaker: boolean = false) {
+  if (supabaseTemporarilyDisabled && !bypassCircuitBreaker) {
+    if (Date.now() < supabaseDisabledUntil) {
+      return null;
+    } else {
+      // Cooldown finished, try again
+      supabaseTemporarilyDisabled = false;
+      supabaseConsecutiveFailures = 0;
+    }
+  }
+
   let url = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   let key = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
   
@@ -108,7 +123,7 @@ function getSupabase() {
   return supabaseClient;
 }
 
-function withTimeout<T>(promise: Promise<T> | any, ms: number = 30000): Promise<T> {
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 2500): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
@@ -855,6 +870,12 @@ app.use((req, res, next) => {
       customSupabaseUrl = (url || "").trim();
       customSupabaseKey = (key || "").trim();
       supabaseClient = null; // force recreation of client with new credentials
+      
+      // Reset circuit breaker on manual credentials update
+      supabaseConsecutiveFailures = 0;
+      supabaseTemporarilyDisabled = false;
+      supabaseDisabledUntil = 0;
+
       console.log("Custom Supabase credentials set in server memory. URL size:", customSupabaseUrl.length, "Key size:", customSupabaseKey.length);
       res.json({ success: true, message: "Custom Supabase credentials updated in server memory successfully." });
     } catch (err: any) {
@@ -865,7 +886,8 @@ app.use((req, res, next) => {
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
     try {
-      const supabase = getSupabase();
+      // Diagnostic check bypasses the circuit breaker so the user can test/recover connection
+      const supabase = getSupabase(true);
       const resolvedUrl = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
       const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
@@ -882,12 +904,14 @@ app.use((req, res, next) => {
         });
       }
 
-      // Perform a ping / select test query against the database to check if schema is constructed
-      let { data, error } = await supabase.from("tenants").select("id").limit(1);
+      // Perform a ping / select test query against the database with a fast timeout (e.g. 2500ms) to check if schema is constructed
+      let testQuery = supabase.from("tenants").select("id").limit(1);
+      let { data, error } = await withTimeout<any>(testQuery, 2500);
 
       if (error) {
         console.warn("Supabase connection: tenants table query failed, trying branches table fallback...");
-        const { error: branchesErr } = await supabase.from("branches").select("id").limit(1);
+        let fallbackQuery = supabase.from("branches").select("id").limit(1);
+        const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 2500);
         if (!branchesErr) {
           error = null;
         }
@@ -906,6 +930,11 @@ app.use((req, res, next) => {
         });
       }
 
+      // Reset circuit breaker variables on successful connection test
+      supabaseConsecutiveFailures = 0;
+      supabaseTemporarilyDisabled = false;
+      supabaseDisabledUntil = 0;
+
       res.json({
         configured: true,
         connected: true,
@@ -917,6 +946,15 @@ app.use((req, res, next) => {
       });
     } catch (e: any) {
       console.error("Diagnosis Exception:", e);
+      
+      // Trigger circuit breaker on failed diagnostic check if it's a timeout/unreachable issue
+      supabaseConsecutiveFailures++;
+      if (supabaseConsecutiveFailures >= 2) {
+        supabaseTemporarilyDisabled = true;
+        supabaseDisabledUntil = Date.now() + 60000; // Disable queries for 60 seconds
+        console.warn(`[CIRCUIT BREAKER] Supabase disabled for 60 seconds due to consecutive connection test failures.`);
+      }
+
       const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
       const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || "";
@@ -1343,7 +1381,7 @@ app.use((req, res, next) => {
         });
       }
 
-      // Fetch all tables in parallel with a timeout to prevent hanging
+      // Fetch all tables in parallel with a timeout to prevent hanging (snappy 2500ms timeout)
       let [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
         Promise.all([
           supabase.from("branches").select("*").eq("tenantId", tenantId),
@@ -1351,7 +1389,7 @@ app.use((req, res, next) => {
           supabase.from("users").select("*").eq("tenantId", tenantId),
           supabase.from("deliveries").select("*").eq("tenantId", tenantId)
         ]),
-        30000
+        2500
       );
 
       // If schema tables don't exist yet, it'll error.
@@ -1373,7 +1411,7 @@ app.use((req, res, next) => {
               supabase.from("users").select("*").eq("tenantId", tenantId),
               supabase.from("deliveries").select("*").eq("tenantId", tenantId)
             ]),
-            30000
+            2500
           );
           rBranches = fBranches;
           rTrucks = fTrucks;
@@ -1387,6 +1425,11 @@ app.use((req, res, next) => {
       const deserializedUsers = (rUsers.data || []).map((u: any) => deserializeFromPhone(u));
       const deserializedTrucks = (rTrucks.data || []).map((t: any) => deserializeType(t));
 
+      // Reset failure counters on query success
+      supabaseConsecutiveFailures = 0;
+      supabaseTemporarilyDisabled = false;
+      supabaseDisabledUntil = 0;
+
       res.json({
         supabaseActive: true,
         branches: rBranches.data || [],
@@ -1395,6 +1438,17 @@ app.use((req, res, next) => {
         deliveries: rDeliveries.data || []
       });
     } catch (err: any) {
+      // Trigger circuit breaker for timeout or network unreachable errors
+      const errMsg = err.message || String(err);
+      if (errMsg.includes("timed out") || errMsg.includes("fetch failed") || errMsg.includes("ENOTFOUND") || errMsg.includes("ECONNREFUSED")) {
+        supabaseConsecutiveFailures++;
+        if (supabaseConsecutiveFailures >= 2) {
+          supabaseTemporarilyDisabled = true;
+          supabaseDisabledUntil = Date.now() + 60000; // Disable queries for 60 seconds
+          console.warn(`[CIRCUIT BREAKER] Supabase disabled for 60 seconds due to consecutive state load errors: ${errMsg}`);
+        }
+      }
+
       const dbError = formatDatabaseError(err);
       console.warn("Failed to read Supabase state, returning fallback mock data:", dbError);
       
