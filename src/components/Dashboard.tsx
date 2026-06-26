@@ -35,7 +35,9 @@ import {
   Clock,
   ArrowUp,
   Sliders,
-  Film
+  Film,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 // Regional Coordinate Dictionary for high-accuracy live geolocating
@@ -326,6 +328,28 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const [selectedDay, setSelectedDay] = useState<number>(12);
   const [selectedYear, setSelectedYear] = useState<number>(2024);
   const [expandedTruckId, setExpandedTruckId] = useState<string | null>(null);
+  
+  const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
+
+  // Manage Leaflet map invalidate size and block page scroll during fullscreen
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    }, 200);
+
+    if (isMapFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = '';
+    };
+  }, [isMapFullscreen]);
   
   // Clip generation animation states
   const [showCreateClipModal, setShowCreateClipModal] = useState<boolean>(false);
@@ -1148,7 +1172,11 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
       </div>
 
       {/* Interactive Regional Dispatch & Live Driver GPS Tracker */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-md overflow-hidden flex flex-col">
+      <div className={`bg-white border border-slate-200/80 shadow-md overflow-hidden flex flex-col transition-all duration-300 ${
+        isMapFullscreen 
+          ? 'fixed inset-0 z-[100] m-0 rounded-none w-screen h-screen' 
+          : 'relative rounded-2xl'
+      }`}>
         <div className="bg-slate-900 px-6 py-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800">
           <div className="space-y-1">
             <div className="flex items-center space-x-2.5">
@@ -1203,13 +1231,36 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 Satellite Zoom
               </button>
             </div>
+
+            {/* Desktop Fullscreen Toggle Anchor */}
+            <button
+              type="button"
+              onClick={() => setIsMapFullscreen(!isMapFullscreen)}
+              className="hidden md:inline-flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 font-semibold transition-all cursor-pointer select-none border-l border-slate-700 pl-3 ml-1"
+            >
+              {isMapFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  <span>Exit Fullscreen</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span>Expand Map Fullscreen</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[480px] font-sans">
+        <div className={`grid grid-cols-1 lg:grid-cols-12 font-sans ${
+          isMapFullscreen ? 'flex-1 min-h-0' : 'min-h-[480px]'
+        }`}>
           
           {/* Real zoomable Leaflet Map Container */}
-          <div className="lg:col-span-8 p-4 relative border-b lg:border-b-0 lg:border-r border-slate-200/85 flex flex-col justify-between overflow-hidden min-h-[430px] lg:min-h-[500px] bg-slate-50">
+          <div className={`lg:col-span-8 p-4 relative border-b lg:border-b-0 lg:border-r border-slate-200/85 flex flex-col justify-between overflow-hidden bg-slate-50 ${
+            isMapFullscreen ? 'h-full min-h-0' : 'min-h-[430px] lg:min-h-[500px]'
+          }`}>
             <div className="relative flex-1 w-full rounded-2xl overflow-hidden shadow-inner border border-slate-200">
               <div 
                 ref={mapContainerRef} 
@@ -1732,7 +1783,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         </div>
 
           {/* Telemetry Multi-Vehicle Tracking List Panel (Matches screenshot layout exactly) */}
-          <div className="lg:col-span-4 p-5 bg-slate-50 border-l border-slate-200 flex flex-col justify-between space-y-4 min-h-[500px]">
+          <div className={`lg:col-span-4 p-5 bg-slate-50 border-l border-slate-200 flex flex-col justify-between space-y-4 ${
+            isMapFullscreen ? 'h-full min-h-0 overflow-hidden' : 'min-h-[500px]'
+          }`}>
             
             <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
               
@@ -1743,7 +1796,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-inner focus:ring-1 focus:ring-blue-500/20"
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-705 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-inner focus:ring-1 focus:ring-blue-500/20"
                 />
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
                   <Search className="h-4 w-4" />
@@ -1760,7 +1813,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               </div>
 
                {/* 3. Listed Active Fleet Vehicles */}
-              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 max-h-[500px]">
+              <div className={`flex-1 overflow-y-auto space-y-3.5 pr-1 ${
+                isMapFullscreen ? 'max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)]' : 'max-h-[500px]'
+              }`}>
                 {(() => {
                   const currentIdlingMinutes = Math.floor((Date.now() - idlingStartTime) / 60000);
                   const combinedFleetList = trucks.map(t => {

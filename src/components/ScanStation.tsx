@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/library';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
 import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert, Trash2 } from 'lucide-react';
 
@@ -74,11 +74,16 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   const zxingCodeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   const [lockFocus, setLockFocus] = useState(false);
+  const lastScannedCodeRef = useRef<string>('');
+  const lastScannedTimeRef = useRef<number>(0);
 
   const startCamera = async (forceFullFrame?: boolean) => {
     const useFullFrame = forceFullFrame !== undefined ? forceFullFrame : fullFrameMode;
     setCameraError(null);
     setIsCameraActive(true);
+    
+    // Create a ref for isAutoScan to avoid stale closures inside the video decoder callback
+    const isAutoScanRef = { current: isAutoScan };
     
     // Allow DOM to update so container is mounted before starting scanner
     setTimeout(async () => {
@@ -91,7 +96,24 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           return;
         }
 
-        const codeReader = new BrowserMultiFormatReader();
+        // Configure hints for high-fidelity scanning (especially Code 39 / 1D linear barcodes)
+        const hints = new Map();
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39,
+          BarcodeFormat.QR_CODE,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.ITF,
+          BarcodeFormat.CODABAR,
+          BarcodeFormat.DATA_MATRIX,
+          BarcodeFormat.PDF_417,
+        ]);
+
+        const codeReader = new BrowserMultiFormatReader(hints);
         zxingCodeReaderRef.current = codeReader;
 
         // Try selecting back/environment camera if possible
@@ -110,15 +132,42 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           console.warn("Could not query camera device list, default constraints will handle camera selection:", deviceListErr);
         }
 
-        await codeReader.decodeFromVideoDevice(
-          selectedDeviceId,
+        // Build premium WebRTC constraints requesting continuous focus mode
+        const constraints: MediaStreamConstraints = {
+          video: {
+            deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+            facingMode: selectedDeviceId ? undefined : 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            advanced: [
+              { focusMode: 'continuous' } as any,
+              { focusMode: 'auto' } as any
+            ]
+          }
+        };
+
+        await codeReader.decodeFromConstraints(
+          constraints,
           videoElement,
           (result, error) => {
             if (result) {
               const text = result.getText();
+              const now = Date.now();
+              
+              // Throttle repeat scanning of the same barcode in rapid succession
+              if (text === lastScannedCodeRef.current && now - lastScannedTimeRef.current < 2500) {
+                return;
+              }
+              lastScannedCodeRef.current = text;
+              lastScannedTimeRef.current = now;
+
               console.log("ZXing decoded active stream barcode:", text);
               handleScanAction(text);
-              stopCamera();
+              
+              // If continuous scan is disabled, close the camera after a match
+              if (!isAutoScanRef.current) {
+                stopCamera();
+              }
             }
           }
         );
@@ -169,8 +218,23 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         console.warn("Client-side BarcodeDetector failed, falling back to ZXing:", detectorErr);
       }
 
-      // 2. ZXing fallback
-      const codeReader = new BrowserMultiFormatReader();
+      // 2. ZXing fallback with high-fidelity try-harder configuration
+      const hints = new Map();
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.ITF,
+        BarcodeFormat.CODABAR,
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.PDF_417,
+      ]);
+      const codeReader = new BrowserMultiFormatReader(hints);
       const img = new Image();
       img.src = dataUrl;
       await new Promise((resolve, reject) => {
@@ -858,14 +922,14 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
           {/* Engine Parameters & Controls */}
           <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-lg flex flex-col space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-700">Auto Scan Mode</span>
+              <span className="font-semibold text-slate-700">Continuous Scan</span>
               <div className="flex items-center space-x-2 bg-slate-100/50 px-1 py-0.5 rounded">
-                <span className="text-[10px] text-gray-500 font-mono font-medium">{isAutoScan ? 'Instant Capture' : 'Manual View'}</span>
+                <span className="text-[10px] text-gray-500 font-mono font-medium">{isAutoScan ? 'Keep Camera Open' : 'Single Match Close'}</span>
                 <button 
                   type="button"
                   onClick={() => setIsAutoScan(!isAutoScan)}
                   className={`w-9 h-5 rounded-full transition-colors relative ${isAutoScan ? 'bg-blue-600' : 'bg-slate-300'}`}
-                  aria-label="Toggle Auto-Scan mode"
+                  aria-label="Toggle Continuous-Scan mode"
                 >
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isAutoScan ? 'right-0.5' : 'left-0.5'}`} />
                 </button>
