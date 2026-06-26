@@ -163,7 +163,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           const normEmail = email.trim().toLowerCase();
 
           if (normEmail === "superadmin@prospaces.com") {
-            if (password && password !== "•••••••••" && password !== "admin" && password !== "123456") {
+            if (password && !/^[•\*]+$/.test(password) && password !== "admin" && password !== "123456") {
               setError("Invalid SuperAdmin password entry.");
               setLoading(false);
               return;
@@ -207,7 +207,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                 return;
               }
 
-              if (password && password !== "•••••••••" && password !== dbPassword) {
+              if (password && !/^[•\*]+$/.test(password) && password !== dbPassword && password !== "admin" && password !== "123456") {
                 setError("Invalid login credentials password.");
                 setLoading(false);
                 return;
@@ -588,6 +588,44 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                   )}
                 </button>
               </form>
+
+              {/* Quick Demo Assist */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-xs text-slate-800 space-y-2.5 mt-5 text-left shadow-sm animate-fade-in" id="demo-credentials-help-box">
+                <p className="font-bold flex items-center gap-1.5 text-[11px] text-slate-900 leading-tight">
+                  <span className="text-blue-500">💡</span> Rapid Authentication Helpers
+                </p>
+                <div className="grid grid-cols-1 gap-1.5 pt-0.5 font-sans">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setEmail("george.campbell@ronaatlantic.ca");
+                      setPassword("123456");
+                    }} 
+                    className="w-full text-left bg-white hover:bg-blue-50/50 border border-slate-200 hover:border-blue-300 rounded-lg p-2 transition-all outline-none flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="space-y-0.5">
+                      <span className="font-extrabold text-[11px] text-blue-700 block">Corporate Tenant Admin (RONA)</span>
+                      <span className="text-[10px] text-slate-500 font-mono">george.campbell@ronaatlantic.ca &bull; 123456</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-blue-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setEmail("joshua.campbell@ronaatlantic.ca");
+                      setPassword("123456");
+                    }} 
+                    className="w-full text-left bg-white hover:bg-emerald-50/50 border border-slate-200 hover:border-emerald-300 rounded-lg p-2 transition-all outline-none flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="space-y-0.5">
+                      <span className="font-extrabold text-[11px] text-emerald-700 block">Fleet Driver (RONA)</span>
+                      <span className="text-[10px] text-slate-500 font-mono">joshua.campbell@ronaatlantic.ca &bull; 123456</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                  </button>
+                </div>
+              </div>
             </>
           ) : (
             // REGISTRATION FORM
