@@ -216,44 +216,6 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('prospaces_active_tenant', JSON.stringify(tenant));
     localStorage.setItem('prospaces_active_user', JSON.stringify(user));
-    
-    // Auto-heal / force user insertion and vehicle association on login
-    let updatedUsers = [...users];
-    const userExists = updatedUsers.some(u => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
-    if (userExists) {
-      updatedUsers = updatedUsers.map(u => u.email.toLowerCase() === user.email.toLowerCase() ? { ...u, lastActive: new Date().toISOString() } : u);
-    } else {
-      updatedUsers.push({
-        ...user,
-        tenantId: tenant.id,
-        lastActive: new Date().toISOString()
-      });
-    }
-
-    let updatedTrucks = [...trucks];
-    if (user.role === 'Driver') {
-      const truckExists = updatedTrucks.some(t => t.driver.toLowerCase() === user.name.toLowerCase());
-      if (!truckExists) {
-        const isJoshua = user.name.toLowerCase().includes("joshua");
-        const defaultTruckId = isJoshua ? "TRUCK-28" : `TRUCK-${Math.floor(10 + Math.random() * 90)}`;
-        const defaultTruckName = isJoshua ? "Truck-2" : `Truck-Custom`;
-        const defaultType = isJoshua 
-          ? "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651" 
-          : "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938";
-        updatedTrucks.push({
-          id: defaultTruckId,
-          tenantId: tenant.id,
-          name: defaultTruckName,
-          type: defaultType,
-          driver: user.name,
-          branchId: user.associatedStoreId || "DC-WINAMILL"
-        });
-      }
-    }
-
-    setUsers(updatedUsers);
-    setTrucks(updatedTrucks);
-    syncStateToSupabase(tenant.id, deliveries, updatedTrucks, branches, updatedUsers);
   };
 
   const handleLogout = () => {
