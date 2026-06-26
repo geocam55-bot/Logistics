@@ -108,7 +108,7 @@ function getSupabase() {
   return supabaseClient;
 }
 
-function withTimeout<T>(promise: Promise<T> | any, ms: number = 3000): Promise<T> {
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 30000): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
@@ -1031,7 +1031,7 @@ app.use((req, res, next) => {
           .from("users")
           .select("*")
           .ilike("email", email.trim()),
-        3000
+        30000
       )) as any;
 
       if (error) {
@@ -1067,7 +1067,7 @@ app.use((req, res, next) => {
             .from("tenants")
             .select("*")
             .eq("id", user.tenantId),
-          3000
+          30000
         )) as any;
 
         return res.json({
@@ -1351,7 +1351,7 @@ app.use((req, res, next) => {
           supabase.from("users").select("*").eq("tenantId", tenantId),
           supabase.from("deliveries").select("*").eq("tenantId", tenantId)
         ]),
-        5000
+        30000
       );
 
       // If schema tables don't exist yet, it'll error.
@@ -1373,7 +1373,7 @@ app.use((req, res, next) => {
               supabase.from("users").select("*").eq("tenantId", tenantId),
               supabase.from("deliveries").select("*").eq("tenantId", tenantId)
             ]),
-            5000
+            30000
           );
           rBranches = fBranches;
           rTrucks = fTrucks;
