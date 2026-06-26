@@ -588,62 +588,6 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                   )}
                 </button>
               </form>
-
-              {/* Quick Demo Assist */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-800 space-y-3 mt-6 text-left shadow-sm" id="demo-credentials-help-box">
-                <p className="font-bold flex items-center gap-1.5 text-[11.5px] text-slate-900 leading-tight">
-                  <span className="text-blue-500">💡</span> Rapid Authentication Helpers
-                </p>
-                <p className="text-[10.5px] leading-relaxed text-slate-500 font-sans font-medium">
-                  Select one of the system profiles below to instantly prefill credentials and sign in:
-                </p>
-                <div className="grid grid-cols-1 gap-2 pt-1 font-sans">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setEmail("superadmin@prospaces.com");
-                      setPassword("admin");
-                    }} 
-                    className="w-full text-left bg-white hover:bg-violet-50 border border-slate-200 hover:border-violet-300 rounded-lg p-2.5 transition-all outline-none flex items-center justify-between cursor-pointer group"
-                  >
-                    <div className="space-y-0.5">
-                      <span className="font-extrabold text-[11px] text-violet-700 block group-hover:text-violet-800">Global SuperAdmin</span>
-                      <span className="text-[10px] text-slate-400 font-mono">superadmin@prospaces.com &bull; admin</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-violet-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setEmail("george.campbell@ronaatlantic.ca");
-                      setPassword("•••••••••");
-                    }} 
-                    className="w-full text-left bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-350 rounded-lg p-2.5 transition-all outline-none flex items-center justify-between cursor-pointer group"
-                  >
-                    <div className="space-y-0.5">
-                      <span className="font-extrabold text-[11px] text-blue-700 block group-hover:text-blue-800">Corporate Tenant Admin (RONA)</span>
-                      <span className="text-[10px] text-slate-400 font-mono">george.campbell@ronaatlantic.ca</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-blue-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setEmail("joshua.campbell@ronaatlantic.ca");
-                      setPassword("•••••••••");
-                    }} 
-                    className="w-full text-left bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg p-2.5 transition-all outline-none flex items-center justify-between cursor-pointer group"
-                  >
-                    <div className="space-y-0.5">
-                      <span className="font-extrabold text-[11px] text-emerald-700 block group-hover:text-emerald-800">Fleet Driver (RONA)</span>
-                      <span className="text-[10px] text-slate-400 font-mono">joshua.campbell@ronaatlantic.ca</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
-                  </button>
-                </div>
-              </div>
             </>
           ) : (
             // REGISTRATION FORM
