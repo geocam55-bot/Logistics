@@ -1061,49 +1061,55 @@ export default function App() {
       
       {/* Enterprise Brand Header */}
       <header className="bg-white text-slate-800 shadow-sm border-b border-slate-200/80" id="prospaces-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           
           {/* Logo & title context */}
-          <div className="flex items-center space-x-4 text-center sm:text-left">
+          <div className="flex items-center space-x-3 sm:space-x-4 text-left flex-row w-full sm:w-auto">
             <div className="shrink-0 flex items-center justify-center">
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-16 sm:h-20 w-auto object-contain animate-fade-in"
+                className="h-10 sm:h-20 w-auto object-contain animate-fade-in"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
-              <h1 className="font-sans font-black text-slate-900 text-base sm:text-lg tracking-tight leading-tight">
+              <h1 className="font-sans font-black text-slate-900 text-sm sm:text-lg tracking-tight leading-tight">
                 {currentTenant.name}
               </h1>
-              <p className="text-slate-500 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mt-0.5 leading-none flex items-center justify-center sm:justify-start gap-2">
+              <p className="text-slate-500 text-[9px] sm:text-xs font-semibold uppercase tracking-wider mt-0.5 leading-none flex items-center gap-1.5">
                 <span>Enterprise Logistics Portal</span>
                 <span className="opacity-40">&bull;</span>
-                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold">{currentTenant.code}</span>
+                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{currentTenant.code}</span>
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Logged-In User Profile context */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200/85 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-600">
-              <Store className="h-3.5 w-3.5 text-slate-400" />
-              <span>{branches.length} Registers &bull; {trucks.length} Vehicles</span>
+          <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2.5">
+            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200/85 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono text-slate-600">
+              <Store className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400" />
+              <span>{branches.length} Regs &bull; {trucks.length} Vehs</span>
             </div>
 
             {/* Authenticated User Badge & Logout Switcher */}
-            <div className="flex items-center space-x-2.5 border-l border-slate-200 pl-3">
-              <div className="hidden lg:flex flex-col text-right">
+            <div className="flex items-center space-x-2 border-l border-slate-200 pl-2.5">
+              <div className="hidden sm:flex flex-col text-right font-sans">
                 <span className="text-xs font-black leading-none text-slate-800">{currentUser.name}</span>
                 <span className="text-[9px] font-mono text-slate-500 leading-none mt-1 uppercase font-bold tracking-wider">
+                  {currentUser.role}
+                </span>
+              </div>
+              <div className="sm:hidden flex flex-col text-right pr-1 font-sans">
+                <span className="text-[10px] font-bold leading-none text-slate-800 truncate max-w-[80px]">{currentUser.name.split(' ')[0]}</span>
+                <span className="text-[8px] font-mono text-slate-400 leading-none mt-0.5 uppercase tracking-wider">
                   {currentUser.role}
                 </span>
               </div>
               <button 
                 onClick={handleLogout}
                 title="Logout & Switch Logistical Tenant"
-                className="text-slate-500 hover:text-slate-800 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center border border-slate-200"
+                className="text-slate-500 hover:text-slate-800 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center border border-slate-200 cursor-pointer shrink-0"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -1117,11 +1123,11 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="prospaces-body">
         
         {/* Navigation Tabs bar */}
-        <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-wrap gap-1 shadow-sm w-full" id="prospaces-nav">
+        <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-nowrap md:flex-wrap overflow-x-auto md:overflow-x-visible gap-1 shadow-sm w-full scrollbar-none select-none" id="prospaces-nav" style={{ WebkitOverflowScrolling: 'touch' }}>
           
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
               activeTab === 'dashboard' 
                 ? theme.activeBtn
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -1134,7 +1140,7 @@ export default function App() {
           {['Admin', 'Dispatcher', 'Driver'].includes(currentUser?.role || '') && (
             <button
               onClick={() => setActiveTab('scanner')}
-              className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+              className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
                 activeTab === 'scanner' 
                   ? theme.activeBtn
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -1147,7 +1153,7 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('queue')}
-            className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
               activeTab === 'queue' 
                 ? theme.activeBtn
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -1160,7 +1166,7 @@ export default function App() {
           {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
             <button
               onClick={() => setActiveTab('document-import')}
-              className={`flex-1 sm:flex-initial py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
+              className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
                 activeTab === 'document-import' 
                   ? theme.activeBtn
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -1171,86 +1177,75 @@ export default function App() {
             </button>
           )}
 
-          {/* Interactive Fleet Setup Dropdown trigger */}
+          {/* Fleet Setup Switcher Button */}
           {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-            <div className="relative flex-1 sm:flex-initial">
-              <button
-                onClick={() => setIsFleetDropdownOpen(!isFleetDropdownOpen)}
-                className={`w-full py-2 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all ${
-                  ['stores', 'trucks', 'users', 'architecture'].includes(activeTab)
-                    ? theme.activeBtn
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <TruckIcon className="h-4 w-4" />
-                <span>Fleet Setup</span>
-                <ChevronDown className="h-3 w-3 opacity-80" />
-              </button>
-              {isFleetDropdownOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setIsFleetDropdownOpen(false)}
-                  />
-                  <div className="absolute left-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden py-1">
-                    <div className="px-3 py-1.5 border-b border-slate-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">
-                      Registries Setup
-                    </div>
-                    <button
-                      onClick={() => {
-                        setActiveTab('stores');
-                        setIsFleetDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                        activeTab === 'stores' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Store className="h-3.5 w-3.5 text-blue-600" />
-                      <span>Stores</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('trucks');
-                        setIsFleetDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                        activeTab === 'trucks' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <TruckIcon className="h-3.5 w-3.5 text-blue-600" />
-                      <span>Trucks</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('users');
-                        setIsFleetDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                        activeTab === 'users' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Users className="h-3.5 w-3.5 text-blue-600" />
-                      <span>Users</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('architecture');
-                        setIsFleetDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center space-x-2.5 transition-colors ${
-                        activeTab === 'architecture' ? theme.accentBg : 'text-gray-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Layers3 className="h-3.5 w-3.5 text-blue-600" />
-                      <span>Overall Architecture</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              onClick={() => {
+                // Default to stores sub-tab when clicking Fleet Setup
+                setActiveTab('stores');
+              }}
+              className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
+                ['stores', 'trucks', 'users', 'architecture'].includes(activeTab)
+                  ? theme.activeBtn
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <TruckIcon className="h-4 w-4" />
+              <span>Fleet Setup</span>
+            </button>
           )}
 
         </div>
+
+        {/* Secondary Sub-navigation for Fleet Setup */}
+        {['stores', 'trucks', 'users', 'architecture'].includes(activeTab) && (
+          <div className="bg-slate-100 border border-slate-200/50 p-1 rounded-xl flex flex-nowrap overflow-x-auto gap-1 shadow-inner w-full scrollbar-none select-none animate-fade-in" id="prospaces-subnav" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <button
+              onClick={() => setActiveTab('stores')}
+              className={`flex-1 py-1.5 px-3.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 whitespace-nowrap ${
+                activeTab === 'stores'
+                  ? 'bg-white text-blue-800 shadow-xs border border-slate-200/40'
+                  : 'text-gray-500 hover:bg-white/50 hover:text-gray-800'
+              }`}
+            >
+              <Store className="h-3.5 w-3.5 text-blue-600" />
+              <span>Stores</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('trucks')}
+              className={`flex-1 py-1.5 px-3.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 whitespace-nowrap ${
+                activeTab === 'trucks'
+                  ? 'bg-white text-blue-800 shadow-xs border border-slate-200/40'
+                  : 'text-gray-500 hover:bg-white/50 hover:text-gray-800'
+              }`}
+            >
+              <TruckIcon className="h-3.5 w-3.5 text-blue-600" />
+              <span>Trucks</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex-1 py-1.5 px-3.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 whitespace-nowrap ${
+                activeTab === 'users'
+                  ? 'bg-white text-blue-800 shadow-xs border border-slate-200/40'
+                  : 'text-gray-500 hover:bg-white/50 hover:text-gray-800'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5 text-blue-600" />
+              <span>Users</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('architecture')}
+              className={`flex-1 py-1.5 px-3.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 whitespace-nowrap ${
+                activeTab === 'architecture'
+                  ? 'bg-white text-blue-800 shadow-xs border border-slate-200/40'
+                  : 'text-gray-500 hover:bg-white/50 hover:text-gray-800'
+              }`}
+            >
+              <Layers3 className="h-3.5 w-3.5 text-blue-600" />
+              <span>Overall Architecture</span>
+            </button>
+          </div>
+        )}
         {/* Dynamic content area depending on tabs */}
         <div className="flex-1 transition-all duration-300" id="current-tab-view">
           {activeTab === 'dashboard' && (
