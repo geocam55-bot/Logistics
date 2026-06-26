@@ -34,9 +34,8 @@ import {
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
 
-// Global window.fetch interceptor to automatically inject custom Supabase headers for stateless backend resilience
-const originalFetch = window.fetch;
-window.fetch = async function (input, init) {
+// Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
+async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input && 'url' in (input as any) ? (input as any).url : ''));
   if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
     const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
@@ -53,8 +52,8 @@ window.fetch = async function (input, init) {
       init.headers = headers;
     }
   }
-  return originalFetch.call(this, input, init);
-};
+  return window.fetch(input, init);
+}
 
 const getThemeClasses = (color: string) => {
   // Always return the classic corporate blue styling to match previous design
@@ -116,7 +115,7 @@ export default function App() {
     const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
     if (savedUrl && savedKey) {
       initializeFrontendSupabase(savedUrl, savedKey);
-      fetch('/api/setup-custom-supabase', {
+      customFetch('/api/setup-custom-supabase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: savedUrl, key: savedKey })
@@ -324,7 +323,7 @@ export default function App() {
       localStorage.setItem('prospaces_custom_supabase_key', key);
 
       // Send to backend server
-      const res = await fetch('/api/setup-custom-supabase', {
+      const res = await customFetch('/api/setup-custom-supabase', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -364,7 +363,7 @@ export default function App() {
       initializeFrontendSupabase('', '');
 
       // Reset backend
-      await fetch('/api/setup-custom-supabase', {
+      await customFetch('/api/setup-custom-supabase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: '', key: '' })
@@ -388,7 +387,7 @@ export default function App() {
 
   const checkSupabaseStatus = async () => {
     try {
-      const res = await fetch("/api/supabase-status");
+      const res = await customFetch("/api/supabase-status");
       if (!res.ok) {
         throw new Error(`Server returned non-ok status: ${res.status}`);
       }
@@ -433,7 +432,7 @@ export default function App() {
 
     setSyncStatus('SYNCING');
     try {
-      const res = await fetch('/api/tenant/save-state', {
+      const res = await customFetch('/api/tenant/save-state', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -493,7 +492,7 @@ export default function App() {
 
         let data: any;
         try {
-          const res = await fetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
+          const res = await customFetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
           if (!res.ok) {
             throw new Error(`Server returned error status ${res.status}`);
           }
@@ -685,7 +684,7 @@ export default function App() {
         // Run connectivity diagnostics on mount to initialize the frontend Supabase client early
         checkSupabaseStatus().catch(() => {});
 
-        const res = await fetch("/api/tenants");
+        const res = await customFetch("/api/tenants");
         if (!res.ok) {
           throw new Error(`Server returned non-ok status: ${res.status}`);
         }
@@ -716,7 +715,7 @@ export default function App() {
 
   const handleAddTenant = async (newTenant: Tenant) => {
     try {
-      const res = await fetch("/api/tenants", {
+      const res = await customFetch("/api/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenant: newTenant })
@@ -743,7 +742,7 @@ export default function App() {
 
   const handleUpdateTenant = async (updatedTenant: Tenant) => {
     try {
-      const res = await fetch("/api/tenants", {
+      const res = await customFetch("/api/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenant: updatedTenant })
@@ -770,7 +769,7 @@ export default function App() {
 
   const handleDeleteTenant = async (id: string) => {
     try {
-      const res = await fetch(`/api/tenants/${id}`, {
+      const res = await customFetch(`/api/tenants/${id}`, {
         method: "DELETE"
       });
       if (!res.ok) {
@@ -809,7 +808,7 @@ export default function App() {
 
   const deleteRecordWithFallback = async (table: string, id: string, tenantId: string) => {
     try {
-      const res = await fetch(`/api/tenant/delete-record?table=${table}&id=${id}&tenantId=${tenantId}`, { method: 'DELETE' });
+      const res = await customFetch(`/api/tenant/delete-record?table=${table}&id=${id}&tenantId=${tenantId}`, { method: 'DELETE' });
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
@@ -923,7 +922,7 @@ export default function App() {
       // Call the live API to wipe database records permanently
       setSyncStatus('SYNCING');
       try {
-        const res = await fetch("/api/tenant/clear-all", {
+        const res = await customFetch("/api/tenant/clear-all", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
