@@ -34,6 +34,28 @@ import {
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1781387785955.jpg';
 
+// Global window.fetch interceptor to automatically inject custom Supabase headers for stateless backend resilience
+const originalFetch = window.fetch;
+window.fetch = async function (input, init) {
+  const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input && 'url' in (input as any) ? (input as any).url : ''));
+  if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
+    const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
+    const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
+    if (savedUrl && savedKey) {
+      init = init || {};
+      const headers = new Headers(init.headers || {});
+      if (!headers.has('x-custom-supabase-url')) {
+        headers.set('x-custom-supabase-url', savedUrl);
+      }
+      if (!headers.has('x-custom-supabase-key')) {
+        headers.set('x-custom-supabase-key', savedKey);
+      }
+      init.headers = headers;
+    }
+  }
+  return originalFetch.call(this, input, init);
+};
+
 const getThemeClasses = (color: string) => {
   // Always return the classic corporate blue styling to match previous design
   return {

@@ -438,6 +438,25 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Dynamic headers middleware to seamlessly support multi-tenant custom Supabase connections
+app.use((req, res, next) => {
+  const customUrlHeader = req.headers["x-custom-supabase-url"];
+  const customKeyHeader = req.headers["x-custom-supabase-key"];
+  if (customUrlHeader) {
+    const urlStr = Array.isArray(customUrlHeader) ? customUrlHeader[0] : customUrlHeader;
+    if (urlStr && urlStr.trim()) {
+      customSupabaseUrl = urlStr.trim();
+    }
+  }
+  if (customKeyHeader) {
+    const keyStr = Array.isArray(customKeyHeader) ? customKeyHeader[0] : customKeyHeader;
+    if (keyStr && keyStr.trim()) {
+      customSupabaseKey = keyStr.trim();
+    }
+  }
+  next();
+});
+
 // Support Vercel routing where the path might omit or include /api
 if (process.env.VERCEL) {
   app.use((req, res, next) => {
