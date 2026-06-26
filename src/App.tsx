@@ -86,6 +86,7 @@ export default function App() {
   const [customDbKey, setCustomDbKey] = useState(() => localStorage.getItem('prospaces_custom_supabase_key') || '');
   const [configSaving, setConfigSaving] = useState(false);
   const [configMsg, setConfigMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isDbInitializing, setIsDbInitializing] = useState(() => !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key')));
 
   // Load custom credentials from localStorage on mount and register them with the backend memory store
   useEffect(() => {
@@ -98,10 +99,17 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: savedUrl, key: savedKey })
       }).then(() => {
-        checkSupabaseStatus().catch(() => {});
+        return checkSupabaseStatus();
+      }).then(() => {
+        setIsDbInitializing(false);
+        setLoadTrigger(prev => prev + 1);
       }).catch(err => {
         console.warn("Failed to notify backend server of custom Supabase credentials:", err);
+        setIsDbInitializing(false);
+        setLoadTrigger(prev => prev + 1);
       });
+    } else {
+      setIsDbInitializing(false);
     }
   }, []);
 
@@ -448,6 +456,10 @@ export default function App() {
   // Hydrate state from Supabase dynamically on tenant switch or manual retry trigger
   useEffect(() => {
     if (!currentTenant) return;
+    if (isDbInitializing) {
+      console.log("Postponing state load until custom database initialization completes...");
+      return;
+    }
 
     const tenantId = currentTenant.id;
 
@@ -537,7 +549,7 @@ export default function App() {
     };
 
     loadState();
-  }, [currentTenant, loadTrigger]);
+  }, [currentTenant, loadTrigger, isDbInitializing]);
 
   // Periodic state polling to retrieve live driver GPS and order updates on desktop/other mobiles
   useEffect(() => {
