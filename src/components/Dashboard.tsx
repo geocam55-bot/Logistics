@@ -291,13 +291,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
   // Persistent tracking for vehicle idling duration to prevent the metric from being hardcoded
   const [idlingStartTime] = useState<number>(() => {
-    const saved = localStorage.getItem("rona_idling_start_time");
+    const saved = localStorage.getItem("prospaces_idling_start_time");
     if (saved) {
       return parseInt(saved, 10);
     } else {
       // Set to 45 minutes ago initially so it starts at exactly 45 minutes
       const fortyFiveMinsAgo = Date.now() - (45 * 60 * 1000);
-      localStorage.setItem("rona_idling_start_time", String(fortyFiveMinsAgo));
+      localStorage.setItem("prospaces_idling_start_time", String(fortyFiveMinsAgo));
       return fortyFiveMinsAgo;
     }
   });
@@ -499,10 +499,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         targetLng = orig.lng;
       } else {
         const homeBranch = activeBranches.find(b => b.id === selectedTruck.branchId);
-        const isRona = selectedTruck.tenantId === 'ronaatlantic';
+        const isProSpaces = selectedTruck.tenantId === 'prospaces';
         const orig = homeBranch 
           ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
-          : isRona 
+          : isProSpaces 
             ? { lat: 44.6488, lng: -63.5752 } 
             : { lat: 37.2872, lng: -121.9500 };
         targetLat = orig.lat;
@@ -815,10 +815,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
         } else {
           const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-          const isRona = truck.tenantId === 'ronaatlantic';
+          const isProSpaces = truck.tenantId === 'prospaces';
           const orig = homeBranch 
             ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
-            : isRona 
+            : isProSpaces 
               ? { lat: 44.6488, lng: -63.5752 } 
               : { lat: 37.2872, lng: -121.9500 };
           origLat = isNaN(orig.lat) ? 44.6488 : orig.lat;
@@ -1451,10 +1451,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   destLat = dest.lat; destLng = dest.lng;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === matchedTruck.branchId);
-                  const isRona = matchedTruck.tenantId === 'ronaatlantic';
+                  const isProSpaces = matchedTruck.tenantId === 'prospaces';
                   const orig = homeBranch 
                     ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
-                    : isRona 
+                    : isProSpaces 
                       ? { lat: 44.6488, lng: -63.5752 } 
                       : { lat: 37.2872, lng: -121.9500 };
                   origLat = orig.lat; origLng = orig.lng;
@@ -1515,10 +1515,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   destLat = dest.lat; destLng = dest.lng;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-                  const isRona = truck.tenantId === 'ronaatlantic';
+                  const isProSpaces = truck.tenantId === 'prospaces';
                   const orig = homeBranch 
                     ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
-                    : isRona 
+                    : isProSpaces 
                       ? { lat: 44.6488, lng: -63.5752 } 
                       : { lat: 37.2872, lng: -121.9500 };
                   origLat = orig.lat; origLng = orig.lng;
@@ -1682,10 +1682,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-                  const isRona = truck.tenantId === 'ronaatlantic';
+                  const isProSpaces = truck.tenantId === 'prospaces';
                   const orig = homeBranch 
                     ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
-                    : isRona 
+                    : isProSpaces 
                       ? { lat: 44.6488, lng: -63.5752 } 
                       : { lat: 37.2872, lng: -121.9500 };
                   origLat = orig.lat; origLng = orig.lng;

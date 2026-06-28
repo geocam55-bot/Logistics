@@ -25,6 +25,11 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
   const [error, setError] = useState<string | null>(null);
   const [showMemberLookup, setShowMemberLookup] = useState(false);
 
+  // Password reset request states
+  const [isRequestingReset, setIsRequestingReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+
   // Helper: map email to correct Tenant of the workspace
   const determineTenantFromEmail = (enteredEmail: string): Tenant => {
     const list = tenantsList || TENANTS;
@@ -52,7 +57,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       primaryColor: 'blue'
     };
 
-    // 1. Prioritize full/exact tenant ID match (e.g. "ronaatlantic" in "george.campbell@ronaatlantic.ca")
+    // 1. Prioritize full/exact tenant ID match (e.g. "prospaces" in "george.campbell@prospaces.com")
     for (const t of list) {
       if (norm.includes(t.id.toLowerCase())) {
         return t;
@@ -163,7 +168,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           const normEmail = email.trim().toLowerCase();
 
           if (normEmail === "superadmin@prospaces.com") {
-            if (password && !/^[•\*]+$/.test(password) && password !== "admin" && password !== "123456") {
+            if (password && !/^[•\*]+$/.test(password) && password !== "SuperAdmin2026!") {
               setError("Invalid SuperAdmin password entry.");
               setLoading(false);
               return;
@@ -198,7 +203,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
               console.error("Direct Supabase query error:", dbErr);
             } else if (data && data.length > 0) {
               const userObj = deserializeFromPhone(data[0]);
-              const dbPassword = userObj.password || "123456";
+              const dbPassword = userObj.password || "";
               const uStatus = userObj.status || "Active";
 
               if (uStatus === "Inactive") {
@@ -207,7 +212,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                 return;
               }
 
-              if (password && !/^[•\*]+$/.test(password) && password !== dbPassword && password !== "admin" && password !== "123456") {
+              if (password && !/^[•\*]+$/.test(password) && password !== dbPassword) {
                 setError("Invalid login credentials password.");
                 setLoading(false);
                 return;
@@ -255,21 +260,31 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
         // Define fallback user matching entered email or default to George Campbell
         const fallbackEmail = email.trim().toLowerCase();
         const fallbackTenant = resolvedTenant || {
-          id: 'ronaatlantic',
-          name: 'RONA Atlantic',
-          code: 'RA',
-          description: 'Corporate logistics tracking for RONA franchise dealer stores.',
+          id: 'prospaces',
+          name: 'ProSpaces Logistics',
+          code: 'PS',
+          description: 'Corporate logistics tracking for ProSpaces distributor and dealer stores.',
           logoBadge: '🏢',
           regionalFocus: 'Atlantic Canada (Dartmouth, Tantallon, Halifax)',
           primaryColor: 'blue'
         };
 
         let fallbackUser: User;
-        if (fallbackEmail.includes("joshua")) {
+        if (fallbackEmail === "superadmin@prospaces.com" || fallbackEmail === "superadmin") {
+          fallbackUser = {
+            id: "USR-SUPER-ADMIN-01",
+            name: "ProSpaces Super Admin",
+            email: "superadmin@prospaces.com",
+            role: "SUPER_ADMIN",
+            phone: "(902) 555-0000",
+            status: "Active",
+            associatedStoreId: "DC-WINAMILL"
+          };
+        } else if (fallbackEmail.includes("joshua")) {
           fallbackUser = {
             id: "USR-1869",
             name: "Joshua Campbell",
-            email: "joshua.campbell@ronaatlantic.ca",
+            email: "joshua.campbell@prospaces.com",
             role: "Driver",
             phone: "(902) 555-1869",
             status: "Active",
@@ -279,7 +294,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           fallbackUser = {
             id: "USR-57008",
             name: "George Campbell",
-            email: "george.campbell@ronaatlantic.ca",
+            email: "george.campbell@prospaces.com",
             role: "Admin",
             phone: "(902) 555-0199",
             status: "Active",
@@ -344,7 +359,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
             tenantId: resolvedTenant.id,
             associatedStoreId: storeHub,
             phone: customPhone.trim() || '(902) 555-0199',
-            password: password && password !== '•••••••••' ? password : '123456'
+            password: password && password !== '•••••••••' ? password : 'ProSpaces2026!'
           })
         });
 
@@ -376,7 +391,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           role: customRole,
           phone: customPhone.trim() || '(902) 555-0199',
           associatedStoreId: storeHub,
-          password: password && password !== '•••••••••' ? password : '123456',
+          password: password && password !== '•••••••••' ? password : 'ProSpaces2026!',
           status: "Active"
         };
 
@@ -428,6 +443,78 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Could not complete real user database registration.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetRequestSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setError("Please enter your email address.");
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    setResetSuccessMessage(null);
+    
+    try {
+      const supabase = getFrontendSupabase();
+      if (!supabase) {
+        setError("Database is currently offline. Please contact your local administrator.");
+        setLoading(false);
+        return;
+      }
+      
+      const emailQuery = resetEmail.trim().toLowerCase();
+      // Look up user
+      const { data, error: dbErr } = await supabase
+        .from("users")
+        .select("*")
+        .ilike("email", emailQuery);
+        
+      if (dbErr) {
+        throw dbErr;
+      }
+      
+      if (!data || data.length === 0) {
+        setError(`We couldn't find an account associated with '${resetEmail}'. Please check the email spelling.`);
+        setLoading(false);
+        return;
+      }
+      
+      const userRecord = data[0];
+      const deserializedUser = deserializeFromPhone(userRecord);
+      
+      // Mark as password reset requested
+      deserializedUser.resetRequest = "Requested";
+      
+      // Reserialize to phone
+      const phonePayload = serializeToPhone(
+        deserializedUser.phone, 
+        deserializedUser.password, 
+        deserializedUser.status, 
+        deserializedUser.driverLicenseExpire, 
+        deserializedUser.lastActive,
+        deserializedUser.resetRequest
+      );
+      
+      // Update in Supabase
+      const { error: updateErr } = await supabase
+        .from("users")
+        .update({ phone: phonePayload })
+        .eq("id", userRecord.id);
+        
+      if (updateErr) {
+        throw updateErr;
+      }
+      
+      setResetSuccessMessage(`Your password reset request has been sent to the Admin! Please notify George Campbell or your local branch administrator to approve and set your new password.`);
+      setResetEmail('');
+    } catch (err: any) {
+      console.error("Password reset request error:", err);
+      setError("An error occurred while submitting your password reset request. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -505,12 +592,14 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           </div>
 
           <h2 className="text-2xl font-bold font-sans text-slate-1000 text-center tracking-tight mb-1.5" style={{ color: '#0f172a' }}>
-            {isRegistering ? 'Register Live Account' : 'Members Sign In'}
+            {isRequestingReset ? 'Reset Your Password' : isRegistering ? 'Register Live Account' : 'Members Sign In'}
           </h2>
           <p className="text-slate-400 text-center text-xs mb-8">
-            {isRegistering 
-              ? 'Enter your profile details to create an isolated database row.' 
-              : 'Enter your credentials to access your workspace.'}
+            {isRequestingReset
+              ? 'Submit a request to your administrator to reset your password.'
+              : isRegistering 
+                ? 'Enter your profile details to create an isolated database row.' 
+                : 'Enter your credentials to access your workspace.'}
           </p>
 
           {error && (
@@ -520,7 +609,60 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
             </div>
           )}
 
-          {!isRegistering ? (
+          {resetSuccessMessage && (
+            <div className="mb-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 text-xs text-emerald-800 flex items-start space-x-2.5 leading-relaxed">
+              <span className="text-emerald-500 font-bold shrink-0">✅</span>
+              <span>{resetSuccessMessage}</span>
+            </div>
+          )}
+
+          {isRequestingReset ? (
+            <>
+              {/* PASSWORD RESET REQUEST FLOW */}
+              <form onSubmit={handleResetRequestSubmit} className="space-y-4">
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <Mail className="h-4 w-4 text-slate-400" />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      placeholder="you@company.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+                >
+                  {loading ? 'Submitting Request...' : 'Send Password Change Request'}
+                </button>
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRequestingReset(false);
+                      setError(null);
+                      setResetSuccessMessage(null);
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 hover:underline animate-fade-in"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              </form>
+            </>
+          ) : !isRegistering ? (
             <>
               {/* SIGN IN FLOW */}
               <form onSubmit={handleFormLogin} className="space-y-4">
@@ -553,8 +695,12 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                     </label>
                     <button 
                       type="button"
-                      onClick={() => setError("Password reset is managed by your local branch administrator.")}
-                      className="text-xs font-semibold text-blue-650 hover:text-blue-700 hover:underline"
+                      onClick={() => {
+                        setIsRequestingReset(true);
+                        setError(null);
+                        setResetSuccessMessage(null);
+                      }}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
                     >
                       Forgot password?
                     </button>
@@ -588,44 +734,6 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                   )}
                 </button>
               </form>
-
-              {/* Quick Demo Assist */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-xs text-slate-800 space-y-2.5 mt-5 text-left shadow-sm animate-fade-in" id="demo-credentials-help-box">
-                <p className="font-bold flex items-center gap-1.5 text-[11px] text-slate-900 leading-tight">
-                  <span className="text-blue-500">💡</span> Rapid Authentication Helpers
-                </p>
-                <div className="grid grid-cols-1 gap-1.5 pt-0.5 font-sans">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setEmail("george.campbell@ronaatlantic.ca");
-                      setPassword("123456");
-                    }} 
-                    className="w-full text-left bg-white hover:bg-blue-50/50 border border-slate-200 hover:border-blue-300 rounded-lg p-2 transition-all outline-none flex items-center justify-between cursor-pointer group"
-                  >
-                    <div className="space-y-0.5">
-                      <span className="font-extrabold text-[11px] text-blue-700 block">Corporate Tenant Admin (RONA)</span>
-                      <span className="text-[10px] text-slate-500 font-mono">george.campbell@ronaatlantic.ca &bull; 123456</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-blue-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setEmail("joshua.campbell@ronaatlantic.ca");
-                      setPassword("123456");
-                    }} 
-                    className="w-full text-left bg-white hover:bg-emerald-50/50 border border-slate-200 hover:border-emerald-300 rounded-lg p-2 transition-all outline-none flex items-center justify-between cursor-pointer group"
-                  >
-                    <div className="space-y-0.5">
-                      <span className="font-extrabold text-[11px] text-emerald-700 block">Fleet Driver (RONA)</span>
-                      <span className="text-[10px] text-slate-500 font-mono">joshua.campbell@ronaatlantic.ca &bull; 123456</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-500 shrink-0 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
-                  </button>
-                </div>
-              </div>
             </>
           ) : (
             // REGISTRATION FORM

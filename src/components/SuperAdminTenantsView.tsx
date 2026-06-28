@@ -61,7 +61,7 @@ export default function SuperAdminTenantsView({
   
   // User Form fields
   const [userEmail, setUserEmail] = useState('');
-  const [userPassword, setUserPassword] = useState('123456');
+  const [userPassword, setUserPassword] = useState('ProSpaces2026!');
   const [userFullName, setUserFullName] = useState('');
   const [userRole, setUserRole] = useState<'User' | 'Driver' | 'Dispatcher' | 'Admin'>('User');
   const [userStatus, setUserStatus] = useState<'Active' | 'Inactive'>('Active');
@@ -129,7 +129,7 @@ export default function SuperAdminTenantsView({
 
   const resetUserForm = () => {
     setUserEmail('');
-    setUserPassword('123456');
+    setUserPassword('ProSpaces2026!');
     setUserFullName('');
     setUserRole('User');
     setUserStatus('Active');
@@ -401,7 +401,7 @@ export default function SuperAdminTenantsView({
   const fillUserEdit = (user: User) => {
     setEditingUserId(user.id);
     setUserEmail(user.email);
-    setUserPassword(user.password || '123456');
+    setUserPassword(user.password || '');
     setUserFullName(user.name);
     setUserRole(user.role as any || 'User');
     setUserStatus(user.status || 'Active');
@@ -1071,7 +1071,7 @@ export default function SuperAdminTenantsView({
                             <p className="font-mono text-[10px] text-slate-450 flex items-center space-x-1.5 pt-0.5">
                               <span className="text-slate-500 font-bold shrink-0">Passcode:</span>
                               <span className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-400 tracking-wider">
-                                {u.password || '123456'}
+                                {u.password || 'ProSpaces2026!'}
                               </span>
                             </p>
                           </div>

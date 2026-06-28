@@ -155,7 +155,7 @@ function formatDatabaseError(err: any): string {
   return msg;
 }
 
-function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined): string {
+function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined): string {
   const basePhone = (phone || "").trim();
   let res = basePhone;
   if (password) {
@@ -170,6 +170,9 @@ function serializeToPhone(phone: string | undefined, password: string | undefine
   if (lastActive) {
     res += ` ||lastact:${lastActive}`;
   }
+  if (resetRequest) {
+    res += ` ||resetreq:${resetRequest}`;
+  }
   return res;
 }
 
@@ -177,10 +180,11 @@ function deserializeFromPhone(user: any): any {
   if (!user) return user;
   const phone = user.phone || "";
   let cleanPhone = phone;
-  let password = user.password || "123456";
+  let password = user.password || "";
   let status = user.status || "Active";
   let driverLicenseExpire = user.driverLicenseExpire || "";
   let lastActive = "";
+  let resetRequest = "";
 
   const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
   if (pwMatch) {
@@ -202,6 +206,11 @@ function deserializeFromPhone(user: any): any {
     lastActive = lastactMatch[1];
     cleanPhone = cleanPhone.replace(/\|\|lastact:[^\s|]+/, "");
   }
+  const resetreqMatch = phone.match(/\|\|resetreq:([^\s|]+)/);
+  if (resetreqMatch) {
+    resetRequest = resetreqMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|resetreq:[^\s|]+/, "");
+  }
 
   return {
     ...user,
@@ -209,7 +218,8 @@ function deserializeFromPhone(user: any): any {
     password,
     status,
     driverLicenseExpire,
-    lastActive
+    lastActive,
+    resetRequest
   };
 }
 
@@ -305,7 +315,7 @@ create table if not exists users (
   role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User'
   phone text,
   "associatedStoreId" text,
-  password text default '123456',
+  password text default 'ProSpaces2026!',
   status text default 'Active',
   "driverLicenseExpire" text
 );
@@ -339,7 +349,7 @@ create table if not exists deliveries (
 
 -- Seed Initial Logistical Partners
 insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
-('ronaatlantic', 'RONA Atlantic', 'RA', 'Corporate logistics tracking for RONA franchise dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
+('prospaces', 'ProSpaces Logistics', 'PS', 'Corporate logistics tracking for ProSpaces distributor and dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
 on conflict (id) do nothing;
 
 -- 6. Row-Level Security (RLS) Master Configuration & Policies
@@ -524,32 +534,39 @@ async function runSelfHealingOnce() {
       if (supabase) {
         console.log("Starting lazy database self-healing and alignment process...");
         
-        // 1. Ensure ronaatlantic tenant is seeded
-        const ronaTenant = {
-          id: "ronaatlantic",
-          name: "RONA Atlantic",
-          code: "RA",
-          description: "Corporate logistics tracking for RONA franchise dealer stores.",
+        // 1. Ensure prospaces tenant is seeded
+        const prospacesTenant = {
+          id: "prospaces",
+          name: "ProSpaces Logistics",
+          code: "PS",
+          description: "Corporate logistics tracking for ProSpaces distributor and dealer stores.",
           logoBadge: "🏢",
           regionalFocus: "Atlantic Canada (Dartmouth, Tantallon, Halifax)",
           primaryColor: "blue"
         };
-        await supabase.from("tenants").upsert([ronaTenant]);
-        console.log("Seeded/validated 'ronaatlantic' tenant.");
+        await supabase.from("tenants").upsert([prospacesTenant]);
+        console.log("Seeded/validated 'prospaces' tenant.");
 
-        // 2. Migrate users from agfydicwfv8u0rqr5apc to ronaatlantic
+        // 2. Migrate users from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
         const { data: usersToMigrate } = await supabase
           .from("users")
           .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
           
         if (usersToMigrate && usersToMigrate.length > 0) {
           for (const user of usersToMigrate) {
+            let updatedEmail = user.email;
+            if (updatedEmail.endsWith("@ronaatlantic.ca")) {
+              updatedEmail = updatedEmail.replace("@ronaatlantic.ca", "@prospaces.com");
+            }
             await supabase
               .from("users")
-              .update({ tenantId: "ronaatlantic" })
+              .update({ 
+                tenantId: "prospaces",
+                email: updatedEmail
+              })
               .eq("id", user.id);
-            console.log(`Migrated user ${user.name} (${user.email}) to 'ronaatlantic' tenant.`);
+            console.log(`Migrated user ${user.name} (${user.email} -> ${updatedEmail}) to 'prospaces' tenant.`);
           }
         }
 
@@ -557,41 +574,55 @@ async function runSelfHealingOnce() {
         const { data: joshuaUsers } = await supabase
           .from("users")
           .select("*")
-          .ilike("email", "joshua.campbell@ronaatlantic.ca");
+          .ilike("email", "%joshua.campbell%");
           
         if (joshuaUsers && joshuaUsers.length > 0) {
           for (const user of joshuaUsers) {
-            if (user.tenantId !== "ronaatlantic") {
+            let updatedEmail = user.email;
+            if (updatedEmail.endsWith("@ronaatlantic.ca")) {
+              updatedEmail = updatedEmail.replace("@ronaatlantic.ca", "@prospaces.com");
+            }
+            if (user.tenantId !== "prospaces" || user.email !== updatedEmail) {
               await supabase
                 .from("users")
-                .update({ tenantId: "ronaatlantic" })
+                .update({ 
+                  tenantId: "prospaces",
+                  email: updatedEmail
+                })
                 .eq("id", user.id);
-              console.log(`Reconciled Joshua Campbell's tenantId to 'ronaatlantic'.`);
+              console.log(`Reconciled Joshua Campbell's tenantId to 'prospaces' and email to ${updatedEmail}.`);
             }
           }
         }
 
-        // 3. Migrate branches from agfydicwfv8u0rqr5apc to ronaatlantic
+        // 3. Migrate branches from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
         const { data: branchesToMigrate } = await supabase
           .from("branches")
           .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
           
         if (branchesToMigrate && branchesToMigrate.length > 0) {
           for (const branch of branchesToMigrate) {
+            let cleanBranchName = branch.name;
+            if (cleanBranchName.startsWith("RONA - ")) {
+              cleanBranchName = cleanBranchName.replace("RONA - ", "ProSpaces - ");
+            }
             await supabase
               .from("branches")
-              .update({ tenantId: "ronaatlantic" })
+              .update({ 
+                tenantId: "prospaces",
+                name: cleanBranchName
+              })
               .eq("id", branch.id);
-            console.log(`Migrated branch ${branch.name} to 'ronaatlantic' tenant.`);
+            console.log(`Migrated branch ${branch.name} -> ${cleanBranchName} to 'prospaces' tenant.`);
           }
         }
 
-        // 4. Migrate trucks from agfydicwfv8u0rqr5apc to ronaatlantic
+        // 4. Migrate trucks from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
         const { data: trucksToMigrate } = await supabase
           .from("trucks")
           .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
           
         if (trucksToMigrate && trucksToMigrate.length > 0) {
           for (const truck of trucksToMigrate) {
@@ -601,11 +632,11 @@ async function runSelfHealingOnce() {
             await supabase
               .from("trucks")
               .update({ 
-                tenantId: "ronaatlantic",
+                tenantId: "prospaces",
                 type: updatedType
               })
               .eq("id", truck.id);
-            console.log(`Migrated truck ${truck.name} to 'ronaatlantic' and set coordinates to 137 Chain Lake Drive.`);
+            console.log(`Migrated truck ${truck.name} to 'prospaces' and set coordinates.`);
           }
         }
 
@@ -622,7 +653,7 @@ async function runSelfHealingOnce() {
             await supabase
               .from("trucks")
               .update({ 
-                tenantId: "ronaatlantic",
+                tenantId: "prospaces",
                 type: updatedType
               })
               .eq("id", truck.id);
@@ -630,64 +661,81 @@ async function runSelfHealingOnce() {
           }
         }
 
-        // 5. Migrate deliveries from agfydicwfv8u0rqr5apc to ronaatlantic
+        // 5. Migrate deliveries from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
         const { data: deliveriesToMigrate } = await supabase
           .from("deliveries")
           .select("*")
-          .eq("tenantId", "agfydicwfv8u0rqr5apc");
+          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
           
         if (deliveriesToMigrate && deliveriesToMigrate.length > 0) {
           for (const del of deliveriesToMigrate) {
+            // Update history notes or location if they contain RONA
+            let updatedHistory = del.history;
+            if (Array.isArray(updatedHistory)) {
+              updatedHistory = updatedHistory.map((h: any) => {
+                if (h && typeof h === "object") {
+                  let updatedLoc = h.location || "";
+                  if (updatedLoc.startsWith("RONA - ")) {
+                    updatedLoc = updatedLoc.replace("RONA - ", "ProSpaces - ");
+                  }
+                  return { ...h, location: updatedLoc };
+                }
+                return h;
+              });
+            }
             await supabase
               .from("deliveries")
-              .update({ tenantId: "ronaatlantic" })
+              .update({ 
+                tenantId: "prospaces",
+                history: updatedHistory
+              })
               .eq("id", del.id);
-            console.log(`Migrated delivery ${del.invoiceNumber} to 'ronaatlantic' tenant.`);
+            console.log(`Migrated delivery ${del.invoiceNumber} to 'prospaces' tenant.`);
           }
         }
 
-        // 6. Delete temporary tenant agfydicwfv8u0rqr5apc to keep DB clean
+        // 6. Delete temporary and old tenants to keep DB clean
         await supabase
           .from("tenants")
           .delete()
-          .eq("id", "agfydicwfv8u0rqr5apc");
-        console.log("Cleaned up temporary tenant 'agfydicwfv8u0rqr5apc'.");
+          .in("id", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
+        console.log("Cleaned up temporary tenants 'agfydicwfv8u0rqr5apc' and 'ronaatlantic'.");
 
-        // 7. Auto-Seed default data for ronaatlantic if tables are empty
-        console.log("Verifying if ronaatlantic tables require default seeding...");
+        // 7. Auto-Seed default data for prospaces if tables are empty
+        console.log("Verifying if prospaces tables require default seeding...");
         
         // A. Seed branches if empty
         const { data: currentBranches, error: errB } = await supabase
           .from("branches")
           .select("id")
-          .eq("tenantId", "ronaatlantic");
+          .eq("tenantId", "prospaces");
         if (!errB && (!currentBranches || currentBranches.length === 0)) {
-          console.log("Branches are empty for ronaatlantic. Auto-seeding default branches...");
+          console.log("Branches are empty for prospaces. Auto-seeding default branches...");
           const defaultBranches = [
             {
               id: "01075",
-              tenantId: "ronaatlantic",
-              name: "RONA - Tantallon",
+              tenantId: "prospaces",
+              name: "ProSpaces - Tantallon",
               type: "STORE",
               address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
             },
             {
               id: "01065",
-              tenantId: "ronaatlantic",
-              name: "RONA - ALMON",
+              tenantId: "prospaces",
+              name: "ProSpaces - ALMON",
               type: "STORE",
               address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
             },
             {
               id: "01070",
-              tenantId: "ronaatlantic",
-              name: "RONA - Elmsdale",
+              tenantId: "prospaces",
+              name: "ProSpaces - Elmsdale",
               type: "DC",
               address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
             },
             {
               id: "DC-WINAMILL",
-              tenantId: "ronaatlantic",
+              tenantId: "prospaces",
               name: "44444 - 500 Windmill Road",
               type: "DC",
               address: "500 Windmill Road, Dartmouth, Nova Scotia, B3B 1B3, Canada"
@@ -702,30 +750,30 @@ async function runSelfHealingOnce() {
         const { data: currentUsers, error: errU } = await supabase
           .from("users")
           .select("id")
-          .eq("tenantId", "ronaatlantic");
+          .eq("tenantId", "prospaces");
         if (!errU && (!currentUsers || currentUsers.length === 0)) {
-          console.log("Users are empty for ronaatlantic. Auto-seeding default users...");
+          console.log("Users are empty for prospaces. Auto-seeding default users...");
           const defaultUsers = [
             {
               id: "USR-57008",
-              tenantId: "ronaatlantic",
+              tenantId: "prospaces",
               name: "George Campbell",
-              email: "george.campbell@ronaatlantic.ca",
+              email: "george.campbell@prospaces.com",
               role: "Admin",
-              phone: " ||pw:123456 ||status:Active",
+              phone: " ||pw:George2026! ||status:Active",
               associatedStoreId: "DC-WINAMILL",
-              password: "123456",
+              password: "George2026!",
               status: "Active"
             },
             {
               id: "USR-1869",
-              tenantId: "ronaatlantic",
+              tenantId: "prospaces",
               name: "Joshua Campbell",
-              email: "joshua.campbell@ronaatlantic.ca",
+              email: "joshua.campbell@prospaces.com",
               role: "Driver",
-              phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
+              phone: " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
               associatedStoreId: "DC-WINAMILL",
-              password: "123456",
+              password: "Joshua2026!",
               status: "Active",
               driverLicenseExpire: "2027-01-22"
             }
@@ -739,13 +787,13 @@ async function runSelfHealingOnce() {
         const { data: currentTrucks, error: errT } = await supabase
           .from("trucks")
           .select("id")
-          .eq("tenantId", "ronaatlantic");
+          .eq("tenantId", "prospaces");
         if (!errT && (!currentTrucks || currentTrucks.length === 0)) {
-          console.log("Trucks are empty for ronaatlantic. Auto-seeding default trucks...");
+          console.log("Trucks are empty for prospaces. Auto-seeding default trucks...");
           const defaultTrucks = [
             {
               id: "TRUCK-87",
-              tenantId: "ronaatlantic",
+              tenantId: "prospaces",
               name: "Truck-1",
               type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
               driver: "George Campbell",
@@ -753,7 +801,7 @@ async function runSelfHealingOnce() {
             },
             {
               id: "TRUCK-28",
-              tenantId: "ronaatlantic",
+              tenantId: "prospaces",
               name: "Truck-2",
               type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
               driver: "Joshua Campbell",
@@ -769,13 +817,13 @@ async function runSelfHealingOnce() {
         const { data: currentDeliveries, error: errD } = await supabase
           .from("deliveries")
           .select("id")
-          .eq("tenantId", "ronaatlantic");
+          .eq("tenantId", "prospaces");
         if (!errD && (!currentDeliveries || currentDeliveries.length === 0)) {
-          console.log("Deliveries are empty for ronaatlantic. Auto-seeding default deliveries...");
+          console.log("Deliveries are empty for prospaces. Auto-seeding default deliveries...");
           const defaultDeliveries = [
             {
               id: "263890",
-              tenantId: "ronaatlantic",
+              tenantId: "prospaces",
               invoiceNumber: "263890",
               epicorSalesOrder: "263890",
               customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
@@ -797,14 +845,14 @@ async function runSelfHealingOnce() {
                 {
                   notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
                   status: "REGISTERED",
-                  location: "RONA - Tantallon",
+                  location: "ProSpaces - Tantallon",
                   operator: "Azure OCR Automate Stream",
                   timestamp: "6/16/2026, 11:15:48 AM"
                 },
                 {
                   notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
                   status: "REGISTERED",
-                  location: "RONA - Tantallon",
+                  location: "ProSpaces - Tantallon",
                   operator: "Logistics Board Coordinator",
                   timestamp: "2026-06-16T14:16:19.891Z"
                 }
@@ -1025,7 +1073,7 @@ app.use((req, res, next) => {
 
       const normEmail = email.trim().toLowerCase();
       if (normEmail === "superadmin@prospaces.com") {
-        if (password && !/^[•\*]+$/.test(password) && password !== "admin" && password !== "123456") {
+        if (password && !/^[•\*]+$/.test(password) && password !== "SuperAdmin2026!") {
           return res.json({
             supabaseActive: getSupabase() !== null,
             found: true,
@@ -1090,8 +1138,8 @@ app.use((req, res, next) => {
         }
 
         // Validate Password
-        const dbPassword = user.password || "123456";
-        if (password && !/^[•\*]+$/.test(password) && password !== dbPassword && password !== "admin" && password !== "123456") {
+        const dbPassword = user.password || "";
+        if (password && !/^[•\*]+$/.test(password) && password !== dbPassword) {
           return res.json({
             supabaseActive: true,
             found: true,
@@ -1161,7 +1209,7 @@ app.use((req, res, next) => {
         role,
         phone: phone || "",
         associatedStoreId: associatedStoreId || "",
-        password: password || "123456",
+        password: password || "ProSpaces2026!",
         status: status || "Active"
       };
 
@@ -1216,28 +1264,28 @@ app.use((req, res, next) => {
         {
           id: "01075",
           tenantId: tid,
-          name: "RONA - Tantallon",
+          name: "ProSpaces - Tantallon",
           type: "STORE",
           address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
         },
         {
           id: "01065",
           tenantId: tid,
-          name: "RONA - ALMON",
+          name: "ProSpaces - ALMON",
           type: "STORE",
           address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
         },
         {
           id: "01070",
           tenantId: tid,
-          name: "RONA - Elmsdale",
+          name: "ProSpaces - Elmsdale",
           type: "DC",
           address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
         },
         {
           id: "500",
           tenantId: tid,
-          name: "RONA - WINDMILL",
+          name: "ProSpaces - WINDMILL",
           type: "DC",
           address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
         }
@@ -1265,18 +1313,18 @@ app.use((req, res, next) => {
           id: "USR-57008",
           tenantId: tid,
           name: "George Campbell",
-          email: "george.campbell@ronaatlantic.ca",
+          email: "george.campbell@prospaces.com",
           role: "Admin",
-          phone: " ||pw:123456 ||status:Active",
+          phone: " ||pw:George2026! ||status:Active",
           associatedStoreId: "DC-WINAMILL"
         },
         {
           id: "USR-1869",
           tenantId: tid,
           name: "Joshua Campbell",
-          email: "joshua.campbell@ronaatlantic.ca",
+          email: "joshua.campbell@prospaces.com",
           role: "Driver",
-          phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
+          phone: " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
           associatedStoreId: "DC-WINAMILL"
         }
       ],
@@ -1305,14 +1353,14 @@ app.use((req, res, next) => {
             {
               notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
               status: "REGISTERED",
-              location: "RONA - Tantallon",
+              location: "ProSpaces - Tantallon",
               operator: "Azure OCR Automate Stream",
               timestamp: "6/16/2026, 11:15:48 AM"
             },
             {
               notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
               status: "REGISTERED",
-              location: "RONA - Tantallon",
+              location: "ProSpaces - Tantallon",
               operator: "Logistics Board Coordinator",
               timestamp: "2026-06-16T14:16:19.891Z"
             }
@@ -1461,28 +1509,28 @@ app.use((req, res, next) => {
           {
             id: "01075",
             tenantId: String(req.query.tenantId),
-            name: "RONA - Tantallon",
+            name: "ProSpaces - Tantallon",
             type: "STORE",
             address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
           },
           {
             id: "01065",
             tenantId: String(req.query.tenantId),
-            name: "RONA - ALMON",
+            name: "ProSpaces - ALMON",
             type: "STORE",
             address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
           },
           {
             id: "01070",
             tenantId: String(req.query.tenantId),
-            name: "RONA - Elmsdale",
+            name: "ProSpaces - Elmsdale",
             type: "DC",
             address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
           },
           {
             id: "500",
             tenantId: String(req.query.tenantId),
-            name: "RONA - WINDMILL",
+            name: "ProSpaces - WINDMILL",
             type: "DC",
             address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
           }
@@ -1510,10 +1558,10 @@ app.use((req, res, next) => {
             id: "USR-57008",
             tenantId: String(req.query.tenantId),
             name: "George Campbell",
-            email: "george.campbell@ronaatlantic.ca",
+            email: "george.campbell@prospaces.com",
             role: "Admin",
-            phone: " ||pw:123456 ||status:Active",
-            password: "123456",
+            phone: " ||pw:George2026! ||status:Active",
+            password: "George2026!",
             status: "Active",
             associatedStoreId: "DC-WINAMILL"
           },
@@ -1521,10 +1569,10 @@ app.use((req, res, next) => {
             id: "USR-1869",
             tenantId: String(req.query.tenantId),
             name: "Joshua Campbell",
-            email: "joshua.campbell@ronaatlantic.ca",
+            email: "joshua.campbell@prospaces.com",
             role: "Driver",
-            phone: " ||pw:123456 ||status:Active ||licexp:2027-01-22",
-            password: "123456",
+            phone: " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
+            password: "Joshua2026!",
             status: "Active",
             driverLicenseExpire: "2027-01-22",
             associatedStoreId: "DC-WINAMILL"
@@ -1555,14 +1603,14 @@ app.use((req, res, next) => {
               {
                 notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
                 status: "REGISTERED",
-                location: "RONA - Tantallon",
+                location: "ProSpaces - Tantallon",
                 operator: "Azure OCR Automate Stream",
                 timestamp: "6/16/2026, 11:15:48 AM"
               },
               {
                 notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
                 status: "REGISTERED",
-                location: "RONA - Tantallon",
+                location: "ProSpaces - Tantallon",
                 operator: "Logistics Board Coordinator",
                 timestamp: "2026-06-16T14:16:19.891Z"
               }
@@ -1659,7 +1707,7 @@ app.use((req, res, next) => {
               name: u.name,
               email: u.email,
               role: u.role,
-              phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive),
+              phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive, u.resetRequest),
               associatedStoreId: u.associatedStoreId || null
             };
           });

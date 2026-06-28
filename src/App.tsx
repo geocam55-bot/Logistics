@@ -29,7 +29,7 @@ import LoginScreen from './components/LoginScreen';
 import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
-  ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck,
+  ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck, Key,
   Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
@@ -100,6 +100,15 @@ export default function App() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isFleetDropdownOpen, setIsFleetDropdownOpen] = useState(false);
+
+  // User Password Change states
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState<string | null>(null);
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
 
   // Custom Supabase Database credentials state
   const [showDbConfig, setShowDbConfig] = useState(false);
@@ -231,6 +240,57 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !currentTenant) return;
+    
+    setChangePasswordError(null);
+    setChangePasswordSuccess(null);
+    
+    const userCurrentDbPass = currentUser.password || "";
+    if (currentPassword !== userCurrentDbPass) {
+      setChangePasswordError("The current password you entered is incorrect.");
+      return;
+    }
+    if (newPassword.trim() === '') {
+      setChangePasswordError("New password cannot be empty.");
+      return;
+    }
+    if (newPassword === '123456') {
+      setChangePasswordError("For security reasons, '123456' is no longer allowed. Please choose a different password.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setChangePasswordError("New passwords do not match.");
+      return;
+    }
+    
+    setChangePasswordLoading(true);
+    try {
+      const updatedUser: User = { ...currentUser, password: newPassword };
+      
+      // Update local storage and React state immediately
+      setCurrentUser(updatedUser);
+      localStorage.setItem('prospaces_active_user', JSON.stringify(updatedUser));
+      
+      // Update in our users state list so that syncStateToSupabase writes the serialized phone payload
+      const updatedUsersList = users.map(u => u.id === currentUser.id ? updatedUser : u);
+      setUsers(updatedUsersList);
+      
+      await syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updatedUsersList);
+      
+      setChangePasswordSuccess("Your password has been changed successfully!");
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err: any) {
+      console.error(err);
+      setChangePasswordError("Failed to update password in database. Please try again.");
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
   // Supabase Live Sync and Configuration Diagnostics
   const [supabaseStatus, setSupabaseStatus] = useState<{
     configured: boolean;
@@ -243,6 +303,11 @@ export default function App() {
   const [dismissedRlsWarning, setDismissedRlsWarning] = useState<boolean>(() => localStorage.getItem('prospaces_dismissed_rls_warning') === 'true');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'ERROR'>('IDLE');
+  const lastMutationTimeRef = useRef<number>(0);
+  const syncStatusRef = useRef<string>('IDLE');
+  useEffect(() => {
+    syncStatusRef.current = syncStatus;
+  }, [syncStatus]);
   const [dbActive, setDbActive] = useState<boolean>(true);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const [loadTrigger, setLoadTrigger] = useState<number>(0);
@@ -387,6 +452,7 @@ export default function App() {
     b: Branch[],
     u: User[]
   ) => {
+    lastMutationTimeRef.current = Date.now();
     // Save to browser cache immediately so that local fallback remains 100% persistent in sandbox
     localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(d));
     localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(t));
@@ -448,6 +514,16 @@ export default function App() {
     const tenantId = currentTenant.id;
 
     const loadState = async () => {
+      // Prevent fetching if a mutation/save/delete is in progress or occurred very recently
+      if (syncStatusRef.current === 'SYNCING') {
+        console.log("[Sync Lock] Skipping database state polling during active synchronization.");
+        return;
+      }
+      if (Date.now() - lastMutationTimeRef.current < 4000) {
+        console.log("[Sync Lock] Skipping database state polling to allow recent updates to fully commit.");
+        return;
+      }
+
       setLastFetchError(null);
       try {
         // Run connectivity diagnostics in background to keep UI stats updated
@@ -586,7 +662,7 @@ export default function App() {
         name: currentUser.name,
         email: currentUser.email,
         role: currentUser.role,
-        phone: currentUser.phone || " ||pw:123456 ||status:Active",
+        phone: currentUser.phone || " ||pw:ProSpaces2026! ||status:Active",
         status: "Active",
         associatedStoreId: currentUser.associatedStoreId || "DC-WINAMILL",
         driverLicenseExpire: currentUser.driverLicenseExpire || (currentUser.role === 'Driver' ? "2027-01-22" : undefined),
@@ -756,7 +832,7 @@ export default function App() {
   };
 
   // Sync with Supabase when deliveries change
-  const handleAddOrUpdateDelivery = (newRecord: DeliveryRecord) => {
+  const handleAddOrUpdateDelivery = async (newRecord: DeliveryRecord) => {
     if (!currentTenant) return;
     const updated = [...deliveries];
     const index = updated.findIndex(d => d.id === newRecord.id);
@@ -766,10 +842,11 @@ export default function App() {
       updated.unshift(newRecord);
     }
     setDeliveries(updated);
-    syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
+    await syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
   };
 
   const deleteRecordWithFallback = async (table: string, id: string, tenantId: string) => {
+    lastMutationTimeRef.current = Date.now();
     try {
       const res = await customFetch(`/api/tenant/delete-record?table=${table}&id=${id}&tenantId=${tenantId}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -785,81 +862,109 @@ export default function App() {
     }
   };
 
-  const handleDeleteDelivery = (id: string) => {
+  const handleDeleteDelivery = async (id: string) => {
     if (!currentTenant) return;
     const updated = deliveries.filter(d => d.id !== id);
     setDeliveries(updated);
-    deleteRecordWithFallback('deliveries', id, currentTenant.id);
-    syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
+    setSyncStatus('SYNCING');
+    lastMutationTimeRef.current = Date.now();
+    try {
+      await deleteRecordWithFallback('deliveries', id, currentTenant.id);
+      await syncStateToSupabase(currentTenant.id, updated, trucks, branches, users);
+    } catch (err) {
+      console.error("Delete delivery error:", err);
+      setSyncStatus('ERROR');
+    }
   };
 
   // Fleet handlers
-  const handleAddTruck = (newTruck: Truck) => {
+  const handleAddTruck = async (newTruck: Truck) => {
     if (!currentTenant) return;
     const updated = [...trucks, newTruck];
     setTrucks(updated);
-    syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
+    await syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
-  const handleUpdateTruck = (updatedTruck: Truck) => {
+  const handleUpdateTruck = async (updatedTruck: Truck) => {
     if (!currentTenant) return;
     const updated = trucks.map(t => t.id === updatedTruck.id ? updatedTruck : t);
     setTrucks(updated);
-    syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
+    await syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
   };
 
-  const handleDeleteTruck = (id: string) => {
+  const handleDeleteTruck = async (id: string) => {
     if (!currentTenant) return;
     const updated = trucks.filter(t => t.id !== id);
     setTrucks(updated);
-    deleteRecordWithFallback('trucks', id, currentTenant.id);
-    syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
+    setSyncStatus('SYNCING');
+    lastMutationTimeRef.current = Date.now();
+    try {
+      await deleteRecordWithFallback('trucks', id, currentTenant.id);
+      await syncStateToSupabase(currentTenant.id, deliveries, updated, branches, users);
+    } catch (err) {
+      console.error("Delete truck error:", err);
+      setSyncStatus('ERROR');
+    }
   };
 
   // Branch / Store handlers
-  const handleAddBranch = (newBranch: Branch) => {
+  const handleAddBranch = async (newBranch: Branch) => {
     if (!currentTenant) return;
     const updated = [...branches, newBranch];
     setBranches(updated);
-    syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
+    await syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
-  const handleUpdateBranch = (updatedBranch: Branch) => {
+  const handleUpdateBranch = async (updatedBranch: Branch) => {
     if (!currentTenant) return;
     const updated = branches.map(b => b.id === updatedBranch.id ? updatedBranch : b);
     setBranches(updated);
-    syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
+    await syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
   };
 
-  const handleDeleteBranch = (id: string) => {
+  const handleDeleteBranch = async (id: string) => {
     if (!currentTenant) return;
     const updated = branches.filter(b => b.id !== id);
     setBranches(updated);
-    deleteRecordWithFallback('branches', id, currentTenant.id);
-    syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
+    setSyncStatus('SYNCING');
+    lastMutationTimeRef.current = Date.now();
+    try {
+      await deleteRecordWithFallback('branches', id, currentTenant.id);
+      await syncStateToSupabase(currentTenant.id, deliveries, trucks, updated, users);
+    } catch (err) {
+      console.error("Delete branch error:", err);
+      setSyncStatus('ERROR');
+    }
   };
 
   // User handlers
-  const handleAddUser = (newUser: User) => {
+  const handleAddUser = async (newUser: User) => {
     if (!currentTenant) return;
     const updated = [...users, newUser];
     setUsers(updated);
-    syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
+    await syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
-  const handleUpdateUser = (updatedUser: User) => {
+  const handleUpdateUser = async (updatedUser: User) => {
     if (!currentTenant) return;
     const updated = users.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u);
     setUsers(updated);
-    syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
+    await syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     if (!currentTenant) return;
     const updated = users.filter(u => u.id !== id);
     setUsers(updated);
-    deleteRecordWithFallback('users', id, currentTenant.id);
-    syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
+    setSyncStatus('SYNCING');
+    lastMutationTimeRef.current = Date.now();
+    try {
+      await deleteRecordWithFallback('users', id, currentTenant.id);
+      await syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updated);
+    } catch (err) {
+      console.error("Delete user error:", err);
+      setSyncStatus('ERROR');
+    }
   };
 
   // Purge / Clear all operational data for the current tenant to start totally fresh
@@ -1068,6 +1173,20 @@ export default function App() {
                   {currentUser.role}
                 </span>
               </div>
+              <button 
+                onClick={() => {
+                  setShowChangePasswordModal(true);
+                  setChangePasswordError(null);
+                  setChangePasswordSuccess(null);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmNewPassword('');
+                }}
+                title="Change Account Password"
+                className="text-slate-500 hover:text-slate-800 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center border border-slate-200 cursor-pointer shrink-0"
+              >
+                <Key className="h-3.5 w-3.5 text-slate-500" />
+              </button>
               <button 
                 onClick={handleLogout}
                 title="Logout & Switch Logistical Tenant"
@@ -1317,6 +1436,100 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {showChangePasswordModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="change-password-modal">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-slate-800 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center space-x-2">
+                <Key className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-bold font-sans text-slate-900">Change Account Password</h3>
+              </div>
+              <button
+                onClick={() => setShowChangePasswordModal(false)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-50 transition-all text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {changePasswordError && (
+              <div className="mb-4 bg-rose-50 border border-rose-100 rounded-xl p-3 text-xs text-rose-800 flex items-start space-x-2">
+                <span className="text-rose-500 font-bold shrink-0">⚠️</span>
+                <span>{changePasswordError}</span>
+              </div>
+            )}
+
+            {changePasswordSuccess && (
+              <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 flex items-start space-x-2">
+                <span className="text-emerald-500 font-bold shrink-0">✅</span>
+                <span>{changePasswordSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="block text-xs font-semibold text-slate-700">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="At least 6 characters, no simple passwords"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Repeat your new password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowChangePasswordModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changePasswordLoading}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all disabled:opacity-50"
+                >
+                  {changePasswordLoading ? 'Saving...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

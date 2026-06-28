@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 // Serialization and Deserialization helpers matching the backend implementation
-export function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined): string {
+export function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined): string {
   const basePhone = (phone || "").trim();
   let res = basePhone;
   if (password) {
@@ -16,6 +16,9 @@ export function serializeToPhone(phone: string | undefined, password: string | u
   if (lastActive) {
     res += ` ||lastact:${lastActive}`;
   }
+  if (resetRequest) {
+    res += ` ||resetreq:${resetRequest}`;
+  }
   return res;
 }
 
@@ -23,10 +26,11 @@ export function deserializeFromPhone(user: any): any {
   if (!user) return user;
   const phone = user.phone || "";
   let cleanPhone = phone;
-  let password = user.password || "123456";
+  let password = user.password || "";
   let status = user.status || "Active";
   let driverLicenseExpire = user.driverLicenseExpire || "";
   let lastActive = "";
+  let resetRequest = "";
 
   const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
   if (pwMatch) {
@@ -48,6 +52,11 @@ export function deserializeFromPhone(user: any): any {
     lastActive = lastactMatch[1];
     cleanPhone = cleanPhone.replace(/\|\|lastact:[^\s|]+/, "");
   }
+  const resetreqMatch = phone.match(/\|\|resetreq:([^\s|]+)/);
+  if (resetreqMatch) {
+    resetRequest = resetreqMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|resetreq:[^\s|]+/, "");
+  }
 
   return {
     ...user,
@@ -55,7 +64,8 @@ export function deserializeFromPhone(user: any): any {
     password,
     status,
     driverLicenseExpire,
-    lastActive
+    lastActive,
+    resetRequest
   };
 }
 
@@ -301,7 +311,7 @@ export async function saveTenantStateDirect(
     name: u.name,
     email: u.email,
     role: u.role,
-    phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive),
+    phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive, u.resetRequest),
     associatedStoreId: u.associatedStoreId
   }));
 

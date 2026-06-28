@@ -30,7 +30,7 @@ export default function UsersSetup({
   const [userPhone, setUserPhone] = useState('');
   const [driverLicenseExpire, setDriverLicenseExpire] = useState('');
   const [associatedStoreId, setAssociatedStoreId] = useState('');
-  const [userPassword, setUserPassword] = useState('123456');
+  const [userPassword, setUserPassword] = useState('ProSpaces2026!');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
 
@@ -58,7 +58,7 @@ export default function UsersSetup({
     setUserPhone('');
     setDriverLicenseExpire('');
     setAssociatedStoreId(branches[0]?.id || '');
-    setUserPassword('123456');
+    setUserPassword('ProSpaces2026!');
     setIsAdding(true);
     setEditingUserId(null);
   };
@@ -71,7 +71,7 @@ export default function UsersSetup({
     setUserPhone(user.phone || '');
     setDriverLicenseExpire(user.driverLicenseExpire || '');
     setAssociatedStoreId(user.associatedStoreId || '');
-    setUserPassword(user.password || '123456');
+    setUserPassword(user.password || '');
     setEditingUserId(user.id);
     setIsAdding(false);
   };
@@ -91,7 +91,7 @@ export default function UsersSetup({
       phone: userPhone.trim() || undefined,
       driverLicenseExpire: driverLicenseExpire || undefined,
       associatedStoreId: associatedStoreId || undefined,
-      password: userPassword || '123456'
+      password: userPassword || 'ProSpaces2026!'
     };
 
     if (editingUserId) {
@@ -113,7 +113,7 @@ export default function UsersSetup({
     setUserEmail('');
     setUserPhone('');
     setDriverLicenseExpire('');
-    setUserPassword('123456');
+    setUserPassword('ProSpaces2026!');
   };
 
   const showFeedback = (msg: string) => {
@@ -292,7 +292,7 @@ export default function UsersSetup({
                   <input
                     type="text"
                     required
-                    placeholder="Enter login password (e.g. 123456)"
+                    placeholder="Enter login password (e.g. ProSpaces2026!)"
                     value={userPassword}
                     onChange={(e) => setUserPassword(e.target.value)}
                     className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -386,7 +386,7 @@ export default function UsersSetup({
                         </div>
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span>Passcode: <strong className="font-mono bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded text-[10px]">{user.password || '123456'}</strong></span>
+                          <span>Passcode: <strong className="font-mono bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded text-[10px]">{user.password || 'ProSpaces2026!'}</strong></span>
                         </div>
                         {user.driverLicenseExpire && (
                           <div className={`flex items-center space-x-2 px-2.5 py-1.5 rounded-lg border mt-2.5 ${

@@ -73,6 +73,7 @@ export interface User {
   driverLicenseExpire?: string;
   tenantId?: string;
   lastActive?: string;
+  resetRequest?: string;
 }
 
 export interface Tenant {
