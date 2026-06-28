@@ -12,7 +12,7 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreenProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('•••••••••');
+  const [password, setPassword] = useState('');
   
   // Registration parameters
   const [customName, setCustomName] = useState('');
