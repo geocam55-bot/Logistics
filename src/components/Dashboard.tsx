@@ -321,7 +321,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   });
   
   // Custom Map Visual Themes
-  const [mapTheme, setMapTheme] = useState<'daylight' | 'cyber' | 'satellite'>('daylight');
+  const [mapTheme, setMapTheme] = useState<'default' | 'satellite' | 'terrain' | 'traffic'>('default');
 
   // Map engine configuration (Supports TomTom and OpenStreetMap/CartoDB fallbacks)
   const [mapEngine, setMapEngine] = useState<'carto' | 'tomtom'>('carto');
@@ -444,6 +444,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const mapRef = useRef<L.Map | null>(null);
   const lastBoundsKeyRef = useRef<string>('');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const trafficLayerRef = useRef<L.TileLayer | null>(null);
   const lastFlownTruckIdRef = useRef<string | null>(null);
   const layersRef = useRef<{
     hq: L.LayerGroup | null;
@@ -611,34 +612,38 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     if (tileLayerRef.current) {
       tileLayerRef.current.remove();
     }
+    if (trafficLayerRef.current) {
+      trafficLayerRef.current.remove();
+      trafficLayerRef.current = null;
+    }
 
     let urlTemplate = '';
     let attribution = '';
     let hasSubdomains = false;
 
-    if (mapEngine === 'tomtom' && tomTomApiKey) {
+    if (mapTheme === 'terrain') {
+      // Use premium Esri Topography & Terrain basemap
+      urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+      attribution = 'Tiles &copy; Esri &mdash; Esri, USGS, NOAA';
+    } else if (mapEngine === 'tomtom' && tomTomApiKey) {
       hasSubdomains = true;
-      if (mapTheme === 'daylight') {
-        urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${tomTomApiKey}`;
-        attribution = '&copy; TomTom Map Display';
-      } else if (mapTheme === 'cyber') {
-        urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/basic/night/{z}/{x}/{y}.png?key=${tomTomApiKey}`;
-        attribution = '&copy; TomTom Map Display (Night Mode)';
-      } else {
+      if (mapTheme === 'satellite') {
         urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/sat/main/{z}/{x}/{y}.jpg?key=${tomTomApiKey}`;
         attribution = '&copy; TomTom Satellite Imagery';
+      } else {
+        // default or traffic
+        urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${tomTomApiKey}`;
+        attribution = '&copy; TomTom Map Display';
       }
     } else {
-      // Fallback Engine
-      if (mapTheme === 'daylight') {
+      // Fallback Engine (CartoDB)
+      if (mapTheme === 'satellite') {
+        urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+        attribution = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
+      } else {
+        // default or traffic
         urlTemplate = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
         attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-      } else if (mapTheme === 'cyber') {
-        urlTemplate = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-        attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-      } else {
-        urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        attribution = 'Tiles &copy; Esri &mdash; Source: Esri, USDA, USGS, and the GIS User Community';
       }
     }
 
@@ -652,8 +657,19 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     }
 
     const tileLayer = L.tileLayer(urlTemplate, tileOptions).addTo(mapRef.current);
-
     tileLayerRef.current = tileLayer;
+
+    // Add traffic flow overlay if Traffic theme is selected and TomTom key is available
+    if (mapTheme === 'traffic' && tomTomApiKey) {
+      const trafficUrl = `https://{s}.api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?key=${tomTomApiKey}`;
+      const trafficOptions: L.TileLayerOptions = {
+        maxZoom: 18,
+        subdomains: 'abcd',
+        opacity: 0.85
+      };
+      const trafficLayer = L.tileLayer(trafficUrl, trafficOptions).addTo(mapRef.current);
+      trafficLayerRef.current = trafficLayer;
+    }
   }, [mapTheme, mapEngine, tomTomApiKey]);
 
   // 3. Update all markers and route vectors dynamically on state/telemetry changes
@@ -1217,36 +1233,47 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
               <button
                 type="button"
-                onClick={() => setMapTheme('daylight')}
-                className={`px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'daylight' 
+                onClick={() => setMapTheme('default')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'default' 
                     ? 'bg-sky-600 text-white shadow-xs' 
                     : 'text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                Daylight Chart
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapTheme('cyber')}
-                className={`px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'cyber' 
-                    ? 'bg-cyan-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Cyber HUD
+                Default
               </button>
               <button
                 type="button"
                 onClick={() => setMapTheme('satellite')}
-                className={`px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
                   mapTheme === 'satellite' 
                     ? 'bg-amber-600 text-white shadow-xs' 
                     : 'text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                Satellite Zoom
+                Satellite
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapTheme('terrain')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'terrain' 
+                    ? 'bg-emerald-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Terrain
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapTheme('traffic')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'traffic' 
+                    ? 'bg-rose-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Traffic
               </button>
             </div>
 
@@ -1367,11 +1394,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           <div 
             onClick={() => {}}
             className={`lg:col-span-8 p-6 relative border-b lg:border-b-0 lg:border-r flex flex-col justify-between overflow-hidden cursor-crosshair group select-none transition-all duration-300 min-h-[380px] ${
-              mapTheme === 'daylight' 
+              mapTheme !== 'satellite' 
                 ? 'bg-sky-50/70 border-slate-200 bg-[radial-gradient(#94a3b8_0.8px,transparent_0.8px)] [background-size:20px_20px]' 
-                : mapTheme === 'cyber' 
-                  ? 'bg-slate-950/95 border-slate-800 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]' 
-                  : 'bg-[#050f21] border-slate-800 bg-[radial-gradient(#112240_1px,transparent_1px)] [background-size:18px_18px]'
+                : 'bg-slate-950/95 border-slate-800 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]'
             }`}
           >
             
@@ -1385,11 +1410,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               <svg className="w-full h-full opacity-90 transition-all duration-500" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
                 {(() => {
                   const colors = 
-                    mapTheme === 'daylight' 
+                    mapTheme !== 'satellite' 
                       ? { water: '#b2e2f2', land: '#faf9f5', shore: '#0284c7', bridge: '#ef4444', highway: '#94a3b8' } 
-                      : mapTheme === 'cyber' 
-                        ? { water: '#020617', land: '#0f172a', shore: '#06b6d4', bridge: '#f59e0b', highway: '#1e293b' } 
-                        : { water: '#050e1e', land: '#111e30', shore: '#38bdf8', bridge: '#10b981', highway: '#112240' };
+                      : { water: '#050e1e', land: '#111e30', shore: '#38bdf8', bridge: '#10b981', highway: '#112240' };
                   
                   return (
                     <g>
@@ -1496,7 +1519,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                        y1={`${hqPercent.y}%`}
                        x2={`${truckX}%`}
                        y2={`${truckY}%`}
-                      stroke={mapTheme === 'daylight' ? '#2563eb' : '#06b6d4'}
+                      stroke={mapTheme !== 'satellite' ? '#2563eb' : '#06b6d4'}
                       strokeWidth="2"
                       strokeDasharray="4,6"
                       opacity="0.8"
@@ -1560,7 +1583,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       y1={y1} 
                       x2={x2} 
                       y2={y2} 
-                      stroke={isSelected ? "#f59e0b" : (mapTheme === 'daylight' ? '#64748b' : '#475569')} 
+                      stroke={isSelected ? "#f59e0b" : (mapTheme !== 'satellite' ? '#64748b' : '#475569')} 
                       strokeWidth={isSelected ? "2.5" : "1.5"} 
                       strokeDasharray={isSelected ? "5,5" : "4,4"}
                       opacity={isSelected ? "0.9" : "0.5"}
@@ -1667,7 +1690,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     <div className={`p-1 rounded-full border shadow-md ${
                       isAssigned 
                         ? 'bg-amber-955 border-amber-500 text-amber-400' 
-                        : (mapTheme === 'daylight' ? 'bg-slate-300 border-slate-500 text-slate-700' : 'bg-slate-900 border-slate-700 text-slate-450')
+                        : (mapTheme !== 'satellite' ? 'bg-slate-300 border-slate-500 text-slate-700' : 'bg-slate-900 border-slate-700 text-slate-450')
                     }`}>
                       <MapPin className="h-2.5 w-2.5" />
                     </div>
@@ -1770,7 +1793,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
             {/* Bottom Legend Map Panel */}
             <div className={`mt-4 pt-3 border-t flex flex-wrap items-center justify-between text-[11px] gap-2 pr-2 transition-colors duration-300 z-10 ${
-              mapTheme === 'daylight' ? 'border-slate-300 text-slate-600' : 'border-slate-850 text-slate-400'
+              mapTheme !== 'satellite' ? 'border-slate-300 text-slate-600' : 'border-slate-850 text-slate-400'
             }`}>
               <div className="flex flex-wrap items-center gap-4 font-medium">
                 <span className="flex items-center space-x-1.5">
