@@ -27,23 +27,47 @@ export default function StoresSetup({
   const [storeName, setStoreName] = useState('');
   const [storeType, setStoreType] = useState<'STORE' | 'DC'>('STORE');
   const [storeAddress, setStoreAddress] = useState('');
+  const [storeLat, setStoreLat] = useState('');
+  const [storeLng, setStoreLng] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
+
+  const cleanAddressText = (address: string | undefined): string => {
+    if (!address) return '';
+    return address
+      .replace(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/gi, '')
+      .replace(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
 
   const handleStartAdd = () => {
     setStoreId(`STORE-${Math.floor(1000 + Math.random() * 9000)}`);
     setStoreName('');
     setStoreType('STORE');
     setStoreAddress('');
+    setStoreLat('');
+    setStoreLng('');
     setIsAdding(true);
     setEditingBranchId(null);
   };
 
   const handleStartEdit = (branch: Branch) => {
+    const addr = branch.address || '';
+    const latMatch = addr.match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i);
+    const lngMatch = addr.match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i);
+    
+    let cleanAddress = addr;
+    if (latMatch) cleanAddress = cleanAddress.replace(/\|\|lat:[^\s|]+/, '');
+    if (lngMatch) cleanAddress = cleanAddress.replace(/\|\|lng:[^\s|]+/, '');
+    cleanAddress = cleanAddress.replace(/\s+/g, ' ').trim();
+
     setStoreId(branch.id);
     setStoreName(branch.name);
     setStoreType(branch.type);
-    setStoreAddress(branch.address);
+    setStoreAddress(cleanAddress);
+    setStoreLat(latMatch ? latMatch[1] : '');
+    setStoreLng(lngMatch ? lngMatch[1] : '');
     setEditingBranchId(branch.id);
     setIsAdding(false);
   };
@@ -55,11 +79,16 @@ export default function StoresSetup({
       return;
     }
 
+    let finalAddress = storeAddress.trim();
+    if (storeLat.trim() && storeLng.trim()) {
+      finalAddress += ` ||lat:${storeLat.trim()} ||lng:${storeLng.trim()}`;
+    }
+
     const payload: Branch = {
       id: storeId,
       name: storeName.trim(),
       type: storeType,
-      address: storeAddress.trim()
+      address: finalAddress
     };
 
     if (editingBranchId) {
@@ -79,6 +108,8 @@ export default function StoresSetup({
     // Reset Form
     setStoreName('');
     setStoreAddress('');
+    setStoreLat('');
+    setStoreLng('');
   };
 
   const showFeedback = (msg: string) => {
@@ -236,6 +267,29 @@ export default function StoresSetup({
                     className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">Latitude (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 44.7642"
+                      value={storeLat}
+                      onChange={(e) => setStoreLat(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">Longitude (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. -63.6823"
+                      value={storeLng}
+                      onChange={(e) => setStoreLng(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex space-x-2 pt-2 border-t border-slate-100">
@@ -311,7 +365,21 @@ export default function StoresSetup({
                         </p>
                         <div className="flex items-center text-xs text-gray-500 space-x-1 pt-1">
                           <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-sm sm:max-w-md">{branch.address}</span>
+                          <span className="truncate max-w-sm sm:max-w-md" title={cleanAddressText(branch.address)}>
+                            {cleanAddressText(branch.address)}
+                            {(() => {
+                              const latMatch = (branch.address || '').match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i);
+                              const lngMatch = (branch.address || '').match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i);
+                              if (latMatch && lngMatch) {
+                                return (
+                                  <span className="ml-2 font-mono text-[9px] text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
+                                    📍 {parseFloat(latMatch[1]).toFixed(4)}, {parseFloat(lngMatch[1]).toFixed(4)}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </span>
                         </div>
                       </div>
                     </div>

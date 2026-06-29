@@ -51,6 +51,24 @@ const KNOWN_COORDS: Record<string, { lat: number; lng: number }> = {
   'HALIFAX': { lat: 44.6488, lng: -63.5752 },
   'CHAIN LAKE': { lat: 44.6295, lng: -63.6651 },
   '137 CHAIN LAKE': { lat: 44.6295, lng: -63.6651 },
+  'ELMSDALE': { lat: 44.9752, lng: -63.5042 },
+  'ALMON': { lat: 44.6536, lng: -63.6011 },
+  'HUBBARDS': { lat: 44.6314, lng: -64.0531 },
+  'SACKVILLE': { lat: 44.7642, lng: -63.6823 },
+  'BEDFORD': { lat: 44.7303, lng: -63.6617 },
+  'TRURO': { lat: 45.3647, lng: -63.2687 },
+  'WINDSOR': { lat: 44.9904, lng: -64.1311 },
+  'CHESTER': { lat: 44.5424, lng: -64.2405 },
+  'ENFIELD': { lat: 44.9406, lng: -63.5358 },
+  'LAKESIDE': { lat: 44.6489, lng: -63.7176 },
+  'BAYERS LAKE': { lat: 44.6295, lng: -63.6651 },
+  'BURNSIDE': { lat: 44.6983, lng: -63.5855 },
+  'KENTVILLE': { lat: 45.0775, lng: -64.4965 },
+  'HAMMONDS PLAINS': { lat: 44.7364, lng: -63.7854 },
+  'COLE HARBOUR': { lat: 44.6644, lng: -63.4842 },
+  'ST. MARGARETS BAY': { lat: 44.6225, lng: -63.9538 },
+  'ST. MARGARET\'S BAY': { lat: 44.6225, lng: -63.9538 },
+  'RONA': { lat: 44.6314, lng: -64.0531 },
   
   // Silicon Valley, California
   'CAMPBELL': { lat: 37.2872, lng: -121.9500 },
@@ -66,7 +84,30 @@ const KNOWN_COORDS: Record<string, { lat: number; lng: number }> = {
 };
 
 const getGpsForLocation = (id: string, nameOrAddress: string): { lat: number; lng: number } => {
-  const norm = (id + ' ' + nameOrAddress).toUpperCase();
+  const combined = id + ' ' + nameOrAddress;
+  
+  // Try matching ||lat:XX ||lng:YY or lat:XX lng:YY
+  const latMatch = combined.match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i) || combined.match(/lat:\s*(-?\d+(?:\.\d+)?)/i);
+  const lngMatch = combined.match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i) || combined.match(/lng:\s*(-?\d+(?:\.\d+)?)/i);
+  if (latMatch && lngMatch) {
+    const parsedLat = parseFloat(latMatch[1]);
+    const parsedLng = parseFloat(lngMatch[1]);
+    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+      return { lat: parsedLat, lng: parsedLng };
+    }
+  }
+
+  // Also support matching decimal degrees in brackets or parentheses, e.g. [44.123, -63.456]
+  const bracketMatch = combined.match(/[\[\()]\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*[\]\)]/);
+  if (bracketMatch) {
+    const parsedLat = parseFloat(bracketMatch[1]);
+    const parsedLng = parseFloat(bracketMatch[2]);
+    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+      return { lat: parsedLat, lng: parsedLng };
+    }
+  }
+
+  const norm = combined.toUpperCase();
   
   // Try to find a match in our KNOWN_COORDS dictionary
   for (const [key, value] of Object.entries(KNOWN_COORDS)) {
@@ -94,6 +135,15 @@ const getGpsForLocation = (id: string, nameOrAddress: string): { lat: number; ln
     const lng = -64.4 + (((score * 17) % 40) / 40) * 0.70;
     return { lat, lng };
   }
+};
+
+const cleanAddressText = (address: string | undefined): string => {
+  if (!address) return '';
+  return address
+    .replace(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/gi, '')
+    .replace(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
 const getPercentCoordsFromGps = (lat: number, lng: number): { x: number; y: number } => {
@@ -785,7 +835,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         .bindPopup(`
           <div class="font-sans text-xs p-1.5 space-y-0.5 font-sans">
             <p class="font-bold text-slate-900">🎯 Recipient: ${delivery.customerName}</p>
-            <p class="text-[10px] text-slate-600">${delivery.deliveryAddress}</p>
+            <p class="text-[10px] text-slate-600">${cleanAddressText(delivery.deliveryAddress)}</p>
             <p class="text-[9px] text-slate-500">Invoice: ${delivery.invoiceNumber} ${delivery.weight ? `&bull; Weight: ${delivery.weight}` : ''}</p>
             <div class="mt-1.5 flex items-center gap-1.5 border-t border-slate-100 pt-1.5 font-sans">
               <span class="px-1.5 py-0.25 text-[8.5px] font-extrabold rounded bg-amber-100 text-amber-800 uppercase">
@@ -1698,7 +1748,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     {/* Popover */}
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[10px] text-white px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-25 font-sans space-y-0.5">
                       <p className="font-semibold text-slate-150">🎯 Recipient: {delivery.customerName}</p>
-                      <p className="text-[8px] text-slate-400 font-mono">Invoice: {delivery.invoiceNumber} &bull; {delivery.deliveryAddress}</p>
+                      <p className="text-[8px] text-slate-400 font-mono">Invoice: {delivery.invoiceNumber} &bull; {cleanAddressText(delivery.deliveryAddress)}</p>
                       <p className="text-[8px] text-amber-400">Status: {delivery.status.replace('_', ' ')} {isAssigned ? `(Assigned: ${delivery.assignedTruck})` : '(Unassigned)'}</p>
                     </div>
                   </div>
@@ -1779,7 +1829,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         <>
                           <p className="text-[8px] text-emerald-400 font-mono font-semibold">Active Run: {assignedDelivery.id}</p>
                           <p className="text-[8px] text-slate-400 font-mono">Manifest Status: {assignedDelivery.status}</p>
-                          <p className="text-[8px] text-slate-400">Destination: {assignedDelivery.deliveryAddress}</p>
+                          <p className="text-[8px] text-slate-400">Destination: {cleanAddressText(assignedDelivery.deliveryAddress)}</p>
                         </>
                       ) : (
                         <p className="text-[8px] text-slate-400 italic">Idle at home depot base</p>
