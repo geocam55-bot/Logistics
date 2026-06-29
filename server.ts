@@ -123,7 +123,7 @@ function getSupabase(bypassCircuitBreaker: boolean = false) {
   return supabaseClient;
 }
 
-function withTimeout<T>(promise: Promise<T> | any, ms: number = 2500): Promise<T> {
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 30000): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
@@ -952,14 +952,14 @@ app.use((req, res, next) => {
         });
       }
 
-      // Perform a ping / select test query against the database with a fast timeout (e.g. 2500ms) to check if schema is constructed
+      // Perform a ping / select test query against the database with a safe timeout to check if schema is constructed
       let testQuery = supabase.from("tenants").select("id").limit(1);
-      let { data, error } = await withTimeout<any>(testQuery, 2500);
+      let { data, error } = await withTimeout<any>(testQuery, 30000);
 
       if (error) {
-        console.warn("Supabase connection: tenants table query failed, trying branches table fallback...");
-        let fallbackQuery = supabase.from("branches").select("id").limit(1);
-        const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 2500);
+         console.warn("Supabase connection: tenants table query failed, trying branches table fallback...");
+         let fallbackQuery = supabase.from("branches").select("id").limit(1);
+         const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 30000);
         if (!branchesErr) {
           error = null;
         }
@@ -1283,7 +1283,7 @@ app.use((req, res, next) => {
           address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
         },
         {
-          id: "500",
+          id: "DC-WINAMILL",
           tenantId: tid,
           name: "ProSpaces - WINDMILL",
           type: "DC",
@@ -1429,7 +1429,7 @@ app.use((req, res, next) => {
         });
       }
 
-      // Fetch all tables in parallel with a timeout to prevent hanging (snappy 2500ms timeout)
+      // Fetch all tables in parallel with a timeout to prevent hanging (safe 30000ms timeout)
       let [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
         Promise.all([
           supabase.from("branches").select("*").eq("tenantId", tenantId),
@@ -1437,7 +1437,7 @@ app.use((req, res, next) => {
           supabase.from("users").select("*").eq("tenantId", tenantId),
           supabase.from("deliveries").select("*").eq("tenantId", tenantId)
         ]),
-        2500
+        30000
       );
 
       // If schema tables don't exist yet, it'll error.
@@ -1451,7 +1451,7 @@ app.use((req, res, next) => {
         console.log(`Live database has 0 registers/branches for tenant '${tenantId}'. Automatically seeding default templates...`);
         try {
           await seedDefaultState(supabase, String(tenantId));
-          // Re-fetch to load the seeded records from the database
+          // Re-fetch to load the seeded records from the database with a safe timeout
           const [fBranches, fTrucks, fUsers, fDeliveries] = await withTimeout<any>(
             Promise.all([
               supabase.from("branches").select("*").eq("tenantId", tenantId),
@@ -1459,7 +1459,7 @@ app.use((req, res, next) => {
               supabase.from("users").select("*").eq("tenantId", tenantId),
               supabase.from("deliveries").select("*").eq("tenantId", tenantId)
             ]),
-            2500
+            30000
           );
           rBranches = fBranches;
           rTrucks = fTrucks;
@@ -1528,7 +1528,7 @@ app.use((req, res, next) => {
             address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
           },
           {
-            id: "500",
+            id: "DC-WINAMILL",
             tenantId: String(req.query.tenantId),
             name: "ProSpaces - WINDMILL",
             type: "DC",
@@ -1645,17 +1645,55 @@ app.use((req, res, next) => {
         });
       }
 
+      // Deduplicate payloads by unique ID to avoid ON CONFLICT constraint violations
+      const uniqueBranchesMap = new Map<string, any>();
+      (branches || []).forEach((b: any) => {
+        if (b && b.id) uniqueBranchesMap.set(b.id, b);
+      });
+      const uniqueBranches = Array.from(uniqueBranchesMap.values());
+
+      const uniqueTrucksMap = new Map<string, any>();
+      (trucks || []).forEach((t: any) => {
+        if (t && t.id) uniqueTrucksMap.set(t.id, t);
+      });
+      const uniqueTrucks = Array.from(uniqueTrucksMap.values());
+
+      const uniqueUsersMap = new Map<string, any>();
+      (users || []).forEach((u: any) => {
+        if (u && u.id) uniqueUsersMap.set(u.id, u);
+      });
+      const uniqueUsers = Array.from(uniqueUsersMap.values());
+
+      const uniqueDeliveriesMap = new Map<string, any>();
+      (deliveries || []).forEach((d: any) => {
+        if (d && d.id) uniqueDeliveriesMap.set(d.id, d);
+      });
+      const uniqueDeliveries = Array.from(uniqueDeliveriesMap.values());
+
       // Force-inject appropriate tenantIds into nested payloads to maintain strict database isolation
-      const sanitizedBranches = (branches || []).map((b: any) => ({ ...b, tenantId }));
-      const sanitizedTrucks = (trucks || []).map((t: any) => ({ ...t, tenantId }));
-      const sanitizedUsers = (users || []).map((u: any) => ({ ...u, tenantId }));
-      const sanitizedDeliveries = (deliveries || []).map((d: any) => ({ ...d, tenantId }));
+      const sanitizedBranches = uniqueBranches.map((b: any) => ({ ...b, tenantId }));
+      const sanitizedTrucks = uniqueTrucks.map((t: any) => ({ ...t, tenantId }));
+      const sanitizedUsers = uniqueUsers.map((u: any) => ({ ...u, tenantId }));
+      const sanitizedDeliveries = uniqueDeliveries.map((d: any) => ({ ...d, tenantId }));
 
       // Execute upserts series to maintain reference integrity
       // 1. Branches first (parent of trucks and deliveries)
       if (sanitizedBranches.length > 0) {
         const { error } = await supabase.from("branches").upsert(sanitizedBranches);
         if (error) throw new Error(`Branches Sync Error: ${error.message}`);
+
+        // Delete any branches for this tenant that are NOT in sanitizedBranches
+        const branchIds = sanitizedBranches.map((b: any) => b.id);
+        const { error: deleteErr } = await supabase
+          .from("branches")
+          .delete()
+          .eq("tenantId", tenantId)
+          .not("id", "in", `(${branchIds.map(id => `"${id}"`).join(",")})`);
+        if (deleteErr) {
+          console.warn("Non-blocking branches sync deletion failed:", deleteErr.message);
+        }
+      } else {
+        await supabase.from("branches").delete().eq("tenantId", tenantId);
       }
 
       // 2. Trucks
@@ -1692,9 +1730,22 @@ app.use((req, res, next) => {
               throw dbErr;
             }
           }
+
+          // Delete any trucks for this tenant that are NOT in sanitizedTrucks
+          const truckIds = sanitizedTrucks.map((t: any) => t.id);
+          const { error: deleteErr } = await supabase
+            .from("trucks")
+            .delete()
+            .eq("tenantId", tenantId)
+            .not("id", "in", `(${truckIds.map(id => `"${id}"`).join(",")})`);
+          if (deleteErr) {
+            console.warn("Non-blocking trucks sync deletion failed:", deleteErr.message);
+          }
         } catch (dbErr: any) {
           throw new Error(`Trucks Sync Error: ${dbErr.message}`);
         }
+      } else {
+        await supabase.from("trucks").delete().eq("tenantId", tenantId);
       }
 
       // 3. Users - Proactively map and serialize user payloads to prevent "column does not exist" schema mismatches
@@ -1714,9 +1765,22 @@ app.use((req, res, next) => {
 
           const { error } = await supabase.from("users").upsert(usersToUpsert);
           if (error) throw error;
+
+          // Delete any users for this tenant that are NOT in sanitizedUsers
+          const userIds = sanitizedUsers.map((u: any) => u.id);
+          const { error: deleteErr } = await supabase
+            .from("users")
+            .delete()
+            .eq("tenantId", tenantId)
+            .not("id", "in", `(${userIds.map(id => `"${id}"`).join(",")})`);
+          if (deleteErr) {
+            console.warn("Non-blocking users sync deletion failed:", deleteErr.message);
+          }
         } catch (dbErr: any) {
           throw new Error(`Users Sync Error: ${dbErr.message}`);
         }
+      } else {
+        await supabase.from("users").delete().eq("tenantId", tenantId);
       }
 
       // 4. Deliveries with auto-columns stripping fallback for schema mismatch
@@ -1768,6 +1832,19 @@ app.use((req, res, next) => {
         if (!success) {
           throw new Error("Deliveries Sync failed after maximum retries due to persistent schema mismatch.");
         }
+
+        // Delete any deliveries for this tenant that are NOT in sanitizedDeliveries
+        const deliveryIds = sanitizedDeliveries.map((d: any) => d.id);
+        const { error: deleteErr } = await supabase
+          .from("deliveries")
+          .delete()
+          .eq("tenantId", tenantId)
+          .not("id", "in", `(${deliveryIds.map(id => `"${id}"`).join(",")})`);
+        if (deleteErr) {
+          console.warn("Non-blocking deliveries sync deletion failed:", deleteErr.message);
+        }
+      } else {
+        await supabase.from("deliveries").delete().eq("tenantId", tenantId);
       }
 
       res.json({ success: true });
@@ -1792,7 +1869,7 @@ app.use((req, res, next) => {
         if (state) {
           const tableName = table as string;
           if (tableName === "branches" && state.branches) {
-            state.branches = state.branches.filter((item: any) => item.id !== id);
+            state.branches = state.branches.filter((item: any) => item.id !== id && item.id !== "500");
           } else if (tableName === "trucks" && state.trucks) {
             state.trucks = state.trucks.filter((item: any) => item.id !== id);
           } else if (tableName === "users" && state.users) {
@@ -1805,11 +1882,15 @@ app.use((req, res, next) => {
       }
 
       // Ensure we only delete matching ids belonging to the authenticated tenant
-      const { error } = await supabase
-        .from(table as string)
-        .delete()
-        .eq("id", id)
-        .eq("tenantId", tenantId);
+      // If table is branches and id is DC-WINAMILL, also delete legacy ID "500"
+      let deleteQuery = supabase.from(table as string).delete().eq("tenantId", tenantId);
+      if (table === "branches" && id === "DC-WINAMILL") {
+        deleteQuery = deleteQuery.in("id", ["DC-WINAMILL", "500"]);
+      } else {
+        deleteQuery = deleteQuery.eq("id", id);
+      }
+      
+      const { error } = await deleteQuery;
 
       if (error) throw error;
       res.json({ success: true });

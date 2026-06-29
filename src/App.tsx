@@ -16,7 +16,8 @@ import {
   fetchTenantStateDirect, 
   saveTenantStateDirect, 
   deleteRecordDirect, 
-  clearAllDirect 
+  clearAllDirect,
+  deserializeType
 } from './lib/supabaseClient';
 import Dashboard from './components/Dashboard';
 import ScanStation from './components/ScanStation';
@@ -570,6 +571,12 @@ export default function App() {
           }
         }
 
+        if (Date.now() - lastMutationTimeRef.current < 4000) {
+          console.log("[Sync Lock] Ignoring incoming state fetch response to preserve recent user mutations.");
+          setSyncStatus('IDLE');
+          return;
+        }
+
         if (data.supabaseActive) {
           // Populate React state directly from live Supabase Tables
           setDeliveries(data.deliveries || []);
@@ -672,6 +679,42 @@ export default function App() {
     let stateUpdated = false;
     let newUsers = [...users];
     let newTrucks = [...trucks];
+    let newBranches = [...branches];
+
+    // Migrate branch ID "500" (typo) to "DC-WINAMILL"
+    if (newBranches.some(b => b.id === "500")) {
+      const hasWinamill = newBranches.some(b => b.id === "DC-WINAMILL");
+      if (hasWinamill) {
+        newBranches = newBranches.filter(b => b.id !== "500");
+      } else {
+        newBranches = newBranches.map(b => b.id === "500" ? { ...b, id: "DC-WINAMILL" } : b);
+      }
+      newTrucks = newTrucks.map(t => t.branchId === "500" ? { ...t, branchId: "DC-WINAMILL" } : t);
+      newUsers = newUsers.map(u => u.associatedStoreId === "500" ? { ...u, associatedStoreId: "DC-WINAMILL" } : u);
+      stateUpdated = true;
+    }
+
+    // Safeguard uniqueness to avoid duplicate keys in React and ON CONFLICT constraint errors in database
+    const uniqueBranchesMap = new Map<string, Branch>();
+    newBranches.forEach(b => uniqueBranchesMap.set(b.id, b));
+    if (uniqueBranchesMap.size !== newBranches.length) {
+      newBranches = Array.from(uniqueBranchesMap.values());
+      stateUpdated = true;
+    }
+
+    const uniqueTrucksMap = new Map<string, Truck>();
+    newTrucks.forEach(t => uniqueTrucksMap.set(t.id, t));
+    if (uniqueTrucksMap.size !== newTrucks.length) {
+      newTrucks = Array.from(uniqueTrucksMap.values());
+      stateUpdated = true;
+    }
+
+    const uniqueUsersMap = new Map<string, User>();
+    newUsers.forEach(u => uniqueUsersMap.set(u.id, u));
+    if (uniqueUsersMap.size !== newUsers.length) {
+      newUsers = Array.from(uniqueUsersMap.values());
+      stateUpdated = true;
+    }
 
     // 1. Ensure current user exists in users list
     const userExists = newUsers.some(u => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -724,7 +767,7 @@ export default function App() {
           driver: currentUser.name,
           branchId: currentUser.associatedStoreId || "DC-WINAMILL"
         };
-        newTrucks.push(newTruckRecord);
+        newTrucks.push(deserializeType(newTruckRecord));
         stateUpdated = true;
       }
     }
@@ -732,7 +775,8 @@ export default function App() {
     if (stateUpdated) {
       setUsers(newUsers);
       setTrucks(newTrucks);
-      syncStateToSupabase(currentTenant.id, deliveries, newTrucks, branches, newUsers);
+      setBranches(newBranches);
+      syncStateToSupabase(currentTenant.id, deliveries, newTrucks, newBranches, newUsers);
     }
   }, [currentUser, currentTenant, branches.length, users.length, trucks.length]);
 
@@ -1567,6 +1611,7 @@ export default function App() {
             <FleetSetup 
               trucks={trucks} 
               branches={branches}
+              users={users}
               onAddTruck={handleAddTruck} 
               onUpdateTruck={handleUpdateTruck} 
               onDeleteTruck={handleDeleteTruck} 

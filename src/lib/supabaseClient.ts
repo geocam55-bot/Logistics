@@ -304,8 +304,25 @@ export async function saveTenantStateDirect(
   const supabase = getFrontendSupabase();
   if (!supabase) return { supabaseActive: false };
 
+  // Deduplicate input arrays to prevent ON CONFLICT DO UPDATE rows violations
+  const uniqueBranchesMap = new Map<string, any>();
+  (branches || []).forEach(b => { if (b && b.id) uniqueBranchesMap.set(b.id, b); });
+  const uniqueBranches = Array.from(uniqueBranchesMap.values());
+
+  const uniqueTrucksMap = new Map<string, any>();
+  (trucks || []).forEach(t => { if (t && t.id) uniqueTrucksMap.set(t.id, t); });
+  const uniqueTrucks = Array.from(uniqueTrucksMap.values());
+
+  const uniqueUsersMap = new Map<string, any>();
+  (users || []).forEach(u => { if (u && u.id) uniqueUsersMap.set(u.id, u); });
+  const uniqueUsers = Array.from(uniqueUsersMap.values());
+
+  const uniqueDeliveriesMap = new Map<string, any>();
+  (deliveries || []).forEach(d => { if (d && d.id) uniqueDeliveriesMap.set(d.id, d); });
+  const uniqueDeliveries = Array.from(uniqueDeliveriesMap.values());
+
   // Prepare and serialize
-  const serializedUsers = users.map(u => ({
+  const serializedUsers = uniqueUsers.map(u => ({
     id: u.id,
     tenantId,
     name: u.name,
@@ -315,7 +332,7 @@ export async function saveTenantStateDirect(
     associatedStoreId: u.associatedStoreId
   }));
 
-  const serializedTrucks = trucks.map(t => ({
+  const serializedTrucks = uniqueTrucks.map(t => ({
     id: t.id,
     tenantId,
     name: t.name,
@@ -324,7 +341,7 @@ export async function saveTenantStateDirect(
     branchId: t.branchId
   }));
 
-  const mappedBranches = branches.map(b => ({
+  const mappedBranches = uniqueBranches.map(b => ({
     id: b.id,
     tenantId,
     name: b.name,
@@ -332,7 +349,7 @@ export async function saveTenantStateDirect(
     address: b.address
   }));
 
-  const mappedDeliveries = deliveries.map(d => ({
+  const mappedDeliveries = uniqueDeliveries.map(d => ({
     id: d.id,
     tenantId,
     invoiceNumber: d.invoiceNumber,

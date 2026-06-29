@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Branch } from '../types';
+import { Truck, Branch, User } from '../types';
 import { Truck as TruckIcon, Plus, Trash2, Edit2, Shield, Info, ChevronRight, FileCheck, AlertTriangle, Calendar } from 'lucide-react';
 
 interface FleetSetupProps {
   trucks: Truck[];
   branches: Branch[];
+  users?: User[];
   onAddTruck: (truck: Truck) => void;
   onUpdateTruck: (truck: Truck) => void;
   onDeleteTruck: (id: string) => void;
@@ -14,6 +15,7 @@ interface FleetSetupProps {
 export default function FleetSetup({
   trucks,
   branches,
+  users,
   onAddTruck,
   onUpdateTruck,
   onDeleteTruck,
@@ -45,6 +47,9 @@ export default function FleetSetup({
   // Get trucks assigned to the currently selected branch
   const filteredTrucks = trucks.filter(t => t.branchId === selectedBranchId);
   const selectedBranch = branches.find(b => b.id === selectedBranchId);
+
+  // Filter registered users with Driver role
+  const driversList = (users || []).filter(u => u.role === 'Driver');
 
   // Pre-configured truck models for easy selection
   const TRUCK_TYPES = [
@@ -295,14 +300,27 @@ export default function FleetSetup({
 
                   <div>
                     <label className="text-xs font-semibold text-gray-700 block mb-1">Assigned Logistics Driver</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Full name of driver"
+                    <select
                       value={driverName}
                       onChange={(e) => setDriverName(e.target.value)}
-                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
+                      required
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    >
+                      <option value="">-- Select a Driver --</option>
+                      {driversList.map(u => (
+                        <option key={u.id} value={u.name}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
+                      {driversList.length === 0 && (
+                        <>
+                          <option value="George Campbell">George Campbell</option>
+                          <option value="Dave MacNeil">Dave MacNeil</option>
+                          <option value="Joshua Campbell">Joshua Campbell</option>
+                          <option value="Robert Landry">Robert Landry</option>
+                        </>
+                      )}
+                    </select>
                   </div>
 
                   <div>
