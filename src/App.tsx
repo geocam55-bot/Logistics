@@ -27,10 +27,11 @@ import StoresSetup from './components/StoresSetup';
 import UsersSetup from './components/UsersSetup';
 import LoginScreen from './components/LoginScreen';
 import SuperAdminTenantsView from './components/SuperAdminTenantsView';
+import UserProfileModal, { renderUserAvatarHelper } from './components/UserProfileModal';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck, Key,
-  Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert
+  Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert, Camera, Sliders, User as UserIcon
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
 
@@ -100,6 +101,11 @@ export default function App() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isFleetDropdownOpen, setIsFleetDropdownOpen] = useState(false);
+
+  // User Profile Menu & Modal states
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileActiveTab, setProfileActiveTab] = useState<'info' | 'photo' | 'password'>('info');
 
   // User Password Change states
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -289,6 +295,20 @@ export default function App() {
     } finally {
       setChangePasswordLoading(false);
     }
+  };
+
+  const handleUpdateProfile = async (updatedUser: User) => {
+    if (!currentTenant) return;
+    
+    // Update local storage and React state immediately
+    setCurrentUser(updatedUser);
+    localStorage.setItem('prospaces_active_user', JSON.stringify(updatedUser));
+    
+    // Update in our users state list so that syncStateToSupabase writes the serialized payload
+    const updatedUsersList = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    setUsers(updatedUsersList);
+    
+    await syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updatedUsersList);
   };
 
   // Supabase Live Sync and Configuration Diagnostics
@@ -1073,21 +1093,113 @@ export default function App() {
               </div>
 
               {/* Identity & control */}
-              <div className="flex items-center space-x-2.5 border-l border-slate-800 pl-4 leading-none">
-                <div className="hidden lg:flex flex-col text-right">
-                  <span className="text-xs font-bold leading-none text-slate-200">{currentUser.name}</span>
-                  <span className="text-[9px] font-mono text-amber-400 leading-none mt-1 uppercase font-black tracking-wider">
-                    {currentUser.role}
-                  </span>
-                </div>
+              <div className="relative flex items-center border-l border-slate-800 pl-4">
                 <button 
-                  onClick={handleLogout}
-                  title="Secure De-authorization and Logout"
-                  type="button"
-                  className="text-amber-500 hover:text-amber-400 p-2 bg-amber-500/10 hover:bg-amber-500/20 rounded-xl transition-all flex items-center justify-center border border-amber-500/20 shadow-inner cursor-pointer"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center space-x-2.5 hover:bg-slate-850 p-1.5 rounded-2xl transition-all cursor-pointer select-none text-left"
+                  id="user-menu-trigger-admin"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <div className="hidden lg:flex flex-col text-right font-sans">
+                    <span className="text-xs font-bold leading-none text-slate-200">{currentUser.name}</span>
+                    <span className="text-[9px] font-mono text-amber-400 leading-none mt-1 uppercase font-black tracking-wider">
+                      {currentUser.role}
+                    </span>
+                  </div>
+                  {renderUserAvatarHelper(currentUser.avatarUrl, currentUser.name, "h-8 w-8")}
                 </button>
+
+                {/* Dropdown Menu */}
+                {isUserMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 p-4 z-50 animate-fade-in text-left">
+                      <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-4 flex flex-col items-center justify-center text-center mb-3">
+                        <div className="relative group mb-3">
+                          <div className="h-20 w-20 rounded-full overflow-hidden border-2 border-white shadow-md bg-white flex items-center justify-center">
+                            {renderUserAvatarHelper(currentUser.avatarUrl, currentUser.name, "h-full w-full")}
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setIsUserMenuOpen(false);
+                              setProfileActiveTab('photo');
+                              setShowProfileModal(true);
+                            }}
+                            className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-full shadow-lg transition-all cursor-pointer"
+                            title="Update Profile Photo"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        <h4 className="text-xs sm:text-sm font-extrabold text-slate-800 leading-snug">
+                          {currentUser.name} &bull; {currentUser.role}
+                        </h4>
+                        <p className="text-[10px] sm:text-xs text-slate-500 truncate max-w-full font-medium mt-0.5">
+                          {currentUser.email}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            setProfileActiveTab('password');
+                            setShowProfileModal(true);
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 rounded-xl transition-all font-bold text-left cursor-pointer"
+                        >
+                          <Key className="h-4 w-4 text-slate-400" />
+                          <span>Passwords and autofill</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            setProfileActiveTab('info');
+                            setShowProfileModal(true);
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 rounded-xl transition-all font-bold text-left cursor-pointer"
+                        >
+                          <Sliders className="h-4 w-4 text-slate-400" />
+                          <span>Customize profile details</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            setProfileActiveTab('photo');
+                            setShowProfileModal(true);
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 rounded-xl transition-all font-bold text-left cursor-pointer"
+                        >
+                          <Camera className="h-4 w-4 text-slate-400" />
+                          <span>Customize photo / avatar</span>
+                        </button>
+
+                        <div className="border-t border-slate-100 my-2" />
+
+                        <div className="px-3 py-1 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                          <span>Sync engine status</span>
+                          <span className="flex items-center space-x-1 text-green-600 font-bold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                            <span>Sync is on</span>
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2.5 text-xs text-rose-600 hover:bg-rose-50 rounded-xl transition-all font-black text-left cursor-pointer"
+                        >
+                          <LogOut className="h-4 w-4 text-rose-400" />
+                          <span>Logoff & switch tenant</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -1160,40 +1272,119 @@ export default function App() {
             </div>
 
             {/* Authenticated User Badge & Logout Switcher */}
-            <div className="flex items-center space-x-2 border-l border-slate-200 pl-2.5">
-              <div className="hidden sm:flex flex-col text-right font-sans">
-                <span className="text-xs font-black leading-none text-slate-800">{currentUser.name}</span>
-                <span className="text-[9px] font-mono text-slate-500 leading-none mt-1 uppercase font-bold tracking-wider">
-                  {currentUser.role}
-                </span>
-              </div>
-              <div className="sm:hidden flex flex-col text-right pr-1 font-sans">
-                <span className="text-[10px] font-bold leading-none text-slate-800 truncate max-w-[80px]">{currentUser.name.split(' ')[0]}</span>
-                <span className="text-[8px] font-mono text-slate-400 leading-none mt-0.5 uppercase tracking-wider">
-                  {currentUser.role}
-                </span>
-              </div>
+            <div className="relative flex items-center border-l border-slate-200 pl-2.5">
               <button 
-                onClick={() => {
-                  setShowChangePasswordModal(true);
-                  setChangePasswordError(null);
-                  setChangePasswordSuccess(null);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmNewPassword('');
-                }}
-                title="Change Account Password"
-                className="text-slate-500 hover:text-slate-800 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center border border-slate-200 cursor-pointer shrink-0"
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center space-x-2.5 hover:bg-slate-50 p-1.5 rounded-2xl transition-all cursor-pointer select-none text-left"
+                id="user-menu-trigger"
               >
-                <Key className="h-3.5 w-3.5 text-slate-500" />
+                <div className="hidden sm:flex flex-col text-right font-sans">
+                  <span className="text-xs font-black leading-none text-slate-800">{currentUser.name}</span>
+                  <span className="text-[9px] font-mono text-slate-500 leading-none mt-1 uppercase font-bold tracking-wider">
+                    {currentUser.role}
+                  </span>
+                </div>
+                <div className="sm:hidden flex flex-col text-right pr-1 font-sans">
+                  <span className="text-[10px] font-bold leading-none text-slate-800 truncate max-w-[80px]">{currentUser.name.split(' ')[0]}</span>
+                  <span className="text-[8px] font-mono text-slate-400 leading-none mt-0.5 uppercase tracking-wider">
+                    {currentUser.role}
+                  </span>
+                </div>
+                {renderUserAvatarHelper(currentUser.avatarUrl, currentUser.name, "h-8 w-8")}
               </button>
-              <button 
-                onClick={handleLogout}
-                title="Logout & Switch Logistical Tenant"
-                className="text-slate-500 hover:text-slate-800 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center border border-slate-200 cursor-pointer shrink-0"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-              </button>
+
+              {/* User Dropdown Menu */}
+              {isUserMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 p-4 z-50 animate-fade-in text-left">
+                    <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-4 flex flex-col items-center justify-center text-center mb-3">
+                      <div className="relative group mb-3">
+                        <div className="h-20 w-20 rounded-full overflow-hidden border-2 border-white shadow-md bg-white flex items-center justify-center">
+                          {renderUserAvatarHelper(currentUser.avatarUrl, currentUser.name, "h-full w-full")}
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            setProfileActiveTab('photo');
+                            setShowProfileModal(true);
+                          }}
+                          className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-full shadow-lg transition-all cursor-pointer"
+                          title="Update Profile Photo"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <h4 className="text-xs sm:text-sm font-extrabold text-slate-800 leading-snug">
+                        {currentUser.name} &bull; {currentUser.role}
+                      </h4>
+                      <p className="text-[10px] sm:text-xs text-slate-500 truncate max-w-full font-medium mt-0.5">
+                        {currentUser.email}
+                      </p>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          setProfileActiveTab('password');
+                          setShowProfileModal(true);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 rounded-xl transition-all font-bold text-left cursor-pointer"
+                      >
+                        <Key className="h-4 w-4 text-slate-400" />
+                        <span>Passwords and autofill</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          setProfileActiveTab('info');
+                          setShowProfileModal(true);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 rounded-xl transition-all font-bold text-left cursor-pointer"
+                      >
+                        <Sliders className="h-4 w-4 text-slate-400" />
+                        <span>Customize profile details</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          setProfileActiveTab('photo');
+                          setShowProfileModal(true);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 rounded-xl transition-all font-bold text-left cursor-pointer"
+                      >
+                        <Camera className="h-4 w-4 text-slate-400" />
+                        <span>Customize photo / avatar</span>
+                      </button>
+
+                      <div className="border-t border-slate-100 my-2" />
+
+                      <div className="px-3 py-1 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                        <span>Sync engine status</span>
+                        <span className="flex items-center space-x-1 text-green-600 font-bold">
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                          <span>Sync is on</span>
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2.5 text-xs text-rose-600 hover:bg-rose-50 rounded-xl transition-all font-black text-left cursor-pointer"
+                      >
+                        <LogOut className="h-4 w-4 text-rose-400" />
+                        <span>Logoff & switch tenant</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -1338,6 +1529,7 @@ export default function App() {
               branches={branches}
               onUpdateTruck={handleUpdateTruck}
               users={users}
+              currentUser={currentUser}
             />
           )}
           {activeTab === 'scanner' && (
@@ -1529,6 +1721,16 @@ export default function App() {
             </form>
           </div>
         </div>
+      )}
+
+      {showProfileModal && currentUser && (
+        <UserProfileModal
+          currentUser={currentUser}
+          branches={branches}
+          initialTab={profileActiveTab}
+          onClose={() => setShowProfileModal(false)}
+          onUpdateProfile={handleUpdateProfile}
+        />
       )}
 
     </div>

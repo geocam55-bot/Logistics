@@ -74,6 +74,7 @@ export interface User {
   tenantId?: string;
   lastActive?: string;
   resetRequest?: string;
+  avatarUrl?: string;
 }
 
 export interface Tenant {

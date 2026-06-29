@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck as TruckType, User as UserType } from '../types';
+import { renderUserAvatarHelper } from './UserProfileModal';
 import { 
   Truck as TruckIcon, 
   CheckCircle2, 
@@ -267,11 +268,28 @@ interface DashboardProps {
   branches?: Branch[];
   onUpdateTruck?: (truck: TruckType) => void;
   users?: UserType[];
+  currentUser?: UserType | null;
 }
 
-export default function Dashboard({ deliveries, onSelectTab, trucks, branches, onUpdateTruck, users }: DashboardProps) {
+export default function Dashboard({ deliveries, onSelectTab, trucks, branches, onUpdateTruck, users, currentUser }: DashboardProps) {
   const activeBranches = branches || [];
   const activeUsers = users || [];
+
+  const isDriver = currentUser?.role === 'Driver';
+  const driverName = currentUser?.name || '';
+  const driverTrucks = isDriver && driverName
+    ? trucks.filter(t => t.driver && t.driver.toLowerCase() === driverName.toLowerCase())
+    : [];
+  const driverTruckIds = driverTrucks.map(t => t.id);
+
+  const displayDeliveries = isDriver && driverName
+    ? deliveries.filter(d => 
+        (d.assignedDriver && d.assignedDriver.toLowerCase() === driverName.toLowerCase()) ||
+        (d.assignedTruck && driverTruckIds.includes(d.assignedTruck))
+      )
+    : deliveries;
+
+  const displayTrucks = isDriver && driverName ? driverTrucks : trucks;
 
   const isDriverOnline = (driverName: string): boolean => {
     if (!driverName) return false;
@@ -282,7 +300,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   };
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
-  const selectedTruck = selectedTrackTruckId ? trucks.find(t => t.id === selectedTrackTruckId) : trucks[0];
+  const selectedTruck = selectedTrackTruckId ? displayTrucks.find(t => t.id === selectedTrackTruckId) : (displayTrucks[0] || trucks[0]);
   const [isPlayingSimulation, setIsPlayingSimulation] = useState<boolean>(true);
   const [simProgress, setSimProgress] = useState<Record<string, number>>({});
   const [lastRadarPingTime, setLastRadarPingTime] = useState<string>(() => new Date().toLocaleTimeString());
@@ -683,7 +701,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
       activeBranches.forEach(branch => {
         const coords = getBranchCoordinates(branch.id, branch.name);
         const isDC = branch.type === 'DC';
-        const count = deliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
+        const count = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
 
         const branchIcon = L.divIcon({
           className: 'custom-branch-marker',
@@ -717,10 +735,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
     // Plot Customer Delivery Destinations
     if (dGroup) {
-      deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
+      displayDeliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
         const isAssigned = !!delivery.assignedTruck;
         if (isAssigned) {
-          const matchedTruck = trucks.find(t => t.id === delivery.assignedTruck);
+          const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
           if (matchedTruck) {
             const online = isDriverOnline(matchedTruck.driver);
             if (!online) {
@@ -779,10 +797,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
       }
     });
 
-    deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
+    displayDeliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
       const isAssigned = !!delivery.assignedTruck;
       if (isAssigned) {
-        const matchedTruck = trucks.find(t => t.id === delivery.assignedTruck);
+        const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
         if (matchedTruck) {
           const online = isDriverOnline(matchedTruck.driver);
           if (!online) return; // Skip bounds plotting if driver is offline
@@ -796,7 +814,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     });
 
     if (tGroup && rGroup) {
-      trucks.forEach(truck => {
+      displayTrucks.forEach(truck => {
         let origLat: number;
         let origLng: number;
         let destLat: number;
@@ -804,7 +822,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         let isMoving = false;
         const isOnline = isDriverOnline(truck.driver);
 
-        const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+        const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
         if (assignedDelivery) {
           const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
           const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
@@ -843,7 +861,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         }
 
         const isSelected = selectedTrackTruckId === truck.id;
-        if (isSelected || (!selectedTrackTruckId && trucks[0]?.id === truck.id)) {
+        if (isSelected || (!selectedTrackTruckId && displayTrucks[0]?.id === truck.id)) {
           activeTruckGps = { lat: truckLat, lng: truckLng };
         }
 
@@ -929,8 +947,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
     // Auto-fit geographic boundaries to fit all markers elegantly without jittering on every progress update
     const branchesKey = activeBranches.map(b => b.id).sort().join(',');
-    const deliveriesCount = deliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).length;
-    const currentBoundsKey = `${branchesKey}-${deliveriesCount}-${trucks.length}`;
+    const deliveriesCount = displayDeliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).length;
+    const currentBoundsKey = `${branchesKey}-${deliveriesCount}-${displayTrucks.length}`;
     
     if (lastBoundsKeyRef.current !== currentBoundsKey && allPlottedCoords.length > 0 && map) {
       lastBoundsKeyRef.current = currentBoundsKey;
@@ -940,17 +958,17 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         console.warn("Could not fit map bounds dynamically:", e);
       }
     }
-  }, [hqCoords, activeBranches, deliveries, trucks, simProgress, selectedTrackTruckId, isPlayingSimulation, isWatchingGps]);
+  }, [hqCoords, activeBranches, displayDeliveries, displayTrucks, simProgress, selectedTrackTruckId, isPlayingSimulation, isWatchingGps]);
 
   // Statistics
-  const total = deliveries.length;
-  const registered = deliveries.filter(d => d.status === DeliveryStatus.REGISTERED).length;
-  const picked = deliveries.filter(d => d.status === DeliveryStatus.PICKED_AND_LOADED).length;
-  const delivered = deliveries.filter(d => d.status === DeliveryStatus.DELIVERED).length;
-  const returned = deliveries.filter(d => d.status === DeliveryStatus.RETURNED).length;
+  const total = displayDeliveries.length;
+  const registered = displayDeliveries.filter(d => d.status === DeliveryStatus.REGISTERED).length;
+  const picked = displayDeliveries.filter(d => d.status === DeliveryStatus.PICKED_AND_LOADED).length;
+  const delivered = displayDeliveries.filter(d => d.status === DeliveryStatus.DELIVERED).length;
+  const returned = displayDeliveries.filter(d => d.status === DeliveryStatus.RETURNED).length;
 
   const bogoStats = activeBranches.map(branch => {
-    const branchDeliveries = deliveries.filter(d => d.originBranch === branch.id);
+    const branchDeliveries = displayDeliveries.filter(d => d.originBranch === branch.id);
     return {
       ...branch,
       count: branchDeliveries.length,
@@ -965,9 +983,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     const interval = setInterval(() => {
       setSimProgress(prev => {
         const next = { ...prev };
-        trucks.forEach(t => {
+        displayTrucks.forEach(t => {
           const current = prev[t.id] || 0.15;
-          const assignedDelivery = deliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
+          const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
           
           if (assignedDelivery && assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED) {
             let increment = 0.035;
@@ -989,7 +1007,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
       });
     }, 1800);
     return () => clearInterval(interval);
-  }, [trucks, deliveries, isPlayingSimulation]);
+  }, [displayTrucks, displayDeliveries, isPlayingSimulation]);
 
   // Render clip progression ticker
   useEffect(() => {
@@ -1435,7 +1453,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-15" xmlns="http://www.w3.org/2000/svg">
               {(() => {
                 const hqPercent = getPercentCoordsFromGps(hqCoords.lat, hqCoords.lng);
-                const matchedTruck = selectedTrackTruckId ? trucks.find(t => t.id === selectedTrackTruckId) : trucks[0];
+                const matchedTruck = selectedTrackTruckId ? displayTrucks.find(t => t.id === selectedTrackTruckId) : displayTrucks[0];
                 if (!matchedTruck) return null;
 
                 let origLat: number;
@@ -1443,7 +1461,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 let destLat: number;
                 let destLng: number;
 
-                const assignedDelivery = deliveries.find(d => d.assignedTruck === matchedTruck.id && d.status !== DeliveryStatus.DELIVERED);
+                const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === matchedTruck.id && d.status !== DeliveryStatus.DELIVERED);
                 if (assignedDelivery) {
                   const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
                   const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
@@ -1501,13 +1519,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
             {/* Live routing visualizer paths for active vehicles */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
-              {trucks.map(truck => {
+              {displayTrucks.map(truck => {
                 let origLat: number;
                 let origLng: number;
                 let destLat: number;
                 let destLng: number;
 
-                const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+                const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
                 if (assignedDelivery) {
                   const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
                   const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
@@ -1591,7 +1609,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               {activeBranches.map(branch => {
                 const coords = getBranchCoordinates(branch.id, branch.name);
                 const isDC = branch.type === 'DC';
-                const countOfActiveDeliveriesAtBranch = deliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
+                const countOfActiveDeliveriesAtBranch = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
 
                 return (
                   <div
@@ -1624,10 +1642,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               })}
 
               {/* 3. Customer Delivery Destination Pins */}
-              {deliveries.filter(d => {
+              {displayDeliveries.filter(d => {
                 if (d.status === DeliveryStatus.DELIVERED) return false;
                 if (d.assignedTruck) {
-                  const matchedTruck = trucks.find(t => t.id === d.assignedTruck);
+                  const matchedTruck = displayTrucks.find(t => t.id === d.assignedTruck);
                   if (matchedTruck) {
                     const online = isDriverOnline(matchedTruck.driver);
                     if (!online) return false; // Filter out destinations of offline drivers
@@ -1665,7 +1683,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               })}
 
               {/* 4. Live Active Driver Trucks Layer */}
-              {trucks.map(truck => {
+              {displayTrucks.map(truck => {
                 let origLat: number;
                 let origLng: number;
                 let destLat: number;
@@ -1673,7 +1691,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 let isMoving = false;
                 const isOnline = isDriverOnline(truck.driver);
 
-                const assignedDelivery = deliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+                const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
                 if (assignedDelivery) {
                   const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
                   const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
@@ -1818,8 +1836,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               }`}>
                 {(() => {
                   const currentIdlingMinutes = Math.floor((Date.now() - idlingStartTime) / 60000);
-                  const combinedFleetList = trucks.map(t => {
-                    const assignedDelivery = deliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
+                  const combinedFleetList = displayTrucks.map(t => {
+                    const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
                     const hasRealGps = (t as any).lat !== undefined && (t as any).lng !== undefined && !isNaN((t as any).lat) && !isNaN((t as any).lng);
                     const isOnline = isDriverOnline(t.driver);
@@ -1831,7 +1849,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       driver: t.driver || 'No Driver',
                       type: t.type || 'Carrier',
                       activeSpeed: speedValue,
-                      avatar: '',
+                      avatar: (() => {
+                        const matchedUser = activeUsers.find(u => u.name.toLowerCase() === (t.driver || '').toLowerCase());
+                        return matchedUser?.avatarUrl || '';
+                      })(),
                       trips: assignedDelivery ? [
                         {
                           id: assignedDelivery.id,
@@ -1899,18 +1920,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                           <div className="flex items-center gap-3">
                             
                             {/* Driver Profile Face or placeholder circle */}
-                            {truckRow.avatar ? (
-                              <img 
-                                src={truckRow.avatar} 
-                                alt={truckRow.driver} 
-                                className="w-10 h-10 rounded-full object-cover border-2 border-slate-105"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-slate-105 border-2 border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs uppercase">
-                                {truckRow.driver.slice(0, 2)}
-                              </div>
-                            )}
+                            {renderUserAvatarHelper(truckRow.avatar, truckRow.driver, "w-10 h-10 border-2 border-slate-100 shadow-xs")}
 
                             <div>
                               <h4 className="font-sans font-bold text-slate-900 leading-tight text-xs flex items-center gap-1.5 md:text-[13px]">
@@ -2307,7 +2317,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             <h4 className="font-sans font-semibold text-gray-900 tracking-tight text-lg mb-1">🚚 Fleet Registry Status</h4>
             <p className="text-xs text-gray-500 mb-4 font-normal">Active custom-setup vehicles, assigned drivers, and hub affiliations</p>
             
-            {trucks.length === 0 ? (
+            {displayTrucks.length === 0 ? (
               <div className="text-center py-14 text-gray-400 font-mono text-xs border border-dashed border-gray-200 rounded-xl space-y-3 flex flex-col items-center justify-center">
                 <p>No active delivery vehicles registered.</p>
                 <button
@@ -2319,7 +2329,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-1">
-                {trucks.map(truck => {
+                {displayTrucks.map(truck => {
                   const associatedBranch = activeBranches.find(b => b.id === truck.branchId);
                   return (
                     <div key={truck.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl transition-all hover:border-blue-200/50 hover:bg-white hover:shadow-sm space-y-2 flex flex-col justify-between">
@@ -2393,7 +2403,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               </tr>
             </thead>
             <tbody className="text-xs text-gray-700 divide-y divide-gray-50">
-              {deliveries.slice(0, 5).map(delivery => {
+              {displayDeliveries.slice(0, 5).map(delivery => {
                 // Get last event
                 const lastEvent = delivery.history[delivery.history.length - 1];
                 return (
@@ -2435,7 +2445,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     </td>
                     <td className="py-2.5">
                       {(() => {
-                        const matchedTruck = trucks.find(t => t.id === delivery.assignedTruck);
+                        const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
                         if (matchedTruck) {
                           return (
                             <div className="space-y-0.5">
