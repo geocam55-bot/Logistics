@@ -76,6 +76,28 @@ const getThemeClasses = (color: string) => {
   };
 };
 
+function deduplicateUsers(usersList: User[]): User[] {
+  const seenEmails = new Set<string>();
+  const seenIds = new Set<string>();
+  const deduped: User[] = [];
+  
+  for (const u of usersList) {
+    if (!u || !u.id) continue;
+    const cleanId = u.id.trim();
+    const cleanEmail = (u.email || '').trim().toLowerCase();
+    
+    if (seenIds.has(cleanId)) continue;
+    if (cleanEmail && seenEmails.has(cleanEmail)) {
+      continue;
+    }
+    
+    seenIds.add(cleanId);
+    if (cleanEmail) seenEmails.add(cleanEmail);
+    deduped.push(u);
+  }
+  return deduped;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [allTenants, setAllTenants] = useState<Tenant[]>(() => {
@@ -584,7 +606,7 @@ export default function App() {
           setDeliveries(data.deliveries || []);
           setTrucks(data.trucks || []);
           setBranches(data.branches || []);
-          setUsers(data.users || []);
+          setUsers(deduplicateUsers(data.users || []));
           setLastSyncTime(new Date().toLocaleTimeString());
           setDbActive(true);
           setSyncStatus('IDLE');
@@ -603,7 +625,7 @@ export default function App() {
           setDeliveries(cachedDeliveries ? JSON.parse(cachedDeliveries) : (data.branches ? (data.deliveries || []) : []));
           setTrucks(cachedTrucks ? JSON.parse(cachedTrucks) : (data.branches ? (data.trucks || []) : []));
           setBranches(cachedBranches ? JSON.parse(cachedBranches) : (data.branches || []));
-          setUsers(cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : []));
+          setUsers(deduplicateUsers(cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : [])));
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox)`);
           setDbActive(false);
           setSyncStatus('IDLE');
@@ -625,7 +647,7 @@ export default function App() {
           setDeliveries(cachedDeliveries ? JSON.parse(cachedDeliveries) : []);
           setTrucks(cachedTrucks ? JSON.parse(cachedTrucks) : []);
           setBranches(cachedBranches ? JSON.parse(cachedBranches) : []);
-          setUsers(cachedUsers ? JSON.parse(cachedUsers) : []);
+          setUsers(deduplicateUsers(cachedUsers ? JSON.parse(cachedUsers) : []));
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Local Fallback)`);
         } catch (fbErr) {
           console.error("Fallback state load failed:", fbErr);
@@ -1115,11 +1137,16 @@ export default function App() {
                 />
               </div>
               <div>
-                <div className="flex items-center justify-center sm:justify-start space-x-2">
+                <div className="flex items-center justify-center sm:justify-start space-x-2 flex-wrap gap-y-1.5">
                   <h2 className="font-sans font-black text-xl text-slate-100 tracking-tight leading-none m-0">ProSpaces</h2>
                   <span className="bg-amber-500/15 text-amber-400 text-[9.5px] uppercase font-mono px-2 py-0.5 rounded font-black border border-amber-500/30 tracking-widest leading-none">
                     Master Administrator
                   </span>
+                  {currentTenant && (
+                    <span className="bg-slate-800 text-amber-500/90 text-[9.5px] uppercase font-mono px-2 py-0.5 rounded border border-slate-700 tracking-wider font-extrabold leading-none">
+                      Tenant: {currentTenant.name}
+                    </span>
+                  )}
                 </div>
                 <p className="text-slate-400 text-xs font-semibold mt-1.5 leading-none">
                   Global Organizational Partition Controls & Ecosystem Tenant Provisioning
@@ -1299,10 +1326,16 @@ export default function App() {
               />
             </div>
             <div>
-              <h1 className="font-sans font-black text-slate-900 text-sm sm:text-lg tracking-tight leading-tight">
+              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                <span className="bg-blue-50 text-blue-600 border border-blue-200/50 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded font-mono leading-none">
+                  Tenant
+                </span>
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider font-sans leading-none">Active Workspace:</span>
+              </div>
+              <h1 className="font-sans font-black text-slate-900 text-sm sm:text-lg tracking-tight leading-tight m-0">
                 {currentTenant.name}
               </h1>
-              <p className="text-slate-500 text-[9px] sm:text-xs font-semibold uppercase tracking-wider mt-0.5 leading-none flex items-center gap-1.5">
+              <p className="text-slate-500 text-[9px] sm:text-xs font-semibold uppercase tracking-wider mt-1.5 leading-none flex items-center gap-1.5">
                 <span>Enterprise Logistics Portal</span>
                 <span className="opacity-40">&bull;</span>
                 <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{currentTenant.code}</span>

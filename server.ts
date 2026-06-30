@@ -1789,7 +1789,7 @@ app.use((req, res, next) => {
           .from("branches")
           .delete()
           .eq("tenantId", tenantId)
-          .not("id", "in", `(${branchIds.map(id => `"${id}"`).join(",")})`);
+          .not("id", "in", `(${branchIds.join(",")})`);
         if (deleteErr) {
           console.warn("Non-blocking branches sync deletion failed:", deleteErr.message);
         }
@@ -1851,7 +1851,7 @@ app.use((req, res, next) => {
             .from("trucks")
             .delete()
             .eq("tenantId", tenantId)
-            .not("id", "in", `(${truckIds.map(id => `"${id}"`).join(",")})`);
+            .not("id", "in", `(${truckIds.join(",")})`);
           if (deleteErr) {
             console.warn("Non-blocking trucks sync deletion failed:", deleteErr.message);
           }
@@ -1886,7 +1886,7 @@ app.use((req, res, next) => {
             .from("users")
             .delete()
             .eq("tenantId", tenantId)
-            .not("id", "in", `(${userIds.map(id => `"${id}"`).join(",")})`);
+            .not("id", "in", `(${userIds.join(",")})`);
           if (deleteErr) {
             console.warn("Non-blocking users sync deletion failed:", deleteErr.message);
           }
@@ -1953,7 +1953,7 @@ app.use((req, res, next) => {
           .from("deliveries")
           .delete()
           .eq("tenantId", tenantId)
-          .not("id", "in", `(${deliveryIds.map(id => `"${id}"`).join(",")})`);
+          .not("id", "in", `(${deliveryIds.join(",")})`);
         if (deleteErr) {
           console.warn("Non-blocking deliveries sync deletion failed:", deleteErr.message);
         }
