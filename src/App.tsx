@@ -148,6 +148,7 @@ export default function App() {
   const [configSaving, setConfigSaving] = useState(false);
   const [configMsg, setConfigMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isDbInitializing, setIsDbInitializing] = useState(() => !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key')));
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Load custom credentials from localStorage on mount and register them with the backend memory store
   useEffect(() => {
@@ -1209,6 +1210,24 @@ export default function App() {
                 <Database className="h-3.5 w-3.5 text-current shrink-0" />
                 <span>{supabaseStatus?.connected ? 'Live Database Sync Active' : 'Offline / Local Database Sync Mode'}</span>
               </div>
+
+              <button
+                onClick={async () => {
+                  setIsCheckingStatus(true);
+                  try {
+                    await checkSupabaseStatus();
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setIsCheckingStatus(false);
+                  }
+                }}
+                title="Run database connection diagnostics & status verification"
+                className="flex items-center space-x-1 bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-800 px-2.5 py-1.5 rounded-lg text-[10.5px] font-mono transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+              >
+                <RefreshCw className={`h-3 w-3 ${isCheckingStatus ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
+                <span>{isCheckingStatus ? 'Verifying...' : 'Diagnostics'}</span>
+              </button>
 
               {/* Identity & control */}
               <div className="relative flex items-center border-l border-slate-800 pl-4">
