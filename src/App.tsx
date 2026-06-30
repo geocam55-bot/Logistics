@@ -252,6 +252,11 @@ export default function App() {
 
   // Trigger login session handlers
   const handleLoginSuccess = (tenant: Tenant, user: User) => {
+    // Clear operational state immediately to prevent stale cross-tenant contamination
+    setDeliveries([]);
+    setTrucks([]);
+    setBranches([]);
+    setUsers([]);
     setCurrentTenant(tenant);
     setCurrentUser(user);
     localStorage.setItem('prospaces_active_tenant', JSON.stringify(tenant));
@@ -260,15 +265,28 @@ export default function App() {
 
   const handleLogout = () => {
     if (currentUser && currentTenant && users.length > 0) {
-      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, lastActive: "1970-01-01T00:00:00.000Z" } : u);
-      setUsers(updatedUsers);
-      syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updatedUsers);
+      // Safely prevent logout save if the loaded data in state is contaminated or mismatched
+      const hasDifferentTenantData = 
+        branches.some(b => b.tenantId && b.tenantId !== currentTenant.id) ||
+        users.some(u => u.tenantId && u.tenantId !== currentTenant.id) ||
+        trucks.some(t => t.tenantId && t.tenantId !== currentTenant.id);
+
+      if (!hasDifferentTenantData) {
+        const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, lastActive: "1970-01-01T00:00:00.000Z" } : u);
+        setUsers(updatedUsers);
+        syncStateToSupabase(currentTenant.id, deliveries, trucks, branches, updatedUsers);
+      }
     }
     setCurrentTenant(null);
     setCurrentUser(null);
     localStorage.removeItem('prospaces_active_tenant');
     localStorage.removeItem('prospaces_active_user');
     setActiveTab('dashboard');
+    // Clear operational state completely on sign out
+    setDeliveries([]);
+    setTrucks([]);
+    setBranches([]);
+    setUsers([]);
   };
 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
@@ -683,11 +701,27 @@ export default function App() {
     const now = Date.now();
     // Throttle heartbeat to once every 10 seconds
     if (now - lastHeartbeatRef.current < 10000) return;
-    lastHeartbeatRef.current = now;
 
-    const { users: currentUsers, deliveries: currentDeliveries, trucks: currentTrucks, branches: currentBranches } = stateRef.current;
+    const { users: currentUsers, deliveries: currentDeliveries, trucks: currentTrucks, branches: currentBranches, currentTenant: stateTenant } = stateRef.current;
     if (currentUsers.length === 0) return;
 
+    // Prevent cross-tenant writes if state is stale or mismatches the active tenant
+    if (!stateTenant || stateTenant.id !== currentTenant.id) {
+      console.log("[Heartbeat] Tenant mismatch in ref state. Skipping heartbeat save.");
+      return;
+    }
+
+    const hasDifferentTenantData = 
+      currentBranches.some(b => b.tenantId && b.tenantId !== currentTenant.id) ||
+      currentUsers.some(u => u.tenantId && u.tenantId !== currentTenant.id) ||
+      currentTrucks.some(t => t.tenantId && t.tenantId !== currentTenant.id);
+
+    if (hasDifferentTenantData) {
+      console.log("[Heartbeat] Loaded state contains items from a different tenant. Skipping heartbeat save.");
+      return;
+    }
+
+    lastHeartbeatRef.current = now;
     const updatedUsers = currentUsers.map(u => u.id === currentUser.id ? { ...u, lastActive: new Date().toISOString() } : u);
     setUsers(updatedUsers);
     syncStateToSupabase(currentTenant.id, currentDeliveries, currentTrucks, currentBranches, updatedUsers);
@@ -699,6 +733,17 @@ export default function App() {
     
     // We only heal if state has finished loading (i.e. branches is populated, indicating we have state)
     if (branches.length === 0) return;
+
+    // Check for tenant data contamination to prevent cross-tenant writes during state hydration
+    const hasDifferentTenantData = 
+      branches.some(b => b.tenantId && b.tenantId !== currentTenant.id) ||
+      users.some(u => u.tenantId && u.tenantId !== currentTenant.id) ||
+      trucks.some(t => t.tenantId && t.tenantId !== currentTenant.id);
+
+    if (hasDifferentTenantData) {
+      console.log("[Auto-Heal] Loaded state contains items from a different tenant. Skipping auto-heal to avoid data contamination.");
+      return;
+    }
 
     let stateUpdated = false;
     let newUsers = [...users];
