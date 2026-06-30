@@ -38,7 +38,9 @@ import {
   Sliders,
   Film,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Warehouse,
+  Store
 } from 'lucide-react';
 
 // Regional Coordinate Dictionary for high-accuracy live geolocating
@@ -805,31 +807,55 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         const isDC = branch.type === 'DC';
         const count = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
 
+        const iconSvg = isDC 
+          ? `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-warehouse shrink-0"><path d="M22 22H2"/><path d="M10 22v-5a2 2 0 0 1 4 0v5"/><path d="M16 11V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v6"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M18 10V5a2 2 0 0 0-2-2h-8A2 2 0 0 0 6 5v5"/></svg>`
+          : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store shrink-0"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M18 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M14 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M10 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M6 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/></svg>`;
+
+        const cleanName = branch.name
+          .replace(/^ProSpaces\s*-\s*/i, '')
+          .replace(/^ProSpaces\s+/i, '')
+          .replace(/^\d+\s*-\s*/, '')
+          .replace(/^\d+\s+/, '');
+
         const branchIcon = L.divIcon({
           className: 'custom-branch-marker',
           html: `
             <div class="relative -translate-y-1 bg-slate-900 border-2 ${
-              isDC ? 'border-red-500 text-red-00' : 'border-blue-400 text-blue-400 font-bold'
-            } shadow-lg py-0.5 px-1.5 rounded-md text-[9px] font-mono leading-none flex items-center gap-1">
-              <span>${isDC ? "DC" : "DEP"}</span>
-              <span class="text-white opacity-80">${branch.name.split(' ')[0]}</span>
+              isDC ? 'border-red-500 text-red-400' : 'border-blue-400 text-blue-400'
+            } shadow-lg py-0.5 px-1.5 rounded-md text-[9px] font-mono leading-none flex items-center gap-1.5 justify-center whitespace-nowrap min-w-[75px]">
+              ${iconSvg}
+              <span class="font-bold">${isDC ? "DC" : "STORE"}</span>
+              <span class="text-white opacity-95 font-sans font-semibold">${cleanName}</span>
               ${count > 0 ? `<span class="bg-amber-500 text-slate-950 px-1 rounded-full font-sans font-extrabold text-[8px]">${count}</span>` : ''}
             </div>
           `,
-          iconSize: [110, 20],
-          iconAnchor: [55, 10]
+          iconSize: [120, 20],
+          iconAnchor: [60, 10]
         });
 
         L.marker([coords.lat, coords.lng], {
           icon: branchIcon
         })
         .addTo(bGroup)
+        .bindTooltip(`
+          <div class="font-sans text-xs p-1 space-y-1 text-left">
+            <p class="font-bold text-slate-100">${branch.name}</p>
+            <p class="text-[9.5px] text-amber-400 font-medium">${isDC ? "Distribution Center" : "Store Depot"}</p>
+            ${branch.address ? `<p class="text-[9.5px] text-slate-300 border-t border-slate-800 pt-1 mt-1 leading-relaxed whitespace-normal">${branch.address}</p>` : ''}
+          </div>
+        `, {
+          permanent: false,
+          direction: 'top',
+          offset: [0, -10],
+          className: 'bg-slate-900 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 shadow-xl font-sans min-w-[180px] max-w-[240px]'
+        })
         .bindPopup(`
-          <div class="font-sans text-xs p-1">
+          <div class="font-sans text-xs p-1.5 space-y-1">
             <p class="font-bold text-slate-850">${branch.name}</p>
-            <p class="text-[10px] text-slate-500">Facility Type: ${branch.type === 'DC' ? 'Distribution Center' : 'Regional Depot'}</p>
-            <p class="text-[9px] text-slate-400">GPS Coords: ${coords.lat.toFixed(4)}N, ${coords.lng.toFixed(4)}W</p>
-            <p class="text-[10px] text-amber-600 mt-1 font-bold">Pending Carrier Loads: ${count}</p>
+            <p class="text-[10px] text-slate-500">Facility Type: ${branch.type === 'DC' ? 'Distribution Center' : 'Regional Store Depot'}</p>
+            ${branch.address ? `<p class="text-[10px] text-slate-600 font-medium mt-1">${branch.address}</p>` : ''}
+            <p class="text-[9px] text-slate-400 mt-0.5">GPS Coords: ${coords.lat.toFixed(4)}N, ${coords.lng.toFixed(4)}W</p>
+            <p class="text-[10px] text-amber-600 mt-1.5 font-bold border-t border-slate-100 pt-1">Pending Carrier Loads: ${count}</p>
           </div>
         `);
       });
@@ -1720,6 +1746,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 const isDC = branch.type === 'DC';
                 const countOfActiveDeliveriesAtBranch = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
 
+                const cleanName = branch.name
+                  .replace(/^ProSpaces\s*-\s*/i, '')
+                  .replace(/^ProSpaces\s+/i, '')
+                  .replace(/^\d+\s*-\s*/, '')
+                  .replace(/^\d+\s+/, '');
+
                 return (
                   <div
                     key={`marker-${branch.id}`}
@@ -1729,10 +1761,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   >
                     <div className={`p-1.5 rounded-lg border-2 ${
                       isDC 
-                        ? 'bg-red-950 border-red-500 text-red-400 font-bold' 
-                        : 'bg-blue-950 border-blue-505 text-blue-400 font-bold'
-                    } shadow-lg shadow-black/50 flex items-center justify-center`}>
-                      <span className="text-[9px] font-mono leading-none">{isDC ? "DC" : "DEP"}</span>
+                        ? 'bg-red-950 border-red-500 text-red-400' 
+                        : 'bg-blue-950 border-blue-500 text-blue-400'
+                    } shadow-lg shadow-black/50 flex items-center justify-center space-x-1.5 whitespace-nowrap`}>
+                      {isDC ? <Warehouse className="h-3 w-3 shrink-0" /> : <Store className="h-3 w-3 shrink-0" />}
+                      <span className="text-[9px] font-mono leading-none font-bold">{isDC ? "DC" : "STORE"}</span>
+                      <span className="text-white text-[9px] font-sans font-semibold">{cleanName}</span>
                     </div>
 
                     {countOfActiveDeliveriesAtBranch > 0 && (
@@ -1742,9 +1776,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     )}
 
                     {/* Popover label on Hover */}
-                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[10px] text-white px-2 py-1 rounded shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-25 font-sans">
-                      <span className="font-semibold">{branch.name}</span>
-                      <p className="text-[8px] text-slate-400 font-mono">ID: {branch.id} &bull; GPS: {coords.lat.toFixed(4)}N, {coords.lng.toFixed(4)}W</p>
+                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[10px] text-white px-2.5 py-1.5 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-25 font-sans min-w-[180px] max-w-[240px] whitespace-normal space-y-0.5">
+                      <span className="font-semibold block text-slate-100">{branch.name}</span>
+                      <p className="text-[9px] text-amber-400 font-medium">{isDC ? "Distribution Center" : "Regional Store Depot"}</p>
+                      {branch.address && (
+                        <p className="text-[9px] text-slate-300 border-t border-slate-800 pt-1 mt-1 leading-normal">{branch.address}</p>
+                      )}
+                      <p className="text-[8px] text-slate-500 font-mono mt-1">ID: {branch.id} &bull; GPS: {coords.lat.toFixed(4)}N, {coords.lng.toFixed(4)}W</p>
                     </div>
                   </div>
                 );
