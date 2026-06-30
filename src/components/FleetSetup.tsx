@@ -49,7 +49,7 @@ export default function FleetSetup({
   const selectedBranch = branches.find(b => b.id === selectedBranchId);
 
   // Filter registered users with Driver role
-  const driversList = (users || []).filter(u => u.role === 'Driver');
+  const driversList = (users || []).filter(u => u.role?.toLowerCase() === 'driver');
 
   // Pre-configured truck models for easy selection
   const TRUCK_TYPES = [
@@ -309,16 +309,13 @@ export default function FleetSetup({
                       <option value="">-- Select a Driver --</option>
                       {driversList.map(u => (
                         <option key={u.id} value={u.name}>
-                          {u.name} ({u.email})
+                          {u.name} ({u.email || 'No email'})
                         </option>
                       ))}
                       {driversList.length === 0 && (
-                        <>
-                          <option value="George Campbell">George Campbell</option>
-                          <option value="Dave MacNeil">Dave MacNeil</option>
-                          <option value="Joshua Campbell">Joshua Campbell</option>
-                          <option value="Robert Landry">Robert Landry</option>
-                        </>
+                        <option disabled value="">
+                          ⚠️ No registered Driver accounts found. Please add a user with the role "Driver" first.
+                        </option>
                       )}
                     </select>
                   </div>

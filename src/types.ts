@@ -57,6 +57,14 @@ export interface Truck {
   lat?: number;
   lng?: number;
   tenantId?: string;
+  gpsSource?: 'mobile' | 'truck';
+  gpsDeviceId?: string;
+  gpsDeviceName?: string;
+  gpsSimIccid?: string;
+  gpsStatus?: string;
+  gpsLastHandshake?: string;
+  gpsLat?: number;
+  gpsLng?: number;
 }
 
 export type UserRole = 'Driver' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';

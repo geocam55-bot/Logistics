@@ -32,6 +32,148 @@ import {
 } from 'lucide-react';
 import { Branch, DeliveryRecord, DeliveryStatus } from '../types';
 
+const FALLBACK_SUPABASE_SCHEMA_SQL = `/* SUPABASE SCHEMA INITIALIZATION FOR PROSPACES DELIVERY AND LOGISTICS PORTAL */
+
+-- 1. Create tenants table
+create table if not exists tenants (
+  id text primary key,
+  name text not null,
+  code text not null unique,
+  description text,
+  "logoBadge" text,
+  "regionalFocus" text,
+  "primaryColor" text default 'blue'
+);
+
+-- 2. Create branches table
+create table if not exists branches (
+  id text primary key,
+  "tenantId" text not null,
+  name text not null,
+  type text not null, -- 'DC' or 'STORE'
+  address text not null
+);
+
+-- 3. Create trucks/vehicles table
+create table if not exists trucks (
+  id text primary key,
+  "tenantId" text not null,
+  name text not null,
+  type text not null,
+  driver text not null,
+  "branchId" text not null,
+  "registrationDueDate" text
+);
+
+-- 4. Create users table
+create table if not exists users (
+  id text primary key,
+  "tenantId" text not null,
+  name text not null,
+  email text not null,
+  role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User'
+  phone text,
+  "associatedStoreId" text,
+  password text default 'ProSpaces2026!',
+  status text default 'Active',
+  "driverLicenseExpire" text
+);
+
+-- 5. Create deliveries table
+create table if not exists deliveries (
+  id text primary key,
+  "tenantId" text not null,
+  "invoiceNumber" text not null,
+  "epicorSalesOrder" text not null,
+  "customerName" text not null,
+  "deliveryAddress" text not null,
+  phone text not null,
+  "originBranch" text not null,
+  "weight" text,
+  "orderTotal" text,
+  "pdfUrl" text,
+  "destinationNotes" text,
+  status text not null,
+  "registeredAt" text not null,
+  "pickedAt" text,
+  "deliveredAt" text,
+  "returnedAt" text,
+  "returnReason" text,
+  "assignedTruck" text,
+  "assignedDriver" text,
+  "customerSignature" text,
+  "deliveryPhoto" text,
+  history jsonb default '[]'::jsonb
+);
+
+-- Seed Initial Logistical Partners
+insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
+('prospaces', 'ProSpaces Logistics', 'PS', 'Corporate logistics tracking for ProSpaces distributor and dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
+on conflict (id) do nothing;
+
+-- 6. Row-Level Security (RLS) Master Configuration & Policies
+-- To turn RLS ON and protect your database, execute the following commands in your Supabase SQL Editor.
+
+-- STEP 1: Enable Row-Level Security on all tables
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trucks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deliveries ENABLE ROW LEVEL SECURITY;
+
+-- STEP 2: Configure RLS Security Policies
+
+-- Tenants policies
+DROP POLICY IF EXISTS "Allow public read on tenants" ON tenants;
+CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on tenants" ON tenants;
+CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on tenants" ON tenants;
+CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on tenants" ON tenants;
+CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (true);
+
+-- Branches policies
+DROP POLICY IF EXISTS "Allow public read on branches" ON branches;
+CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on branches" ON branches;
+CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on branches" ON branches;
+CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on branches" ON branches;
+CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING (true);
+
+-- Trucks policies
+DROP POLICY IF EXISTS "Allow public read on trucks" ON trucks;
+CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on trucks" ON trucks;
+CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on trucks" ON trucks;
+CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on trucks" ON trucks;
+CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING (true);
+
+-- Users policies
+DROP POLICY IF EXISTS "Allow public read on users" ON users;
+CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on users" ON users;
+CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on users" ON users;
+CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on users" ON users;
+CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING (true);
+
+-- Deliveries policies
+DROP POLICY IF EXISTS "Allow public read on deliveries" ON deliveries;
+CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on deliveries" ON deliveries;
+CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on deliveries" ON deliveries;
+CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on deliveries" ON deliveries;
+CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING (true);
+`;
+
 type DocType = 'Order' | 'Credit' | 'Supplier Pickup' | 'RMA';
 
 interface MappedField {
@@ -2008,7 +2150,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                   <p className="text-xs text-gray-400 mt-0.5">Deploy structured database schemas with multi-tenant row routing.</p>
                 </div>
                 <button
-                  onClick={() => handleCopySql(supabaseStatus?.schemaSql || `-- Fallback SQL schema\nCREATE TABLE IF NOT EXISTS tenant_state (\n  tenant_id TEXT PRIMARY KEY,\n  deliveries JSONB DEFAULT '[]'::jsonb,\n  trucks JSONB DEFAULT '[]'::jsonb,\n  branches JSONB DEFAULT '[]'::jsonb,\n  users JSONB DEFAULT '[]'::jsonb,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);`)}
+                  onClick={() => handleCopySql(supabaseStatus?.schemaSql || FALLBACK_SUPABASE_SCHEMA_SQL)}
                   className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all border shrink-0 cursor-pointer ${
                     copiedSql 
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-extrabold shadow-sm' 
@@ -2061,16 +2203,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                   <span className="text-[9px] text-slate-400">PostgreSQL Compatibility v15+</span>
                 </div>
                 <pre className="p-4 bg-slate-950 text-yellow-100/80 overflow-x-auto max-h-[160px] select-all leading-normal text-xs font-mono font-medium">
-{supabaseStatus?.schemaSql || `-- MULTI-TENANT SCHEMA FOR PROSPACES DELIVERY AND LOGISTICS
--- Connects dynamic frontend objects to live backend tables
-CREATE TABLE IF NOT EXISTS tenant_state (
-  tenant_id TEXT PRIMARY KEY,
-  deliveries JSONB DEFAULT '[]'::jsonb,
-  trucks JSONB DEFAULT '[]'::jsonb,
-  branches JSONB DEFAULT '[]'::jsonb,
-  users JSONB DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);`}
+{supabaseStatus?.schemaSql || FALLBACK_SUPABASE_SCHEMA_SQL}
                 </pre>
               </div>
 

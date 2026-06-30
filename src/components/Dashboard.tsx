@@ -948,7 +948,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           isMoving = false;
         }
 
-        const { lat: truckLat, lng: truckLng, hasRealGps } = getTruckCoords(truck, simProgress, activeBranches);
+        let { lat: truckLat, lng: truckLng, hasRealGps } = getTruckCoords(truck, simProgress, activeBranches);
 
         if (isNaN(truckLat) || isNaN(truckLng)) {
           truckLat = origLat;
