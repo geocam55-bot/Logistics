@@ -1202,14 +1202,18 @@ export default function App() {
 
             {/* Quick Status Bar */}
             <div className="flex items-center space-x-4">
-              <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-mono border leading-none ${
-                supabaseStatus?.connected 
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' 
-                  : 'bg-amber-950/40 border-amber-500/30 text-amber-300'
-              }`}>
+              <button
+                onClick={() => setShowDbConfig(true)}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-mono border leading-none transition-all duration-200 hover:scale-102 active:scale-98 cursor-pointer ${
+                  supabaseStatus?.connected 
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40' 
+                    : 'bg-amber-950/40 border-amber-500/30 text-amber-300 hover:bg-amber-900/40 animate-pulse'
+                }`}
+                title="Click to configure live database connection keys & API endpoints"
+              >
                 <Database className="h-3.5 w-3.5 text-current shrink-0" />
                 <span>{supabaseStatus?.connected ? 'Live Database Sync Active' : 'Offline / Local Database Sync Mode'}</span>
-              </div>
+              </button>
 
               <button
                 onClick={async () => {
