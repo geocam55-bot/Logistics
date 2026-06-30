@@ -146,6 +146,42 @@ const cleanAddressText = (address: string | undefined): string => {
     .trim();
 };
 
+const getTruckCoords = (truck: any, simProgress: Record<string, number>, branches: any[]) => {
+  const isTruckGps = truck.gpsSource === 'truck';
+  const hasRealGps = isTruckGps 
+    ? (truck.gpsLat !== undefined && truck.gpsLng !== undefined && !isNaN(truck.gpsLat) && !isNaN(truck.gpsLng))
+    : (truck.lat !== undefined && truck.lng !== undefined && !isNaN(truck.lat) && !isNaN(truck.lng));
+
+  let origLat = 44.6488;
+  let origLng = -63.5752;
+  let destLat = 44.6518;
+  let destLng = -63.5722;
+  let isMoving = false;
+
+  const homeBranch = branches.find(b => b.id === truck.branchId);
+  if (homeBranch) {
+    const latMatch = (homeBranch.address || '').match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i);
+    const lngMatch = (homeBranch.address || '').match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i);
+    if (latMatch && lngMatch) {
+      origLat = parseFloat(latMatch[1]);
+      origLng = parseFloat(lngMatch[1]);
+      destLat = origLat + 0.003;
+      destLng = origLng + 0.003;
+      isMoving = true;
+    }
+  }
+
+  const progress = simProgress[truck.id] ?? 0.15;
+  const lat = hasRealGps 
+    ? (isTruckGps ? truck.gpsLat : truck.lat) 
+    : (isMoving ? (origLat + (destLat - origLat) * progress) : origLat);
+  const lng = hasRealGps 
+    ? (isTruckGps ? truck.gpsLng : truck.lng) 
+    : (isMoving ? (origLng + (destLng - origLng) * progress) : origLng);
+
+  return { lat, lng, hasRealGps, isTruckGps };
+};
+
 const getPercentCoordsFromGps = (lat: number, lng: number): { x: number; y: number } => {
   const isCalifornia = lat < 40;
   
@@ -912,10 +948,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           isMoving = false;
         }
 
-        const progress = simProgress[truck.id] ?? 0.15;
-        const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined && !isNaN((truck as any).lat) && !isNaN((truck as any).lng);
-        let truckLat = hasRealGps ? (truck as any).lat : (isMoving ? (origLat + (destLat - origLat) * progress) : origLat);
-        let truckLng = hasRealGps ? (truck as any).lng : (isMoving ? (origLng + (destLng - origLng) * progress) : origLng);
+        const { lat: truckLat, lng: truckLng, hasRealGps } = getTruckCoords(truck, simProgress, activeBranches);
 
         if (isNaN(truckLat) || isNaN(truckLng)) {
           truckLat = origLat;
@@ -966,6 +999,11 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               ? `Delivering order ${assignedDelivery.invoiceNumber}`
               : 'Standby / Refueling';
 
+        const isTruckGps = (truck as any).gpsSource === 'truck';
+        const activeGpsSourceLabel = isTruckGps 
+          ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-amber-200">🛰️ Stationary: ${(truck as any).gpsDeviceId || 'Core Telematics'}</span>`
+          : `<span class="bg-blue-100 text-blue-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-blue-200">📱 Mobile Device Geolocation</span>`;
+
         const markerInstance = L.marker([truckLat, truckLng], {
           icon: truckIcon,
           zIndexOffset: isSelected ? 1000 : 100
@@ -984,6 +1022,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               <p class="font-bold text-slate-900">${truck.name}</p>
             </div>
             <p class="text-[10.5px] text-slate-700 font-medium font-sans">Driver: <strong class="text-blue-600">${truck.driver || 'No Driver'}</strong></p>
+            <div class="my-1">${activeGpsSourceLabel}</div>
             <p class="text-[10px] text-slate-500">ID: ${truck.id} &bull; Type: ${truck.type || 'Flatbed'}</p>
             <p class="text-[9px] text-slate-400 font-mono font-sans">GPS: ${truckLat.toFixed(5)}N, ${truckLng.toFixed(5)}W</p>
             <p class="text-[9.5px] text-amber-600 font-bold mt-1 font-sans">${popupMessage}</p>
@@ -1552,10 +1591,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   destLat = orig.lat + 0.003; destLng = orig.lng + 0.003;
                 }
 
-                const progress = simProgress[matchedTruck.id] ?? 0.15;
-                const hasRealGps = (matchedTruck as any).lat !== undefined && (matchedTruck as any).lng !== undefined;
-                const truckLat = hasRealGps ? (matchedTruck as any).lat : (origLat + (destLat - origLat) * progress);
-                const truckLng = hasRealGps ? (matchedTruck as any).lng : (origLng + (destLng - origLng) * progress);
+                const { lat: truckLat, lng: truckLng, hasRealGps } = getTruckCoords(matchedTruck, simProgress, activeBranches);
                 const percentCoords = getPercentCoordsFromGps(truckLat, truckLng);
                 const truckX = percentCoords.x;
                 const truckY = percentCoords.y;
@@ -1784,10 +1820,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   isMoving = false;
                 }
 
-                const progress = simProgress[truck.id] ?? 0.15;
-                const hasRealGps = (truck as any).lat !== undefined && (truck as any).lng !== undefined;
-                const truckLat = hasRealGps ? (truck as any).lat : (isMoving ? (origLat + (destLat - origLat) * progress) : origLat);
-                const truckLng = hasRealGps ? (truck as any).lng : (isMoving ? (origLng + (destLng - origLng) * progress) : origLng);
+                const { lat: truckLat, lng: truckLng, hasRealGps } = getTruckCoords(truck, simProgress, activeBranches);
                 const percentCoords = getPercentCoordsFromGps(truckLat, truckLng);
                 const xPosition = percentCoords.x;
                 const yPosition = percentCoords.y;
@@ -1912,7 +1945,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   const combinedFleetList = displayTrucks.map(t => {
                     const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
-                    const hasRealGps = (t as any).lat !== undefined && (t as any).lng !== undefined && !isNaN((t as any).lat) && !isNaN((t as any).lng);
+                    const { hasRealGps } = getTruckCoords(t, simProgress, activeBranches);
                     const isOnline = isDriverOnline(t.driver);
                     const speedValue = assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0;
                     return {

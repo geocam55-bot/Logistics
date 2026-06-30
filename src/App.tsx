@@ -29,10 +29,12 @@ import UsersSetup from './components/UsersSetup';
 import LoginScreen from './components/LoginScreen';
 import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import UserProfileModal, { renderUserAvatarHelper } from './components/UserProfileModal';
+import GpsSetup from './components/GpsSetup';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck, Key,
-  Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert, Camera, Sliders, User as UserIcon
+  Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert, Camera, Sliders, User as UserIcon,
+  Compass
 } from 'lucide-react';
 import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
 
@@ -1501,7 +1503,7 @@ export default function App() {
                 setActiveTab('stores');
               }}
               className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-                ['stores', 'trucks', 'users', 'architecture'].includes(activeTab)
+                ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
                   ? theme.activeBtn
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
@@ -1514,7 +1516,7 @@ export default function App() {
         </div>
 
         {/* Secondary Sub-navigation for Fleet Setup */}
-        {['stores', 'trucks', 'users', 'architecture'].includes(activeTab) && (
+        {['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab) && (
           <div className="bg-slate-100 border border-slate-200/50 p-1 rounded-xl flex flex-nowrap overflow-x-auto gap-1 shadow-inner w-full scrollbar-none select-none animate-fade-in" id="prospaces-subnav" style={{ WebkitOverflowScrolling: 'touch' }}>
             <button
               onClick={() => setActiveTab('stores')}
@@ -1538,6 +1540,19 @@ export default function App() {
               <TruckIcon className="h-3.5 w-3.5 text-blue-600" />
               <span>Trucks</span>
             </button>
+            {currentUser?.role === 'Admin' && (
+              <button
+                onClick={() => setActiveTab('gps')}
+                className={`flex-1 py-1.5 px-3.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 whitespace-nowrap ${
+                  activeTab === 'gps'
+                    ? 'bg-white text-blue-800 shadow-xs border border-slate-200/40'
+                    : 'text-gray-500 hover:bg-white/50 hover:text-gray-800'
+                }`}
+              >
+                <Compass className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                <span>Hardware GPS Setup</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('users')}
               className={`flex-1 py-1.5 px-3.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 whitespace-nowrap ${
@@ -1616,6 +1631,13 @@ export default function App() {
               onUpdateTruck={handleUpdateTruck} 
               onDeleteTruck={handleDeleteTruck} 
               readOnly={currentUser?.role === 'Dispatcher'}
+            />
+          )}
+          {activeTab === 'gps' && (
+            <GpsSetup 
+              trucks={trucks}
+              branches={branches}
+              onUpdateTruck={handleUpdateTruck}
             />
           )}
           {activeTab === 'users' && (

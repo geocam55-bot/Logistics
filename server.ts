@@ -223,7 +223,20 @@ function deserializeFromPhone(user: any): any {
   };
 }
 
-function serializeToType(type: string | undefined, registrationDueDate: string | undefined, lat?: number, lng?: number): string {
+function serializeToType(
+  type: string | undefined,
+  registrationDueDate: string | undefined,
+  lat?: number,
+  lng?: number,
+  gpsSource?: 'mobile' | 'truck',
+  gpsDeviceId?: string,
+  gpsDeviceName?: string,
+  gpsSimIccid?: string,
+  gpsStatus?: string,
+  gpsLastHandshake?: string,
+  gpsLat?: number,
+  gpsLng?: number
+): string {
   const baseType = (type || "").trim();
   let res = baseType;
   if (registrationDueDate) {
@@ -235,6 +248,30 @@ function serializeToType(type: string | undefined, registrationDueDate: string |
   if (lng !== undefined && lng !== null) {
     res += ` ||lng:${lng}`;
   }
+  if (gpsSource) {
+    res += ` ||gpsSource:${gpsSource}`;
+  }
+  if (gpsDeviceId) {
+    res += ` ||gpsDeviceId:${encodeURIComponent(gpsDeviceId)}`;
+  }
+  if (gpsDeviceName) {
+    res += ` ||gpsDeviceName:${encodeURIComponent(gpsDeviceName)}`;
+  }
+  if (gpsSimIccid) {
+    res += ` ||gpsSimIccid:${encodeURIComponent(gpsSimIccid)}`;
+  }
+  if (gpsStatus) {
+    res += ` ||gpsStatus:${gpsStatus}`;
+  }
+  if (gpsLastHandshake) {
+    res += ` ||gpsLastHandshake:${gpsLastHandshake}`;
+  }
+  if (gpsLat !== undefined && gpsLat !== null) {
+    res += ` ||gpsLat:${gpsLat}`;
+  }
+  if (gpsLng !== undefined && gpsLng !== null) {
+    res += ` ||gpsLng:${gpsLng}`;
+  }
   return res;
 }
 
@@ -245,6 +282,14 @@ function deserializeType(truck: any): any {
   let registrationDueDate = truck.registrationDueDate || "";
   let lat: number | undefined;
   let lng: number | undefined;
+  let gpsSource: 'mobile' | 'truck' | undefined;
+  let gpsDeviceId: string | undefined;
+  let gpsDeviceName: string | undefined;
+  let gpsSimIccid: string | undefined;
+  let gpsStatus: 'Connected' | 'Disconnected' | 'Syncing' | 'Error' | undefined;
+  let gpsLastHandshake: string | undefined;
+  let gpsLat: number | undefined;
+  let gpsLng: number | undefined;
 
   const regdueMatch = type.match(/\|\|regdue:([^\s|]+)/);
   if (regdueMatch) {
@@ -264,12 +309,68 @@ function deserializeType(truck: any): any {
     cleanType = cleanType.replace(/\|\|lng:[^\s|]+/, "");
   }
 
+  const gpsSourceMatch = type.match(/\|\|gpsSource:([^\s|]+)/);
+  if (gpsSourceMatch) {
+    gpsSource = gpsSourceMatch[1] as any;
+    cleanType = cleanType.replace(/\|\|gpsSource:[^\s|]+/, "");
+  }
+
+  const gpsDeviceIdMatch = type.match(/\|\|gpsDeviceId:([^\s|]+)/);
+  if (gpsDeviceIdMatch) {
+    gpsDeviceId = decodeURIComponent(gpsDeviceIdMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsDeviceId:[^\s|]+/, "");
+  }
+
+  const gpsDeviceNameMatch = type.match(/\|\|gpsDeviceName:([^\s|]+)/);
+  if (gpsDeviceNameMatch) {
+    gpsDeviceName = decodeURIComponent(gpsDeviceNameMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsDeviceName:[^\s|]+/, "");
+  }
+
+  const gpsSimIccidMatch = type.match(/\|\|gpsSimIccid:([^\s|]+)/);
+  if (gpsSimIccidMatch) {
+    gpsSimIccid = decodeURIComponent(gpsSimIccidMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsSimIccid:[^\s|]+/, "");
+  }
+
+  const gpsStatusMatch = type.match(/\|\|gpsStatus:([^\s|]+)/);
+  if (gpsStatusMatch) {
+    gpsStatus = gpsStatusMatch[1] as any;
+    cleanType = cleanType.replace(/\|\|gpsStatus:[^\s|]+/, "");
+  }
+
+  const gpsLastHandshakeMatch = type.match(/\|\|gpsLastHandshake:([^\s|]+)/);
+  if (gpsLastHandshakeMatch) {
+    gpsLastHandshake = gpsLastHandshakeMatch[1];
+    cleanType = cleanType.replace(/\|\|gpsLastHandshake:[^\s|]+/, "");
+  }
+
+  const gpsLatMatch = type.match(/\|\|gpsLat:([^\s|]+)/);
+  if (gpsLatMatch) {
+    gpsLat = parseFloat(gpsLatMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsLat:[^\s|]+/, "");
+  }
+
+  const gpsLngMatch = type.match(/\|\|gpsLng:([^\s|]+)/);
+  if (gpsLngMatch) {
+    gpsLng = parseFloat(gpsLngMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsLng:[^\s|]+/, "");
+  }
+
   return {
     ...truck,
     type: cleanType.trim(),
     registrationDueDate,
     ...(lat !== undefined && !isNaN(lat) ? { lat } : {}),
-    ...(lng !== undefined && !isNaN(lng) ? { lng } : {})
+    ...(lng !== undefined && !isNaN(lng) ? { lng } : {}),
+    gpsSource: gpsSource || 'mobile',
+    gpsDeviceId: gpsDeviceId || '',
+    gpsDeviceName: gpsDeviceName || '',
+    gpsSimIccid: gpsSimIccid || '',
+    gpsStatus: gpsStatus || 'Disconnected',
+    gpsLastHandshake: gpsLastHandshake || '',
+    ...(gpsLat !== undefined && !isNaN(gpsLat) ? { gpsLat } : {}),
+    ...(gpsLng !== undefined && !isNaN(gpsLng) ? { gpsLng } : {})
   };
 }
 
@@ -1706,7 +1807,20 @@ app.use((req, res, next) => {
               id: t.id,
               tenantId: t.tenantId,
               name: t.name,
-              type: serializeToType(t.type, t.registrationDueDate, t.lat, t.lng),
+              type: serializeToType(
+                t.type,
+                t.registrationDueDate,
+                t.lat,
+                t.lng,
+                t.gpsSource,
+                t.gpsDeviceId,
+                t.gpsDeviceName,
+                t.gpsSimIccid,
+                t.gpsStatus,
+                t.gpsLastHandshake,
+                t.gpsLat,
+                t.gpsLng
+              ),
               driver: t.driver,
               branchId: t.branchId,
               registrationDueDate: t.registrationDueDate || null
