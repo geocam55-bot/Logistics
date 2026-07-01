@@ -106,9 +106,57 @@ create table if not exists deliveries (
   history jsonb default '[]'::jsonb
 );
 
+-- 6. Create gps_units_setup table for built-in GPS hardware configurations in Trucks
+create table if not exists gps_units_setup (
+  id text primary key, -- hardware ID / IMEI
+  "tenantId" text not null default 'prospaces',
+  "deviceId" text not null unique, -- custom unique identifier
+  "deviceName" text not null, -- label, e.g. "CalAmp LMU-3030" or "Built-in GPS Premium"
+  "simIccid" text, -- SIM ICCID card number
+  status text not null default 'Disconnected', -- 'Connected', 'Disconnected', 'Syncing', 'Error'
+  "assignedTruckId" text references trucks(id) on delete set null, -- bound to specific truck
+  "lastHandshake" text, -- formatted string representation
+  "lastLatitude" double precision,
+  "lastLongitude" double precision,
+  "installedAt" text default now()::text
+);
+
+-- 7. Create gps_tracking_history table for telemetric tracking updates
+create table if not exists gps_tracking_history (
+  id uuid primary key default gen_random_uuid(),
+  "tenantId" text not null default 'prospaces',
+  "deviceId" text not null references gps_units_setup("deviceId") on delete cascade,
+  latitude double precision not null,
+  longitude double precision not null,
+  speed double precision, -- speed in km/h or mph
+  heading double precision, -- degrees (0-360)
+  "recordedAt" text not null,
+  "ignitionStatus" boolean default true
+);
+
 -- Seed Initial Logistical Partners
 insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
 ('prospaces', 'ProSpaces Logistics', 'PS', 'Corporate logistics tracking for ProSpaces distributor and dealer stores.', '🏢', 'Atlantic Canada (Dartmouth, Tantallon, Halifax)', 'blue')
+on conflict (id) do nothing;
+
+-- Seed GPS Setup data for the trucks (TRUCK-87 and TRUCK-28)
+insert into gps_units_setup (id, "tenantId", "deviceId", "deviceName", "simIccid", status, "assignedTruckId", "lastHandshake", "lastLatitude", "lastLongitude") values
+('GPS-IMEI-874812', 'prospaces', 'GPS-DEV-87', 'CalAmp LMU-3030 Premium', '8901410327981234567', 'Connected', 'TRUCK-87', '2026-07-01 06:00:00', 44.7082, -63.5938),
+('GPS-IMEI-281932', 'prospaces', 'GPS-DEV-28', 'Sierra Wireless RV50X', '8901410327981234568', 'Connected', 'TRUCK-28', '2026-07-01 06:02:15', 44.6295, -63.6651)
+on conflict (id) do nothing;
+
+-- Seed GPS tracking history points for GPS-DEV-87
+insert into gps_tracking_history (id, "tenantId", "deviceId", latitude, longitude, speed, heading, "recordedAt", "ignitionStatus") values
+(gen_random_uuid(), 'prospaces', 'GPS-DEV-87', 44.7050, -63.5950, 45.2, 180.0, '2026-07-01 05:50:00', true),
+(gen_random_uuid(), 'prospaces', 'GPS-DEV-87', 44.7065, -63.5942, 32.5, 175.5, '2026-07-01 05:55:00', true),
+(gen_random_uuid(), 'prospaces', 'GPS-DEV-87', 44.7082, -63.5938, 0.0, 175.5, '2026-07-01 06:00:00', false)
+on conflict (id) do nothing;
+
+-- Seed GPS tracking history points for GPS-DEV-28
+insert into gps_tracking_history (id, "tenantId", "deviceId", latitude, longitude, speed, heading, "recordedAt", "ignitionStatus") values
+(gen_random_uuid(), 'prospaces', 'GPS-DEV-28', 44.6210, -63.6695, 65.0, 90.0, '2026-07-01 05:52:15', true),
+(gen_random_uuid(), 'prospaces', 'GPS-DEV-28', 44.6255, -63.6672, 48.3, 85.0, '2026-07-01 05:57:15', true),
+(gen_random_uuid(), 'prospaces', 'GPS-DEV-28', 44.6295, -63.6651, 0.0, 85.0, '2026-07-01 06:02:15', false)
 on conflict (id) do nothing;
 
 -- 6. Row-Level Security (RLS) Master Configuration & Policies
@@ -120,6 +168,8 @@ ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trucks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deliveries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gps_units_setup ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gps_tracking_history ENABLE ROW LEVEL SECURITY;
 
 -- STEP 2: Configure RLS Security Policies
 
@@ -172,6 +222,26 @@ DROP POLICY IF EXISTS "Allow public update on deliveries" ON deliveries;
 CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on deliveries" ON deliveries;
 CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING (true);
+
+-- gps_units_setup policies
+DROP POLICY IF EXISTS "Allow public read on gps_units_setup" ON gps_units_setup;
+CREATE POLICY "Allow public read on gps_units_setup" ON gps_units_setup FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on gps_units_setup" ON gps_units_setup;
+CREATE POLICY "Allow public write on gps_units_setup" ON gps_units_setup FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on gps_units_setup" ON gps_units_setup;
+CREATE POLICY "Allow public update on gps_units_setup" ON gps_units_setup FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on gps_units_setup" ON gps_units_setup;
+CREATE POLICY "Allow public delete on gps_units_setup" ON gps_units_setup FOR DELETE USING (true);
+
+-- gps_tracking_history policies
+DROP POLICY IF EXISTS "Allow public read on gps_tracking_history" ON gps_tracking_history;
+CREATE POLICY "Allow public read on gps_tracking_history" ON gps_tracking_history FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public write on gps_tracking_history" ON gps_tracking_history;
+CREATE POLICY "Allow public write on gps_tracking_history" ON gps_tracking_history FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on gps_tracking_history" ON gps_tracking_history;
+CREATE POLICY "Allow public update on gps_tracking_history" ON gps_tracking_history FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on gps_tracking_history" ON gps_tracking_history;
+CREATE POLICY "Allow public delete on gps_tracking_history" ON gps_tracking_history FOR DELETE USING (true);
 `;
 
 type DocType = 'Order' | 'Credit' | 'Supplier Pickup' | 'RMA';
