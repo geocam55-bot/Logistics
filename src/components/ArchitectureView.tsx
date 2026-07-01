@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight, 
   ShieldCheck,
+  Activity,
   Eye,
   HardDrive,
   FileDown,
@@ -295,6 +296,7 @@ interface ArchitectureViewProps {
   syncStatus?: 'IDLE' | 'SYNCING' | 'ERROR';
   lastSyncTime?: string | null;
   onRefreshStatus?: () => Promise<any>;
+  onRunRestDiagnostic?: () => Promise<any>;
   defaultSegment?: 'blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db';
   allowedSegments?: ('blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db')[];
 }
@@ -455,6 +457,7 @@ export default function ArchitectureView({
   syncStatus,
   lastSyncTime,
   onRefreshStatus,
+  onRunRestDiagnostic,
   defaultSegment,
   allowedSegments
 }: ArchitectureViewProps) {
@@ -463,6 +466,24 @@ export default function ArchitectureView({
   const [activeSegment, setActiveSegment] = useState<'blueprint' | 'mapping-ui' | 'local-folder' | 'supabase-db'>(
     defaultSegment || 'blueprint'
   );
+
+  const [restDiagResult, setRestDiagResult] = useState<any>(null);
+  const [restDiagLoading, setRestDiagLoading] = useState(false);
+  const [showDiagDetails, setShowDiagDetails] = useState(false);
+
+  const handleRunRestDiagnostic = async () => {
+    if (!onRunRestDiagnostic) return;
+    setRestDiagLoading(true);
+    setRestDiagResult(null);
+    try {
+      const result = await onRunRestDiagnostic();
+      setRestDiagResult(result);
+    } catch (err: any) {
+      setRestDiagResult({ success: false, error: err.message || "Diagnostic failed." });
+    } finally {
+      setRestDiagLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (defaultSegment) {
@@ -2207,6 +2228,95 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                 <RefreshCw className={`h-3 w-3 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
                 <span>Trigger Diagnostics Sweep</span>
               </button>
+
+              {/* REST Health Diagnostic Section */}
+              {onRunRestDiagnostic && (
+                <div className="border-t border-slate-100 pt-4 mt-2 space-y-3" id="rest-health-diagnostic-utility">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-800">REST API Health Check</span>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-bold">rest/v1/</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Explicitly fetch the raw Supabase REST health endpoint with active credentials to debug response headers, gateway blocks, and active states.
+                  </p>
+
+                  <button
+                    onClick={handleRunRestDiagnostic}
+                    disabled={restDiagLoading}
+                    className="w-full flex items-center justify-center space-x-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 font-bold py-2 px-3 rounded-lg text-xs transition-colors cursor-pointer"
+                  >
+                    {restDiagLoading ? (
+                      <>
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        <span>Fetching rest/v1/...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="h-3 w-3" />
+                        <span>Run REST API Health Check</span>
+                      </>
+                    )}
+                  </button>
+
+                  {restDiagResult && (
+                    <div className={`p-3 rounded-xl border text-xs space-y-2 ${
+                      restDiagResult.success 
+                        ? 'bg-emerald-50/50 border-emerald-100 text-slate-800' 
+                        : 'bg-rose-50/50 border-rose-100 text-slate-800'
+                    }`} id="rest-diagnostic-result">
+                      <div className="flex items-center justify-between font-mono text-[11px] font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`inline-block w-2 h-2 rounded-full ${restDiagResult.success ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                          Status: {restDiagResult.status || 'ERROR'} {restDiagResult.statusText || ''}
+                        </span>
+                        {restDiagResult.duration && (
+                          <span className="text-slate-400 font-normal">{restDiagResult.duration}ms</span>
+                        )}
+                      </div>
+
+                      {!restDiagResult.success && restDiagResult.error && (
+                        <p className="text-[11px] text-rose-700 font-medium">
+                          Error: {restDiagResult.error}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[10px] text-slate-400 font-mono truncate max-w-[140px]" title={restDiagResult.url}>
+                          {restDiagResult.url || 'No URL'}
+                        </span>
+                        <button
+                          onClick={() => setShowDiagDetails(!showDiagDetails)}
+                          className="text-[10px] text-indigo-600 hover:text-indigo-800 underline font-semibold cursor-pointer"
+                        >
+                          {showDiagDetails ? 'Hide Details' : 'Show Headers & Body'}
+                        </button>
+                      </div>
+
+                      {showDiagDetails && (
+                        <div className="space-y-2 pt-2 border-t border-slate-200/50 max-w-full overflow-hidden">
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-600 mb-1">Response Headers</p>
+                            <pre className="text-[9px] font-mono bg-slate-950 text-emerald-400 p-2 rounded-md overflow-x-auto max-h-32 select-all leading-normal">
+                              {JSON.stringify(restDiagResult.headers, null, 2)}
+                            </pre>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-600 mb-1">Response Body</p>
+                            <pre className="text-[9px] font-mono bg-slate-950 text-emerald-400 p-2 rounded-md overflow-x-auto max-h-40 select-all leading-normal">
+                              {typeof restDiagResult.body === 'object' 
+                                ? JSON.stringify(restDiagResult.body, null, 2) 
+                                : String(restDiagResult.body || 'Empty response')}
+                            </pre>
+                          </div>
+                          <p className="text-[9.5px] text-slate-400 italic">
+                            *Full details have also been logged to your browser's Developer Console.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Quick SQL Blueprint Schema setup */}

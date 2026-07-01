@@ -504,6 +504,79 @@ export default function App() {
     setLoadTrigger(prev => prev + 1);
   };
 
+  const runSupabaseRestDiagnostic = async () => {
+    const url = (supabaseStatus?.url || localStorage.getItem('prospaces_custom_supabase_url') || "").trim().replace(/\/+$/, '');
+    const anonKey = (supabaseStatus?.anonKey || localStorage.getItem('prospaces_custom_supabase_key') || "").trim();
+
+    console.log("%c=== SUPABASE REST HEALTH DIAGNOSTIC START ===", "color: #10B981; font-weight: bold; font-size: 14px;");
+    console.log("Target URL:", url);
+    console.log("Target REST Endpoint:", url ? `${url}/rest/v1/` : "None");
+    console.log("Key Prefix:", anonKey ? `${anonKey.substring(0, 10)}...` : "None");
+
+    if (!url) {
+      console.error("Diagnostic aborted: Supabase URL is empty or unconfigured.");
+      console.log("%c=== SUPABASE REST HEALTH DIAGNOSTIC END ===", "color: #EF4444; font-weight: bold; font-size: 14px;");
+      return { success: false, error: "Supabase URL is empty or unconfigured." };
+    }
+
+    try {
+      const restUrl = `${url}/rest/v1/`;
+      const headersObj: Record<string, string> = {
+        "apikey": anonKey,
+        "Authorization": `Bearer ${anonKey}`
+      };
+
+      console.log("Sending explicit fetch with headers:", {
+        "apikey": anonKey ? "PRESENT" : "MISSING",
+        "Authorization": anonKey ? "Bearer PRESENT" : "MISSING"
+      });
+
+      const startTime = performance.now();
+      const response = await fetch(restUrl, {
+        method: 'GET',
+        headers: headersObj
+      });
+      const duration = (performance.now() - startTime).toFixed(1);
+
+      console.log(`%cHTTP Response Status: ${response.status} ${response.statusText} (took ${duration}ms)`, "color: #3B82F6; font-weight: bold;");
+
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      console.log("HTTP Response Headers:", headers);
+
+      const text = await response.text();
+      let parsedBody: any = null;
+      try {
+        parsedBody = JSON.parse(text);
+        console.log("HTTP Response Body (JSON):", parsedBody);
+      } catch {
+        console.log("HTTP Response Body (Text):", text);
+      }
+
+      console.log("%c=== SUPABASE REST HEALTH DIAGNOSTIC SUCCESS ===", "color: #10B981; font-weight: bold; font-size: 14px;");
+      
+      return {
+        success: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+        body: parsedBody || text,
+        url,
+        duration
+      };
+    } catch (err: any) {
+      console.error("Diagnostic fetch failed:", err);
+      console.log("%c=== SUPABASE REST HEALTH DIAGNOSTIC ERROR ===", "color: #EF4444; font-weight: bold; font-size: 14px;");
+      return {
+        success: false,
+        error: err.message || String(err),
+        url
+      };
+    }
+  };
+
   const checkSupabaseStatus = async () => {
     try {
       const res = await customFetch("/api/supabase-status");
@@ -1786,6 +1859,7 @@ export default function App() {
               syncStatus={syncStatus}
               lastSyncTime={lastSyncTime}
               onRefreshStatus={checkSupabaseStatus}
+              onRunRestDiagnostic={runSupabaseRestDiagnostic}
               defaultSegment="mapping-ui"
               allowedSegments={['mapping-ui', 'local-folder']}
             />
@@ -1798,6 +1872,7 @@ export default function App() {
               syncStatus={syncStatus}
               lastSyncTime={lastSyncTime}
               onRefreshStatus={checkSupabaseStatus}
+              onRunRestDiagnostic={runSupabaseRestDiagnostic}
               defaultSegment="blueprint"
               allowedSegments={['blueprint', 'supabase-db']}
             />
