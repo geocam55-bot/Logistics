@@ -6,6 +6,27 @@ import {
   Mail, Lock, Eye, EyeOff, UserPlus, ShieldAlert, KeyRound, UserCheck 
 } from 'lucide-react';
 
+// Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
+async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input && 'url' in (input as any) ? (input as any).url : ''));
+  if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
+    const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
+    const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
+    if (savedUrl && savedKey) {
+      init = init || {};
+      const headers = new Headers(init.headers || {});
+      if (!headers.has('x-custom-supabase-url')) {
+        headers.set('x-custom-supabase-url', savedUrl);
+      }
+      if (!headers.has('x-custom-supabase-key')) {
+        headers.set('x-custom-supabase-key', savedKey);
+      }
+      init.headers = headers;
+    }
+  }
+  return window.fetch(input, init);
+}
+
 interface SuperAdminTenantsViewProps {
   tenants: Tenant[];
   onAddTenant: (t: Tenant) => Promise<void>;
@@ -95,7 +116,7 @@ export default function SuperAdminTenantsView({
     setLoadingUsers(true);
     setError(null);
     try {
-      const res = await fetch(`/api/tenant/state?tenantId=${tenantId}`);
+      const res = await customFetch(`/api/tenant/state?tenantId=${tenantId}`);
       const data = await res.json();
       setTenantUsers(data.users || []);
       
@@ -255,7 +276,7 @@ export default function SuperAdminTenantsView({
       // 1. Fetch target tenant's active collections so we preserve deliveries/trucks/branches
       let fullState = { deliveries: [], trucks: [], branches: [], users: [] };
       try {
-        const res = await fetch(`/api/tenant/state?tenantId=${selectedTenantId}`);
+        const res = await customFetch(`/api/tenant/state?tenantId=${selectedTenantId}`);
         fullState = await res.json();
       } catch (err) {
         console.warn("Using fallback browser local storage caches in sandbox login mode");
@@ -303,7 +324,7 @@ export default function SuperAdminTenantsView({
       }
 
       // 2. Commit states back safely
-      const res = await fetch("/api/tenant/save-state", {
+      const res = await customFetch("/api/tenant/save-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -349,7 +370,7 @@ export default function SuperAdminTenantsView({
       // Fetch full state for sync
       let fullState = { deliveries: [], trucks: [], branches: [], users: [] };
       try {
-        const res = await fetch(`/api/tenant/state?tenantId=${selectedTenantId}`);
+        const res = await customFetch(`/api/tenant/state?tenantId=${selectedTenantId}`);
         fullState = await res.json();
       } catch (err) {
         const ld = localStorage.getItem(`prospaces_deliveries_tenant_${selectedTenantId}`);
@@ -366,7 +387,7 @@ export default function SuperAdminTenantsView({
 
       // Save state
       try {
-        await fetch("/api/tenant/save-state", {
+        await customFetch("/api/tenant/save-state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -379,7 +400,7 @@ export default function SuperAdminTenantsView({
         });
 
         // Delete permanently on database level
-        await fetch(`/api/tenant/delete-record?table=users&id=${userId}&tenantId=${selectedTenantId}`, {
+        await customFetch(`/api/tenant/delete-record?table=users&id=${userId}&tenantId=${selectedTenantId}`, {
           method: 'DELETE'
         });
       } catch (err) {

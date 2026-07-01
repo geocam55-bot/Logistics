@@ -5,6 +5,27 @@ import { getFrontendSupabase, deserializeFromPhone, serializeToPhone } from '../
 import { Shield, Key, CheckCircle2, ArrowRight, Mail, Lock, Building2, UserCheck, HelpCircle, Loader2 } from 'lucide-react';
 import prospacesLogo from '../assets/images/prospaces_logo_1782485612854.jpg';
 
+// Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
+async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input && 'url' in (input as any) ? (input as any).url : ''));
+  if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
+    const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
+    const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
+    if (savedUrl && savedKey) {
+      init = init || {};
+      const headers = new Headers(init.headers || {});
+      if (!headers.has('x-custom-supabase-url')) {
+        headers.set('x-custom-supabase-url', savedUrl);
+      }
+      if (!headers.has('x-custom-supabase-key')) {
+        headers.set('x-custom-supabase-key', savedKey);
+      }
+      init.headers = headers;
+    }
+  }
+  return window.fetch(input, init);
+}
+
 interface LoginScreenProps {
   onLoginSuccess: (tenant: Tenant, user: User) => void;
   tenantsList?: Tenant[];
@@ -144,7 +165,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
     try {
       let result: any = null;
       try {
-        const response = await fetch('/api/auth/login', {
+        const response = await customFetch('/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -347,7 +368,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
     try {
       let result: any = null;
       try {
-        const response = await fetch('/api/auth/register', {
+        const response = await customFetch('/api/auth/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
