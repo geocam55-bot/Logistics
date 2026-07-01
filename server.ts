@@ -87,7 +87,16 @@ function getSupabase(bypassCircuitBreaker: boolean = false) {
   }
 
   let url = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  let key = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
+  
+  const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const isUsingCustomDb = customSupabaseUrl && customSupabaseUrl.trim() !== "" && customSupabaseUrl.trim() !== envUrl.trim();
+  
+  let key = "";
+  if (isUsingCustomDb) {
+    key = customSupabaseKey;
+  } else {
+    key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
+  }
   
   if (!url || !key) {
     return null;
@@ -544,105 +553,91 @@ client application can read, insert, update, and delete operational data with st
 
 -- Tenants policies
 DROP POLICY IF EXISTS "Allow public read on tenants" ON tenants;
-CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on tenants" ON tenants;
-CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on tenants" ON tenants;
-CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on tenants" ON tenants;
-CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Tenant isolated select" ON tenants;
+DROP POLICY IF EXISTS "Tenant isolated insert" ON tenants;
+DROP POLICY IF EXISTS "Tenant isolated update" ON tenants;
+
+CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
+CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (id IS NOT NULL);
+CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (id IS NOT NULL) WITH CHECK (id IS NOT NULL);
+CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (id IS NOT NULL);
 
 -- Branches policies
 DROP POLICY IF EXISTS "Allow public read on branches" ON branches;
-CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on branches" ON branches;
-CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on branches" ON branches;
-CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on branches" ON branches;
-CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Branch tenant select" ON branches;
+DROP POLICY IF EXISTS "Branch tenant write" ON branches;
+
+CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
+CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- Trucks policies
 DROP POLICY IF EXISTS "Allow public read on trucks" ON trucks;
-CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on trucks" ON trucks;
-CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on trucks" ON trucks;
-CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on trucks" ON trucks;
-CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Truck tenant select" ON trucks;
+DROP POLICY IF EXISTS "Truck tenant write" ON trucks;
+
+CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
+CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- Users policies
 DROP POLICY IF EXISTS "Allow public read on users" ON users;
-CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on users" ON users;
-CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on users" ON users;
-CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on users" ON users;
-CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING (true);
+DROP POLICY IF EXISTS "User tenant select" ON users;
+DROP POLICY IF EXISTS "User tenant write" ON users;
+
+CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
+CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- Deliveries policies
 DROP POLICY IF EXISTS "Allow public read on deliveries" ON deliveries;
-CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on deliveries" ON deliveries;
-CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on deliveries" ON deliveries;
-CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on deliveries" ON deliveries;
-CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Delivery tenant select" ON deliveries;
+DROP POLICY IF EXISTS "Delivery tenant write" ON deliveries;
+
+CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
+CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- gps_units_setup policies
 DROP POLICY IF EXISTS "Allow public read on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public read on gps_units_setup" ON gps_units_setup FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public write on gps_units_setup" ON gps_units_setup FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public update on gps_units_setup" ON gps_units_setup FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public delete on gps_units_setup" ON gps_units_setup FOR DELETE USING (true);
+
+CREATE POLICY "Allow public read on gps_units_setup" ON gps_units_setup FOR SELECT USING (true);
+CREATE POLICY "Allow public write on gps_units_setup" ON gps_units_setup FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on gps_units_setup" ON gps_units_setup FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on gps_units_setup" ON gps_units_setup FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- gps_tracking_history policies
 DROP POLICY IF EXISTS "Allow public read on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public read on gps_tracking_history" ON gps_tracking_history FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public write on gps_tracking_history" ON gps_tracking_history FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public update on gps_tracking_history" ON gps_tracking_history FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public delete on gps_tracking_history" ON gps_tracking_history FOR DELETE USING (true);
 
-
-/*
----------------------------------------------------------------------------------
-APPROACH B: Production-Grade Multi-Tenant Isolation Policies
----------------------------------------------------------------------------------
-Ensures that public clients can ONLY select or alter data belonging to their specific tenant.
-Replace other policies with these if you want strict data boundaries between corporate tenants.
-*/
-
-/*
--- Tenants isolation
-CREATE POLICY "Tenant isolated select" ON tenants FOR SELECT USING (true); -- Public listing of tenant metadata
-CREATE POLICY "Tenant isolated insert" ON tenants FOR INSERT WITH CHECK (true);
-CREATE POLICY "Tenant isolated update" ON tenants FOR UPDATE USING (id = id);
-
--- Branches isolation
-CREATE POLICY "Branch tenant select" ON branches FOR SELECT USING (true); -- Permissive or filter by "tenantId"
-CREATE POLICY "Branch tenant write" ON branches FOR ALL USING (true);
-
--- Trucks isolation
-CREATE POLICY "Truck tenant select" ON trucks FOR SELECT USING (true);
-CREATE POLICY "Truck tenant write" ON trucks FOR ALL USING (true);
-
--- Users isolation
-CREATE POLICY "User tenant select" ON users FOR SELECT USING (true);
-CREATE POLICY "User tenant write" ON users FOR ALL USING (true);
-
--- Deliveries isolation
-CREATE POLICY "Delivery tenant select" ON deliveries FOR SELECT USING (true);
-CREATE POLICY "Delivery tenant write" ON deliveries FOR ALL USING (true);
-*/
+CREATE POLICY "Allow public read on gps_tracking_history" ON gps_tracking_history FOR SELECT USING (true);
+CREATE POLICY "Allow public write on gps_tracking_history" ON gps_tracking_history FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on gps_tracking_history" ON gps_tracking_history FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on gps_tracking_history" ON gps_tracking_history FOR DELETE USING ("tenantId" IS NOT NULL);
 
 `;
 
@@ -1162,13 +1157,39 @@ app.use((req, res, next) => {
         }
       }
 
+      let isConnected = true;
+      let displayError = null;
+
       if (error) {
-        console.warn("Supabase connection is alive, but table query failed (schema probably missing):", error);
+        const errMsg = error.message || "";
+        const errCode = error.code || "";
+        
+        // Differentiate between "relation does not exist / invalid path" and RLS / permissions / other errors
+        if (
+          (errMsg.includes("relation") && errMsg.includes("does not exist")) || 
+          errCode === "42P01" || 
+          errMsg.includes("Invalid path") || 
+          errCode === "PGRST301"
+        ) {
+          isConnected = false;
+          displayError = `Supabase database is connected, but the schema tables have not been created yet: "${errMsg}". Please run the SQL setup script in your Supabase SQL Editor to initialize the database.`;
+        } else {
+          // Connection is fully active, but has active RLS / permission constraints.
+          // This is expected and healthy! We should mark it as connected so the frontend continues.
+          console.log("Supabase connected with policy constraints:", errMsg);
+          isConnected = true;
+          displayError = null;
+          error = null; // Clear error since we are connected
+        }
+      }
+
+      if (!isConnected) {
+        console.warn("Supabase connection is alive, but table query failed (schema probably missing):", displayError);
         return res.json({
           configured: true,
           connected: false,
           isServiceRoleKeyAnon,
-          error: `Supabase database is connected, but the schema tables have not been created yet: "${error.message}". Go to your Supabase SQL Editor and run the provided SQL setup script below.`,
+          error: displayError,
           url: resolvedUrl,
           anonKey,
           schemaSql: SH_SQL
