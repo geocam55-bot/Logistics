@@ -75,8 +75,17 @@ let supabaseConsecutiveFailures = 0;
 let supabaseTemporarilyDisabled = false;
 let supabaseDisabledUntil = 0;
 
-function getSupabase(bypassCircuitBreaker: boolean = false) {
-  if (supabaseTemporarilyDisabled && !bypassCircuitBreaker) {
+function getSupabase(reqOrBypass?: any, bypassCircuitBreaker: boolean = false) {
+  let req: any = null;
+  let bypass = bypassCircuitBreaker;
+
+  if (typeof reqOrBypass === "boolean") {
+    bypass = reqOrBypass;
+  } else if (reqOrBypass && typeof reqOrBypass === "object") {
+    req = reqOrBypass;
+  }
+
+  if (supabaseTemporarilyDisabled && !bypass) {
     if (Date.now() < supabaseDisabledUntil) {
       return null;
     } else {
@@ -86,18 +95,37 @@ function getSupabase(bypassCircuitBreaker: boolean = false) {
     }
   }
 
-  let url = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  
-  const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  const isUsingCustomDb = customSupabaseUrl && customSupabaseUrl.trim() !== "" && customSupabaseUrl.trim() !== envUrl.trim();
-  
+  // 1. Resolve credentials dynamically from request headers if present and valid
+  let url = "";
   let key = "";
-  if (isUsingCustomDb) {
-    key = customSupabaseKey;
-  } else {
-    key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
+
+  if (req && req.headers) {
+    const customUrlHeader = req.headers["x-custom-supabase-url"];
+    const customKeyHeader = req.headers["x-custom-supabase-key"];
+    if (customUrlHeader && customKeyHeader) {
+      const u = (Array.isArray(customUrlHeader) ? customUrlHeader[0] : customUrlHeader).trim();
+      const k = (Array.isArray(customKeyHeader) ? customKeyHeader[0] : customKeyHeader).trim();
+      if (u && k && u !== "null" && u !== "undefined" && u !== "Default" && k !== "null" && k !== "undefined") {
+        url = u;
+        key = k;
+      }
+    }
   }
-  
+
+  // 2. Fall back to customSupabaseUrl / environment variables if no valid request headers
+  if (!url || !key) {
+    url = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+    
+    const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+    const isUsingCustomDb = customSupabaseUrl && customSupabaseUrl.trim() !== "" && customSupabaseUrl.trim() !== envUrl.trim();
+    
+    if (isUsingCustomDb) {
+      key = customSupabaseKey;
+    } else {
+      key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY || "";
+    }
+  }
+
   if (!url || !key) {
     return null;
   }
@@ -652,15 +680,15 @@ app.use((req, res, next) => {
   const customUrlHeader = req.headers["x-custom-supabase-url"];
   const customKeyHeader = req.headers["x-custom-supabase-key"];
   if (customUrlHeader) {
-    const urlStr = Array.isArray(customUrlHeader) ? customUrlHeader[0] : customUrlHeader;
-    if (urlStr && urlStr.trim()) {
-      customSupabaseUrl = urlStr.trim();
+    const urlStr = (Array.isArray(customUrlHeader) ? customUrlHeader[0] : customUrlHeader).trim();
+    if (urlStr && urlStr !== "null" && urlStr !== "undefined" && urlStr !== "Default") {
+      customSupabaseUrl = urlStr;
     }
   }
   if (customKeyHeader) {
-    const keyStr = Array.isArray(customKeyHeader) ? customKeyHeader[0] : customKeyHeader;
-    if (keyStr && keyStr.trim()) {
-      customSupabaseKey = keyStr.trim();
+    const keyStr = (Array.isArray(customKeyHeader) ? customKeyHeader[0] : customKeyHeader).trim();
+    if (keyStr && keyStr !== "null" && keyStr !== "undefined") {
+      customSupabaseKey = keyStr;
     }
   }
   next();
@@ -1629,7 +1657,7 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "tenantId parameter is required." });
       }
 
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         const tid = String(tenantId);
         if (!inMemoryTenantStates[tid]) {
@@ -1847,7 +1875,7 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "tenantId parameter is required." });
       }
 
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         const tid = String(tenantId);
         inMemoryTenantStates[tid] = {
@@ -2093,7 +2121,7 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "Missing query properties table, id, or tenantId." });
       }
 
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         const tid = String(tenantId);
         const state = inMemoryTenantStates[tid];
@@ -2139,7 +2167,7 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "tenantId parameter is required." });
       }
 
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         const tid = String(tenantId);
         const state = inMemoryTenantStates[tid];

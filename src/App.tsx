@@ -44,14 +44,18 @@ async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promis
   if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
     const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
     const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
-    if (savedUrl && savedKey) {
+    if (
+      savedUrl && savedKey &&
+      savedUrl.trim() !== "" && savedUrl !== "null" && savedUrl !== "undefined" && savedUrl !== "Default" &&
+      savedKey.trim() !== "" && savedKey !== "null" && savedKey !== "undefined"
+    ) {
       init = init || {};
       const headers = new Headers(init.headers || {});
       if (!headers.has('x-custom-supabase-url')) {
-        headers.set('x-custom-supabase-url', savedUrl);
+        headers.set('x-custom-supabase-url', savedUrl.trim());
       }
       if (!headers.has('x-custom-supabase-key')) {
-        headers.set('x-custom-supabase-key', savedKey);
+        headers.set('x-custom-supabase-key', savedKey.trim());
       }
       init.headers = headers;
     }
