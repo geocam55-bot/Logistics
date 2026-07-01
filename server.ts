@@ -99,6 +99,10 @@ function getSupabase(reqOrBypass?: any, bypassCircuitBreaker: boolean = false) {
   let url = "";
   let key = "";
 
+  const envUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+  const envAnonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY || "").trim();
+  const envServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "").trim();
+
   if (req && req.headers) {
     const customUrlHeader = req.headers["x-custom-supabase-url"];
     const customKeyHeader = req.headers["x-custom-supabase-key"];
@@ -106,23 +110,41 @@ function getSupabase(reqOrBypass?: any, bypassCircuitBreaker: boolean = false) {
       const u = (Array.isArray(customUrlHeader) ? customUrlHeader[0] : customUrlHeader).trim();
       const k = (Array.isArray(customKeyHeader) ? customKeyHeader[0] : customKeyHeader).trim();
       if (u && k && u !== "null" && u !== "undefined" && u !== "Default" && k !== "null" && k !== "undefined") {
-        url = u;
-        key = k;
+        // If client headers match the default environment database, elevate to use the server's service role key
+        const isSameAsEnvUrl = envUrl && u.replace(/\/+$/, '') === envUrl.replace(/\/+$/, '');
+        const isSameAsEnvKey = envAnonKey && k === envAnonKey;
+        
+        if (isSameAsEnvUrl && isSameAsEnvKey && envServiceKey) {
+          url = envUrl;
+          key = envServiceKey;
+        } else {
+          url = u;
+          key = k;
+        }
       }
     }
   }
 
   // 2. Fall back to customSupabaseUrl / environment variables if no valid request headers
   if (!url || !key) {
-    url = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+    const u = (customSupabaseUrl || "").trim();
+    const k = (customSupabaseKey || "").trim();
     
-    const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-    const isUsingCustomDb = customSupabaseUrl && customSupabaseUrl.trim() !== "" && customSupabaseUrl.trim() !== envUrl.trim();
-    
-    if (isUsingCustomDb) {
-      key = customSupabaseKey;
+    if (u && k) {
+      // If server memory config matches the default environment database, elevate to use the server's service role key
+      const isSameAsEnvUrl = envUrl && u.replace(/\/+$/, '') === envUrl.replace(/\/+$/, '');
+      const isSameAsEnvKey = envAnonKey && k === envAnonKey;
+      
+      if (isSameAsEnvUrl && isSameAsEnvKey && envServiceKey) {
+        url = envUrl;
+        key = envServiceKey;
+      } else {
+        url = u;
+        key = k;
+      }
     } else {
-      key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY || "";
+      url = envUrl;
+      key = envServiceKey || envAnonKey || "";
     }
   }
 
@@ -1155,7 +1177,7 @@ app.use((req, res, next) => {
   app.get("/api/supabase-status", async (req, res) => {
     try {
       // Diagnostic check bypasses the circuit breaker so the user can test/recover connection
-      const supabase = getSupabase(true);
+      const supabase = getSupabase(req, true);
       const resolvedUrl = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
       const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
@@ -1268,7 +1290,7 @@ app.use((req, res, next) => {
   // Public DB diagnostics endpoint to compare dev/prod data counts
   app.get("/api/debug-db", async (req, res) => {
     try {
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         return res.json({ initialized: false, error: "Database not configured." });
       }
@@ -1321,13 +1343,13 @@ app.use((req, res, next) => {
       if (normEmail === "superadmin@prospaces.com") {
         if (password && !/^[•\*]+$/.test(password) && password !== "SuperAdmin2026!") {
           return res.json({
-            supabaseActive: getSupabase() !== null,
+            supabaseActive: getSupabase(req) !== null,
             found: true,
             error: "Invalid SuperAdmin password entry."
           });
         }
         return res.json({
-          supabaseActive: getSupabase() !== null,
+          supabaseActive: getSupabase(req) !== null,
           found: true,
           user: {
             id: "USR-SUPER-ADMIN-01",
@@ -1348,7 +1370,7 @@ app.use((req, res, next) => {
         });
       }
 
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         return res.json({
           supabaseActive: false,
@@ -1437,7 +1459,7 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "Missing required profile registration parameters." });
       }
 
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         return res.json({
           supabaseActive: false,
@@ -2449,7 +2471,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
     const fallbackTenants: any[] = [];
 
     try {
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         return res.json({ supabaseActive: false, tenants: fallbackTenants });
       }
@@ -2469,7 +2491,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
       if (!tenant || !tenant.id) {
         return res.status(400).json({ error: "Tenant payload with a valid ID is required." });
       }
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         return res.status(503).json({ error: "Supabase database is inactive or unconfigured. Cannot add tenant." });
       }
@@ -2485,7 +2507,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
   app.delete("/api/tenants/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const supabase = getSupabase();
+      const supabase = getSupabase(req);
       if (!supabase) {
         return res.status(503).json({ error: "Supabase database is inactive or unconfigured. Cannot delete tenant." });
       }

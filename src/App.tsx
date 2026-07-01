@@ -154,29 +154,52 @@ export default function App() {
   const [isDbInitializing, setIsDbInitializing] = useState(() => !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key')));
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
-  // Load custom credentials from localStorage on mount and register them with the backend memory store
+  // Load custom credentials from localStorage on mount and register them with the backend memory store.
+  // Performs a startup check to automatically prune credentials matching default environment variables
   useEffect(() => {
-    const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
-    const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
-    if (savedUrl && savedKey) {
-      initializeFrontendSupabase(savedUrl, savedKey);
-      customFetch('/api/setup-custom-supabase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: savedUrl, key: savedKey })
-      }).then(() => {
-        return checkSupabaseStatus();
-      }).then(() => {
+    const runStartupCheck = async () => {
+      try {
+        const res = await fetch("/api/supabase-status");
+        if (res.ok) {
+          const data = await res.json();
+          const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
+          const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
+          
+          const isSameAsDefault = savedUrl && savedKey && 
+            savedUrl.trim().replace(/\/+$/, '') === (data.url || "").trim().replace(/\/+$/, '') && 
+            savedKey.trim() === (data.anonKey || "").trim();
+
+          if (isSameAsDefault) {
+            console.log("Stale or default credentials found in localStorage. Clearing to use production defaults.");
+            localStorage.removeItem('prospaces_custom_supabase_url');
+            localStorage.removeItem('prospaces_custom_supabase_key');
+            setCustomDbUrl('');
+            setCustomDbKey('');
+            initializeFrontendSupabase('', '');
+            await fetch('/api/setup-custom-supabase', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: '', key: '' })
+            });
+          } else if (savedUrl && savedKey) {
+            initializeFrontendSupabase(savedUrl, savedKey);
+            await fetch('/api/setup-custom-supabase', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: savedUrl, key: savedKey })
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Startup check failed:", err);
+      } finally {
         setIsDbInitializing(false);
         setLoadTrigger(prev => prev + 1);
-      }).catch(err => {
-        console.warn("Failed to notify backend server of custom Supabase credentials:", err);
-        setIsDbInitializing(false);
-        setLoadTrigger(prev => prev + 1);
-      });
-    } else {
-      setIsDbInitializing(false);
-    }
+        checkSupabaseStatus();
+      }
+    };
+
+    runStartupCheck();
   }, []);
 
   // Keep a ref of live states for the geolocation watchPosition callback to avoid stale closures and constant watcher restarts
@@ -495,22 +518,6 @@ export default function App() {
       setSupabaseStatus(data);
       if (data.configured && data.anonKey) {
         initializeFrontendSupabase(data.url, data.anonKey);
-        
-        // Auto-persist to localStorage if empty so that direct client fetches or page refreshes are fully connected
-        if (!localStorage.getItem('prospaces_custom_supabase_url')) {
-          localStorage.setItem('prospaces_custom_supabase_url', data.url);
-        }
-        if (!localStorage.getItem('prospaces_custom_supabase_key')) {
-          localStorage.setItem('prospaces_custom_supabase_key', data.anonKey);
-        }
-
-        // Also update form state if currently empty to keep UI elements in sync
-        if (!customDbUrl) {
-          setCustomDbUrl(data.url);
-        }
-        if (!customDbKey) {
-          setCustomDbKey(data.anonKey);
-        }
       }
       return data;
     } catch (e: any) {
