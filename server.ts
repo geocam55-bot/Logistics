@@ -48,6 +48,24 @@ function isServiceRoleKey(key: string): boolean {
 
 let customSupabaseUrl = "";
 let customSupabaseKey = "";
+
+const CONFIG_FILE = path.join(process.cwd(), "supabase-config.json");
+
+// Load custom Supabase credentials from local file on startup if available
+if (fs.existsSync(CONFIG_FILE)) {
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed.url && parsed.key) {
+      customSupabaseUrl = parsed.url;
+      customSupabaseKey = parsed.key;
+      console.log("Loaded custom Supabase credentials from supabase-config.json");
+    }
+  } catch (err) {
+    console.error("Failed to load supabase-config.json:", err);
+  }
+}
+
 let supabaseClient: any = null;
 let lastSupabaseUrl = "";
 let lastSupabaseKey = "";
@@ -1094,6 +1112,14 @@ app.use((req, res, next) => {
       supabaseConsecutiveFailures = 0;
       supabaseTemporarilyDisabled = false;
       supabaseDisabledUntil = 0;
+
+      // Persist to supabase-config.json
+      try {
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify({ url: customSupabaseUrl, key: customSupabaseKey }, null, 2), "utf8");
+        console.log("Persisted custom Supabase credentials to supabase-config.json");
+      } catch (writeErr) {
+        console.error("Failed to persist custom Supabase credentials to file:", writeErr);
+      }
 
       console.log("Custom Supabase credentials set in server memory. URL size:", customSupabaseUrl.length, "Key size:", customSupabaseKey.length);
       res.json({ success: true, message: "Custom Supabase credentials updated in server memory successfully." });

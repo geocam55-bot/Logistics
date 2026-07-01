@@ -491,6 +491,22 @@ export default function App() {
       setSupabaseStatus(data);
       if (data.configured && data.anonKey) {
         initializeFrontendSupabase(data.url, data.anonKey);
+        
+        // Auto-persist to localStorage if empty so that direct client fetches or page refreshes are fully connected
+        if (!localStorage.getItem('prospaces_custom_supabase_url')) {
+          localStorage.setItem('prospaces_custom_supabase_url', data.url);
+        }
+        if (!localStorage.getItem('prospaces_custom_supabase_key')) {
+          localStorage.setItem('prospaces_custom_supabase_key', data.anonKey);
+        }
+
+        // Also update form state if currently empty to keep UI elements in sync
+        if (!customDbUrl) {
+          setCustomDbUrl(data.url);
+        }
+        if (!customDbKey) {
+          setCustomDbKey(data.anonKey);
+        }
       }
       return data;
     } catch (e: any) {
