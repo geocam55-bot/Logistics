@@ -318,8 +318,16 @@ export async function checkSupabaseStatusDirect(): Promise<any> {
   if (!supabase) {
     return { active: false, details: "Client-side configuration missing/empty environ variables." };
   }
+  
+  const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => {
+    setTimeout(() => reject(new Error("Supabase direct query timed out (exceeded 5000ms)")), 5000);
+  });
+
   try {
-    const { data, error } = await supabase.from("tenants").select("id").limit(1);
+    const { data, error } = await Promise.race([
+      supabase.from("tenants").select("id").limit(1),
+      timeoutPromise
+    ]);
     if (error) {
       return { active: true, error: error.message, details: "Connected to endpoint but received querying error. Schema might need to be created." };
     }
