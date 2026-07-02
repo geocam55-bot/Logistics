@@ -200,17 +200,20 @@ function getSupabase(reqOrBypass?: any, bypassCircuitBreaker: boolean = false) {
   return supabaseClient;
 }
 
-function withTimeout<T>(promise: Promise<T> | any, ms: number = 30000): Promise<T> {
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 5000): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      reject(new Error("Database query timed out (timeout threshold reached)"));
+      reject(new Error(`Database query timed out (exceeded ${ms}ms threshold)`));
     }, ms);
   });
   return Promise.race([
     Promise.resolve(promise).then((res) => {
       clearTimeout(timer);
       return res;
+    }).catch(err => {
+      clearTimeout(timer);
+      throw err;
     }),
     timeoutPromise
   ]);
@@ -1220,12 +1223,12 @@ app.use((req, res, next) => {
 
       // Perform a ping / select test query against the database with a safe timeout to check if schema is constructed
       let testQuery = supabase.from("tenants").select("id").limit(1);
-      let { data, error } = await withTimeout<any>(testQuery, 30000);
+      let { data, error } = await withTimeout<any>(testQuery, 5000);
 
       if (error) {
          console.warn("Supabase connection: tenants table query failed, trying branches table fallback...");
          let fallbackQuery = supabase.from("branches").select("id").limit(1);
-         const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 30000);
+         const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 5000);
         if (!branchesErr) {
           error = null;
         }
@@ -1444,7 +1447,7 @@ app.use((req, res, next) => {
           .from("users")
           .select("*")
           .ilike("email", email.trim()),
-        30000
+        5000
       )) as any;
 
       if (error) {
@@ -1480,7 +1483,7 @@ app.use((req, res, next) => {
             .from("tenants")
             .select("*")
             .eq("id", user.tenantId),
-          30000
+          5000
         )) as any;
 
         return res.json({
@@ -1777,7 +1780,7 @@ app.use((req, res, next) => {
         });
       }
 
-      // Fetch all tables in parallel with a timeout to prevent hanging (safe 30000ms timeout)
+      // Fetch all tables in parallel with a timeout to prevent hanging (safe 5000ms timeout)
       let [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
         Promise.all([
           supabase.from("branches").select("*").eq("tenantId", tenantId),
@@ -1785,7 +1788,7 @@ app.use((req, res, next) => {
           supabase.from("users").select("*").eq("tenantId", tenantId),
           supabase.from("deliveries").select("*").eq("tenantId", tenantId)
         ]),
-        30000
+        5000
       );
 
       // If schema tables don't exist yet, it'll error.
@@ -1807,7 +1810,7 @@ app.use((req, res, next) => {
               supabase.from("users").select("*").eq("tenantId", tenantId),
               supabase.from("deliveries").select("*").eq("tenantId", tenantId)
             ]),
-            30000
+            5000
           );
           rBranches = fBranches;
           rTrucks = fTrucks;

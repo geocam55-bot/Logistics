@@ -1,15 +1,6 @@
 {
-  "timestamp": "2026-07-02T11:40:00.618Z",
+  "timestamp": "2026-07-02T12:51:41.706Z",
   "users": [
-    {
-      "id": "USR-SUPER-ADMIN-01",
-      "tenantId": "system-admin-tenant",
-      "name": "ProSpaces Super Admin",
-      "email": "superadmin@prospaces.com",
-      "role": "SUPER_ADMIN",
-      "phone": "||status:Active ||pw:tV3p&HP# ||status:Active ||lastact:2026-07-02T11:34:41.635Z",
-      "associatedStoreId": "DC-WINAMILL"
-    },
     {
       "id": "USR-57008",
       "tenantId": "system-admin-tenant",
@@ -20,6 +11,15 @@
       "associatedStoreId": "DC-WINAMILL"
     },
     {
+      "id": "USR-SUPER-ADMIN-01",
+      "tenantId": "system-admin-tenant",
+      "name": "ProSpaces Super Admin",
+      "email": "superadmin@prospaces.com",
+      "role": "SUPER_ADMIN",
+      "phone": "||status:Active ||pw:tV3p&HP# ||status:Active ||lastact:2026-07-02T12:50:23.066Z",
+      "associatedStoreId": "DC-WINAMILL"
+    },
+    {
       "id": "USR-1869",
       "tenantId": "prospaces",
       "name": "Joshua Campbell",
@@ -27,6 +27,15 @@
       "role": "Driver",
       "phone": " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
       "associatedStoreId": "DC-WINAMILL"
+    },
+    {
+      "id": "USR-85627",
+      "tenantId": "rona-atlantic",
+      "name": "George Campbell",
+      "email": "george.campbell@ronaatlantic.ca",
+      "role": "Admin",
+      "phone": "(902) 555-0199 ||pw:tV3p&HP# ||status:Active ||lastact:1970-01-01T00:00:00.000Z",
+      "associatedStoreId": "WINDMILL_DC"
     }
   ],
   "tenants": [
