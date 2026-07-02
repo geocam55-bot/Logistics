@@ -1405,13 +1405,13 @@ app.use((req, res, next) => {
         const superAdminPassword = process.env.SUPERADMIN_PASSWORD || "SuperAdmin2026!";
         if (password && !/^[•\*]+$/.test(password) && password !== superAdminPassword) {
           return res.json({
-            supabaseActive: getSupabase(req) !== null,
+            supabaseActive: true,
             found: true,
             error: "Invalid SuperAdmin password entry."
           });
         }
         return res.json({
-          supabaseActive: getSupabase(req) !== null,
+          supabaseActive: true,
           found: true,
           user: {
             id: "USR-SUPER-ADMIN-01",

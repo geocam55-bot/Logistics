@@ -165,7 +165,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
     try {
       let result: any = null;
       try {
-        const response = await customFetch('/api/auth/login', {
+        const response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -364,7 +364,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
     try {
       let result: any = null;
       try {
-        const response = await customFetch('/api/auth/register', {
+        const response = await fetch('/api/auth/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
