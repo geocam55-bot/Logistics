@@ -41,7 +41,8 @@ import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
 // Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
 async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input && 'url' in (input as any) ? (input as any).url : ''));
-  if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
+  const isStatusEndpoint = url && url.includes('/api/supabase-status');
+  if (!isStatusEndpoint && url && (url.startsWith('/api/') || url.includes('/api/'))) {
     const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
     const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
     if (
@@ -590,7 +591,7 @@ export default function App() {
   const checkSupabaseStatus = async () => {
     setSupabaseStatusLoaded(false);
     try {
-      const res = await customFetch("/api/supabase-status");
+      const res = await fetch("/api/supabase-status");
       if (!res.ok) {
         throw new Error(`Server returned non-ok status: ${res.status}`);
       }
