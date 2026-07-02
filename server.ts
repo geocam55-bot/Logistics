@@ -1668,6 +1668,9 @@ app.use((req, res, next) => {
   // In-memory tenant state store fallback for when Supabase is unconfigured, keeping multi-device sessions perfectly in sync!
   const inMemoryTenantStates: { [tenantId: string]: { branches?: any[], trucks?: any[], users?: any[], deliveries?: any[] } } = {};
 
+  // In-memory map to track explicit deletions so concurrent saves don't resurrect them
+  const deletedTenantRecords: { [tenantId: string]: { [table: string]: Set<string> } } = {};
+
   // Fetch full state for a specific tenant from Supabase (or return premium mock fallback arrays when database is unconfigured)
   app.get("/api/tenant/state", async (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -1900,11 +1903,33 @@ app.use((req, res, next) => {
       const supabase = getSupabase(req);
       if (!supabase) {
         const tid = String(tenantId);
+        let filteredBranches = branches || [];
+        let filteredTrucks = trucks || [];
+        let filteredUsers = users || [];
+        let filteredDeliveries = deliveries || [];
+
+        const deletes = deletedTenantRecords[tid];
+        if (deletes) {
+          if (deletes["branches"]) {
+            filteredBranches = filteredBranches.filter((item: any) => !deletes["branches"].has(item.id));
+          }
+          if (deletes["trucks"]) {
+            filteredTrucks = filteredTrucks.filter((item: any) => !deletes["trucks"].has(item.id));
+          }
+          if (deletes["users"]) {
+            filteredUsers = filteredUsers.filter((item: any) => !deletes["users"].has(item.id));
+          }
+          if (deletes["deliveries"]) {
+            filteredDeliveries = filteredDeliveries.filter((item: any) => !deletes["deliveries"].has(item.id));
+          }
+          delete deletedTenantRecords[tid];
+        }
+
         inMemoryTenantStates[tid] = {
-          branches: branches || [],
-          trucks: trucks || [],
-          users: users || [],
-          deliveries: deliveries || []
+          branches: filteredBranches,
+          trucks: filteredTrucks,
+          users: filteredUsers,
+          deliveries: filteredDeliveries
         };
         return res.json({
           supabaseActive: false,
@@ -1918,25 +1943,43 @@ app.use((req, res, next) => {
       (branches || []).forEach((b: any) => {
         if (b && b.id) uniqueBranchesMap.set(b.id, b);
       });
-      const uniqueBranches = Array.from(uniqueBranchesMap.values());
+      let uniqueBranches = Array.from(uniqueBranchesMap.values());
 
       const uniqueTrucksMap = new Map<string, any>();
       (trucks || []).forEach((t: any) => {
         if (t && t.id) uniqueTrucksMap.set(t.id, t);
       });
-      const uniqueTrucks = Array.from(uniqueTrucksMap.values());
+      let uniqueTrucks = Array.from(uniqueTrucksMap.values());
 
       const uniqueUsersMap = new Map<string, any>();
       (users || []).forEach((u: any) => {
         if (u && u.id) uniqueUsersMap.set(u.id, u);
       });
-      const uniqueUsers = Array.from(uniqueUsersMap.values());
+      let uniqueUsers = Array.from(uniqueUsersMap.values());
 
       const uniqueDeliveriesMap = new Map<string, any>();
       (deliveries || []).forEach((d: any) => {
         if (d && d.id) uniqueDeliveriesMap.set(d.id, d);
       });
-      const uniqueDeliveries = Array.from(uniqueDeliveriesMap.values());
+      let uniqueDeliveries = Array.from(uniqueDeliveriesMap.values());
+
+      // Filter out explicitly deleted items from incoming upserts to prevent resurrection
+      const tid = String(tenantId);
+      const deletes = deletedTenantRecords[tid];
+      if (deletes) {
+        if (deletes["branches"]) {
+          uniqueBranches = uniqueBranches.filter((item: any) => !deletes["branches"].has(item.id));
+        }
+        if (deletes["trucks"]) {
+          uniqueTrucks = uniqueTrucks.filter((item: any) => !deletes["trucks"].has(item.id));
+        }
+        if (deletes["users"]) {
+          uniqueUsers = uniqueUsers.filter((item: any) => !deletes["users"].has(item.id));
+        }
+        if (deletes["deliveries"]) {
+          uniqueDeliveries = uniqueDeliveries.filter((item: any) => !deletes["deliveries"].has(item.id));
+        }
+      }
 
       // Force-inject appropriate tenantIds into nested payloads to maintain strict database isolation
       const sanitizedBranches = uniqueBranches.map((b: any) => ({ ...b, tenantId }));
@@ -2128,6 +2171,32 @@ app.use((req, res, next) => {
         await supabase.from("deliveries").delete().eq("tenantId", tenantId);
       }
 
+      // Enforce defensive deletes from memory before finishing the save-state flow
+      const tidStr = String(tenantId);
+      const deletesObj = deletedTenantRecords[tidStr];
+      if (deletesObj) {
+        for (const table of Object.keys(deletesObj)) {
+          const ids = Array.from(deletesObj[table]);
+          if (ids.length > 0) {
+            console.log(`[DEFENSIVE DELETE] Enforcing deletion of ${ids.join(", ")} in table '${table}' for tenant '${tenantId}'`);
+            try {
+              if (table === "branches") {
+                await supabase.from("branches").delete().eq("tenantId", tenantId).in("id", ids);
+              } else if (table === "trucks") {
+                await supabase.from("trucks").delete().eq("tenantId", tenantId).in("id", ids);
+              } else if (table === "users") {
+                await supabase.from("users").delete().eq("tenantId", tenantId).in("id", ids);
+              } else if (table === "deliveries") {
+                await supabase.from("deliveries").delete().eq("tenantId", tenantId).in("id", ids);
+              }
+            } catch (delErr: any) {
+              console.warn(`[DEFENSIVE DELETE] Failed to delete from table '${table}':`, delErr.message || delErr);
+            }
+          }
+        }
+        delete deletedTenantRecords[tidStr];
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       console.error("Supabase Save State Error:", err);
@@ -2143,20 +2212,34 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "Missing query properties table, id, or tenantId." });
       }
 
+      const tidStr = String(tenantId);
+      const tblStr = String(table);
+      const idStr = String(id);
+
+      // Record delete in deletedTenantRecords in-memory map
+      if (!deletedTenantRecords[tidStr]) {
+        deletedTenantRecords[tidStr] = {};
+      }
+      if (!deletedTenantRecords[tidStr][tblStr]) {
+        deletedTenantRecords[tidStr][tblStr] = new Set<string>();
+      }
+      deletedTenantRecords[tidStr][tblStr].add(idStr);
+      if (tblStr === "branches" && idStr === "DC-WINAMILL") {
+        deletedTenantRecords[tidStr][tblStr].add("500");
+      }
+
       const supabase = getSupabase(req);
       if (!supabase) {
-        const tid = String(tenantId);
-        const state = inMemoryTenantStates[tid];
+        const state = inMemoryTenantStates[tidStr];
         if (state) {
-          const tableName = table as string;
-          if (tableName === "branches" && state.branches) {
-            state.branches = state.branches.filter((item: any) => item.id !== id && item.id !== "500");
-          } else if (tableName === "trucks" && state.trucks) {
-            state.trucks = state.trucks.filter((item: any) => item.id !== id);
-          } else if (tableName === "users" && state.users) {
-            state.users = state.users.filter((item: any) => item.id !== id);
-          } else if (tableName === "deliveries" && state.deliveries) {
-            state.deliveries = state.deliveries.filter((item: any) => item.id !== id);
+          if (tblStr === "branches" && state.branches) {
+            state.branches = state.branches.filter((item: any) => item.id !== idStr && item.id !== "500");
+          } else if (tblStr === "trucks" && state.trucks) {
+            state.trucks = state.trucks.filter((item: any) => item.id !== idStr);
+          } else if (tblStr === "users" && state.users) {
+            state.users = state.users.filter((item: any) => item.id !== idStr);
+          } else if (tblStr === "deliveries" && state.deliveries) {
+            state.deliveries = state.deliveries.filter((item: any) => item.id !== idStr);
           }
         }
         return res.json({ success: true, supabaseActive: false });
@@ -2164,11 +2247,11 @@ app.use((req, res, next) => {
 
       // Ensure we only delete matching ids belonging to the authenticated tenant
       // If table is branches and id is DC-WINAMILL, also delete legacy ID "500"
-      let deleteQuery = supabase.from(table as string).delete().eq("tenantId", tenantId);
-      if (table === "branches" && id === "DC-WINAMILL") {
+      let deleteQuery = supabase.from(tblStr).delete().eq("tenantId", tenantId);
+      if (tblStr === "branches" && idStr === "DC-WINAMILL") {
         deleteQuery = deleteQuery.in("id", ["DC-WINAMILL", "500"]);
       } else {
-        deleteQuery = deleteQuery.eq("id", id);
+        deleteQuery = deleteQuery.eq("id", idStr);
       }
       
       const { error } = await deleteQuery;
@@ -2527,6 +2610,23 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
       console.error("Failed to delete tenant from Supabase:", err);
       res.status(500).json({ error: formatDatabaseError(err) });
     }
+  });
+
+  app.get('/clear-local-storage', (req, res) => {
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Clear Local Storage</title></head><body><script>
+      try {
+        localStorage.removeItem('prospaces_custom_supabase_url');
+        localStorage.removeItem('prospaces_custom_supabase_key');
+        localStorage.removeItem('prospaces_dismissed_rls_warning');
+        localStorage.removeItem('prospaces_all_tenants');
+        localStorage.removeItem('prospaces_active_tenant');
+        localStorage.removeItem('prospaces_active_user');
+        console.log('Cleared ProSpaces localStorage keys');
+        alert('Cleared ProSpaces localStorage keys. You will be redirected to /');
+      } catch(e) { console.warn('Failed to clear local storage', e); }
+      window.location = '/';
+    </script></body></html>`;
+    res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
   });
 
 async function startServer() {
