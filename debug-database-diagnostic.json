@@ -1,10 +1,150 @@
 {
-  "timestamp": "2026-06-22T12:22:47.304Z",
-  "users": [],
-  "tenants": [],
-  "branches": [],
-  "trucks": [],
-  "deliveries": [],
+  "timestamp": "2026-07-02T11:40:00.618Z",
+  "users": [
+    {
+      "id": "USR-SUPER-ADMIN-01",
+      "tenantId": "system-admin-tenant",
+      "name": "ProSpaces Super Admin",
+      "email": "superadmin@prospaces.com",
+      "role": "SUPER_ADMIN",
+      "phone": "||status:Active ||pw:tV3p&HP# ||status:Active ||lastact:2026-07-02T11:34:41.635Z",
+      "associatedStoreId": "DC-WINAMILL"
+    },
+    {
+      "id": "USR-57008",
+      "tenantId": "system-admin-tenant",
+      "name": "George Campbell",
+      "email": "george.campbell@prospaces.com",
+      "role": "Admin",
+      "phone": " ||pw:George2026! ||status:Active",
+      "associatedStoreId": "DC-WINAMILL"
+    },
+    {
+      "id": "USR-1869",
+      "tenantId": "prospaces",
+      "name": "Joshua Campbell",
+      "email": "joshua.campbell@prospaces.com",
+      "role": "Driver",
+      "phone": " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
+      "associatedStoreId": "DC-WINAMILL"
+    }
+  ],
+  "tenants": [
+    {
+      "id": "rona-atlantic",
+      "name": "RONA Atlantic",
+      "code": "RA",
+      "description": "",
+      "logoBadge": "🏢",
+      "regionalFocus": "Maritime Canada",
+      "primaryColor": "blue"
+    },
+    {
+      "id": "prospaces",
+      "name": "ProSpaces Logistics",
+      "code": "PS",
+      "description": "Corporate logistics tracking for ProSpaces distributor and dealer stores.",
+      "logoBadge": "🏢",
+      "regionalFocus": "Atlantic Canada (Dartmouth, Tantallon, Halifax)",
+      "primaryColor": "blue"
+    },
+    {
+      "id": "system-admin-tenant",
+      "name": "ProSpaces Logistics & Deliveries",
+      "code": "SAT",
+      "description": "",
+      "logoBadge": "🏢",
+      "regionalFocus": "canada",
+      "primaryColor": "slate"
+    }
+  ],
+  "branches": [
+    {
+      "id": "01075",
+      "tenantId": "prospaces",
+      "name": "ProSpaces - Tantallon",
+      "type": "STORE",
+      "address": "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
+    },
+    {
+      "id": "01065",
+      "tenantId": "prospaces",
+      "name": "ProSpaces - ALMON",
+      "type": "STORE",
+      "address": "6055 Almon St, Halifax, NS B3K 1T9, Canada"
+    },
+    {
+      "id": "01070",
+      "tenantId": "prospaces",
+      "name": "ProSpaces - Elmsdale",
+      "type": "DC",
+      "address": "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
+    },
+    {
+      "id": "DC-WINAMILL",
+      "tenantId": "prospaces",
+      "name": "44444 - 500 Windmill Road",
+      "type": "DC",
+      "address": "500 Windmill Road, Dartmouth, Nova Scotia, B3B 1B3, Canada"
+    }
+  ],
+  "trucks": [
+    {
+      "id": "TRUCK-87",
+      "tenantId": "system-admin-tenant",
+      "name": "Truck-1",
+      "type": "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938 ||gpsSource:mobile ||gpsStatus:Disconnected",
+      "driver": "George Campbell",
+      "branchId": "01075"
+    },
+    {
+      "id": "TRUCK-28",
+      "tenantId": "prospaces",
+      "name": "Truck-2",
+      "type": "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
+      "driver": "Joshua Campbell",
+      "branchId": "DC-WINAMILL"
+    }
+  ],
+  "deliveries": [
+    {
+      "id": "263890",
+      "tenantId": "prospaces",
+      "invoiceNumber": "263890",
+      "epicorSalesOrder": "263890",
+      "customerName": "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
+      "deliveryAddress": "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
+      "phone": "902-555-0199",
+      "originBranch": "01075",
+      "destinationNotes": "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
+      "status": "REGISTERED",
+      "registeredAt": "6/16/2026, 11:15:48 AM",
+      "pickedAt": null,
+      "deliveredAt": null,
+      "returnedAt": null,
+      "returnReason": null,
+      "assignedTruck": "TRUCK-87",
+      "assignedDriver": "George Campbell",
+      "customerSignature": null,
+      "deliveryPhoto": null,
+      "history": [
+        {
+          "notes": "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
+          "status": "REGISTERED",
+          "location": "ProSpaces - Tantallon",
+          "operator": "Azure OCR Automate Stream",
+          "timestamp": "6/16/2026, 11:15:48 AM"
+        },
+        {
+          "notes": "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
+          "status": "REGISTERED",
+          "location": "ProSpaces - Tantallon",
+          "operator": "Logistics Board Coordinator",
+          "timestamp": "2026-06-16T14:16:19.891Z"
+        }
+      ]
+    }
+  ],
   "usersError": null,
   "tenantsError": null,
   "branchesError": null,
