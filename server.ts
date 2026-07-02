@@ -1035,8 +1035,10 @@ async function runSelfHealingOnce() {
           } catch (err: any) {
             seedUErr = err;
           }
-          if (seedUErr) console.error("Error seeding default users:", seedUErr);
-          else console.log("Seeded default users successfully.");
+          if (seedUErr) {
+            const cleanMsg = seedUErr.message || (typeof seedUErr === "object" ? JSON.stringify(seedUErr) : String(seedUErr));
+            console.error("Error seeding default users:", cleanMsg);
+          } else console.log("Seeded default users successfully.");
         }
 
         // C. Seed trucks if empty

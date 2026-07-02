@@ -153,6 +153,14 @@ export default function App() {
   const [configMsg, setConfigMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isDbInitializing, setIsDbInitializing] = useState(() => !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key')));
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [diagnosticsModal, setDiagnosticsModal] = useState<{
+    show: boolean;
+    title: string;
+    connected: boolean;
+    url?: string;
+    isServiceRoleKeyAnon?: boolean;
+    error?: string | null;
+  } | null>(null);
 
   // Load custom credentials from localStorage on mount and register them with the backend memory store.
   // Performs a startup check to automatically prune credentials matching default environment variables
@@ -1320,17 +1328,23 @@ export default function App() {
                   setIsCheckingStatus(true);
                   try {
                     const status = await checkSupabaseStatus();
-                    if (status) {
-                      if (status.connected) {
-                        alert(`[PROSPACES DIAGNOSTICS]\n\nDatabase Connection: ACTIVE & CONNECTED\n\nEndpoint URL:\n${status.url}\n\nSecurity Status:\n${status.isServiceRoleKeyAnon ? "⚠️ Under Limited/Anon Role Key" : "✅ Service Role Key Configured (Admin Mode)"}\n\nAll operational logs and synchronization queues are healthy.`);
-                      } else {
-                        alert(`[PROSPACES DIAGNOSTICS]\n\nDatabase Connection: OFFLINE / UNCONFIGURED\n\nStatus Error / Details:\n${status.error || "Supabase database credentials are unconfigured or placeholder."}\n\nConfigured URL: ${status.url || 'None'}\n\nAction Required: Click the "Offline / Local Database Sync Mode" status button on the left to set up valid live Supabase credentials!`);
-                      }
-                    } else {
-                      alert(`[PROSPACES DIAGNOSTICS]\n\nDatabase Connection: OFFLINE\n\nCould not fetch diagnostics status from the server endpoint.`);
-                    }
+                    setDiagnosticsModal({
+                      show: true,
+                      title: "ProSpaces Database Diagnostics",
+                      connected: !!status?.connected,
+                      url: status?.url || 'Default/Local',
+                      isServiceRoleKeyAnon: !!status?.isServiceRoleKeyAnon,
+                      error: status?.connected ? null : (status?.error || "Supabase database credentials are unconfigured or placeholder.")
+                    });
                   } catch (e: any) {
-                    alert(`[PROSPACES DIAGNOSTICS]\n\nAn unexpected check exception occurred: ${e.message || String(e)}`);
+                    setDiagnosticsModal({
+                      show: true,
+                      title: "Diagnostics System Error",
+                      connected: false,
+                      url: 'Error',
+                      isServiceRoleKeyAnon: false,
+                      error: e.message || String(e)
+                    });
                   } finally {
                     setIsCheckingStatus(false);
                   }
@@ -2010,6 +2024,185 @@ export default function App() {
           onClose={() => setShowProfileModal(false)}
           onUpdateProfile={handleUpdateProfile}
         />
+      )}
+
+      {showDbConfig && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="database-config-modal">
+          <div className="bg-slate-900 text-slate-100 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-800/80 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800/60 pb-4 mb-4">
+              <div className="flex items-center space-x-2.5">
+                <Database className="h-5 w-5 text-blue-400" />
+                <h3 className="text-base font-bold font-sans text-slate-100">Live Database Configuration</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDbConfig(false);
+                  setConfigMsg(null);
+                }}
+                className="text-slate-400 hover:text-slate-200 rounded-lg p-1 hover:bg-slate-800/50 transition-all text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+              Connect ProSpaces Fleet Core directly to your own live Supabase Cloud environment. Custom keys are persistent inside your local browser storage and secure in memory.
+            </p>
+
+            {configMsg && (
+              <div className={`mb-4 border rounded-xl p-3 text-xs flex items-start space-x-2.5 leading-relaxed ${
+                configMsg.type === 'success' 
+                  ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' 
+                  : 'bg-rose-950/30 border-rose-500/30 text-rose-300'
+              }`}>
+                <span className="shrink-0 font-bold">{configMsg.type === 'success' ? '✅' : '⚠️'}</span>
+                <span>{configMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveDbConfig} className="space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Supabase Project API URL
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="https://your-project-id.supabase.co"
+                  value={customDbUrl}
+                  onChange={(e) => setCustomDbUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-950/50 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Supabase Anon Key / Service Role Key
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="eyJhbGciOi..."
+                  value={customDbKey}
+                  onChange={(e) => setCustomDbKey(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-950/50 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  disabled={configSaving}
+                  onClick={async () => {
+                    if (confirm("Are you sure you want to reset credentials to production defaults?")) {
+                      await handleResetDbConfig();
+                    }
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-2 text-xs font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 rounded-xl transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                  <span>Reset Defaults</span>
+                </button>
+
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    disabled={configSaving}
+                    onClick={() => {
+                      setShowDbConfig(false);
+                      setConfigMsg(null);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={configSaving}
+                    className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <span>{configSaving ? 'Verifying & Saving...' : 'Save & Intercept'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {diagnosticsModal && diagnosticsModal.show && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="diagnostics-modal">
+          <div className="bg-slate-900 text-slate-100 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-800/80 animate-fade-in text-left">
+            <div className="flex items-center justify-between border-b border-slate-800/60 pb-4 mb-4">
+              <div className="flex items-center space-x-2.5">
+                <Shield className="h-5 w-5 text-blue-400" />
+                <h3 className="text-base font-bold font-sans text-slate-100">{diagnosticsModal.title}</h3>
+              </div>
+              <button
+                onClick={() => setDiagnosticsModal(null)}
+                className="text-slate-400 hover:text-slate-200 rounded-lg p-1 hover:bg-slate-800/50 transition-all text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                  diagnosticsModal.connected ? 'bg-emerald-950/50 text-emerald-400' : 'bg-rose-950/50 text-rose-400'
+                }`}>
+                  {diagnosticsModal.connected ? '✓' : '✗'}
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-200">Database Connection Status</h4>
+                  <p className="text-xs text-slate-400">
+                    {diagnosticsModal.connected ? 'CONNECTED & ACTIVE' : 'OFFLINE / UNCONFIGURED'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800/60 font-mono text-xs">
+                <div>
+                  <span className="text-slate-500">Endpoint URL:</span>
+                  <p className="text-slate-300 break-all mt-0.5">{diagnosticsModal.url || 'None'}</p>
+                </div>
+                <div className="border-t border-slate-900 my-2 pt-2">
+                  <span className="text-slate-500">Role Authority:</span>
+                  <p className="text-slate-300 mt-0.5">
+                    {diagnosticsModal.isServiceRoleKeyAnon 
+                      ? "⚠️ Under Limited / Anon Role Key (Non-Admin)" 
+                      : "✅ Service Role Key Configured (Admin Mode)"}
+                  </p>
+                </div>
+                {diagnosticsModal.error && (
+                  <div className="border-t border-slate-900 my-2 pt-2">
+                    <span className="text-rose-400">Error Details:</span>
+                    <p className="text-rose-300 break-words mt-0.5 whitespace-pre-wrap">{diagnosticsModal.error}</p>
+                  </div>
+                )}
+              </div>
+
+              {!diagnosticsModal.connected && (
+                <div className="bg-amber-950/20 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-300 leading-relaxed flex items-start space-x-2.5">
+                  <span className="text-amber-500 font-bold shrink-0">⚠️</span>
+                  <span>
+                    Action Required: Click the "Offline / Local Database Sync Mode" status button in the header to set up valid live Supabase credentials!
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDiagnosticsModal(null)}
+                  className="px-5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
+                >
+                  Close Diagnostic View
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
