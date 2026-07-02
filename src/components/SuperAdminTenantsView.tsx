@@ -82,7 +82,7 @@ export default function SuperAdminTenantsView({
   
   // User Form fields
   const [userEmail, setUserEmail] = useState('');
-  const [userPassword, setUserPassword] = useState('ProSpaces2026!');
+  const [userPassword, setUserPassword] = useState('');
   const [userFullName, setUserFullName] = useState('');
   const [userRole, setUserRole] = useState<'User' | 'Driver' | 'Dispatcher' | 'Admin'>('User');
   const [userStatus, setUserStatus] = useState<'Active' | 'Inactive'>('Active');
@@ -150,7 +150,7 @@ export default function SuperAdminTenantsView({
 
   const resetUserForm = () => {
     setUserEmail('');
-    setUserPassword('ProSpaces2026!');
+    setUserPassword('');
     setUserFullName('');
     setUserRole('User');
     setUserStatus('Active');

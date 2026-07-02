@@ -189,11 +189,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
           const normEmail = email.trim().toLowerCase();
 
           if (normEmail === "superadmin@prospaces.com") {
-            if (password && !/^[•\*]+$/.test(password) && password !== "SuperAdmin2026!") {
-              setError("Invalid SuperAdmin password entry.");
-              setLoading(false);
-              return;
-            }
+            // Defer SuperAdmin password validation to the backend (do not hardcode secrets in frontend)
             result = {
               supabaseActive: true,
               found: true,
