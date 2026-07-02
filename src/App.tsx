@@ -740,7 +740,7 @@ export default function App() {
           return;
         } else {
           // Supabase is unconfigured/inactive. Fallback to Local/Session Storage mode with the backend-provided sample seed data.
-          console.warn("Database dashboard reports unconfigured backend connector. Using local sandbox fallback.");
+          console.debug("Database dashboard reports unconfigured backend connector. Using local sandbox fallback.");
           if (data.error) {
             setLastFetchError(data.error);
           }
@@ -816,7 +816,7 @@ export default function App() {
 
     // Prevent cross-tenant writes if state is stale or mismatches the active tenant
     if (!stateTenant || stateTenant.id !== currentTenant.id) {
-      console.log("[Heartbeat] Tenant mismatch in ref state. Skipping heartbeat save.");
+      console.debug("[Heartbeat] Tenant mismatch in ref state. Skipping heartbeat save.");
       return;
     }
 
@@ -826,7 +826,7 @@ export default function App() {
       currentTrucks.some(t => t.tenantId && t.tenantId !== currentTenant.id);
 
     if (hasDifferentTenantData) {
-      console.log("[Heartbeat] Loaded state contains items from a different tenant. Skipping heartbeat save.");
+      console.debug("[Heartbeat] Loaded state contains items from a different tenant. Skipping heartbeat save.");
       return;
     }
 
@@ -850,7 +850,7 @@ export default function App() {
       trucks.some(t => t.tenantId && t.tenantId !== currentTenant.id);
 
     if (hasDifferentTenantData) {
-      console.log("[Auto-Heal] Loaded state contains items from a different tenant. Skipping auto-heal to avoid data contamination.");
+      console.debug("[Auto-Heal] Loaded state contains items from a different tenant. Skipping auto-heal to avoid data contamination.");
       return;
     }
 
