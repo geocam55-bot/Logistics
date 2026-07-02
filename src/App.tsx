@@ -608,7 +608,7 @@ export default function App() {
         configured: !!direct.active,
         connected: !!direct.success,
         isServiceRoleKeyAnon: true, // safe default fallback
-        error: direct.error || null,
+        error: direct.error || direct.details || null,
         url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "Default",
         schemaSql: ""
       };

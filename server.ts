@@ -1238,27 +1238,61 @@ app.use((req, res, next) => {
         const errMsg = error.message || "";
         const errCode = error.code || "";
         
-        // Differentiate between "relation does not exist / invalid path" and RLS / permissions / other errors
-        if (
+        const isSchemaMissing = 
           (errMsg.includes("relation") && errMsg.includes("does not exist")) || 
           errCode === "42P01" || 
           errMsg.includes("Invalid path") || 
-          errCode === "PGRST301"
-        ) {
+          errCode === "PGRST301";
+
+        const isAuthOrConfigError =
+          errMsg.includes("JWT") ||
+          errMsg.includes("jwt") ||
+          errMsg.includes("key") ||
+          errMsg.includes("Key") ||
+          errMsg.includes("token") ||
+          errMsg.includes("signature") ||
+          errMsg.includes("unauthorized") ||
+          errMsg.includes("Unauthorized") ||
+          errMsg.includes("Forbidden") ||
+          errMsg.includes("forbidden") ||
+          errCode === "PGRST300" ||
+          errCode === "PGRST302";
+
+        const isNetworkOrUnreachable =
+          errMsg.includes("fetch failed") ||
+          errMsg.includes("timed out") ||
+          errMsg.includes("timeout") ||
+          errMsg.includes("ENOTFOUND") ||
+          errMsg.includes("ECONNREFUSED") ||
+          errMsg.includes("unreachable") ||
+          errMsg.includes("paused") ||
+          errMsg.includes("inactive");
+
+        if (isSchemaMissing) {
           isConnected = false;
           displayError = `Supabase database is connected, but the schema tables have not been created yet: "${errMsg}". Please run the SQL setup script in your Supabase SQL Editor to initialize the database.`;
-        } else {
-          // Connection is fully active, but has active RLS / permission constraints.
-          // This is expected and healthy! We should mark it as connected so the frontend continues.
-          console.log("Supabase connected with policy constraints:", errMsg);
+        } else if (isAuthOrConfigError) {
+          isConnected = false;
+          displayError = `Authentication check failed: "${errMsg}". Your Supabase API Key (Anon or Service Role Key) appears to be incorrect, expired, or invalid. Please check your credentials.`;
+        } else if (isNetworkOrUnreachable) {
+          isConnected = false;
+          displayError = `Network connection failed: "${errMsg}". The Supabase server is unreachable or your database might be paused. Please verify the URL and ensure the database is active.`;
+        } else if (errCode === "42501" || errMsg.includes("permission denied") || errMsg.includes("insufficient privilege")) {
+          // Connected successfully to PostgreSQL, but user does not have query permissions on 'tenants' table.
+          // This is a legitimate permission constraint, so we are connected!
+          console.log("Supabase connected with policy/permission constraints:", errMsg);
           isConnected = true;
           displayError = null;
-          error = null; // Clear error since we are connected
+          error = null;
+        } else {
+          // Any other error means something went wrong (e.g., bad syntax, invalid input).
+          isConnected = false;
+          displayError = `Supabase query diagnostic failed: "${errMsg}" (Code: ${errCode}).`;
         }
       }
 
       if (!isConnected) {
-        console.warn("Supabase connection is alive, but table query failed (schema probably missing):", displayError);
+        console.warn("Supabase connection is alive, but table query failed:", displayError);
         return res.json({
           configured: true,
           connected: false,
@@ -1295,7 +1329,7 @@ app.use((req, res, next) => {
         console.warn(`[CIRCUIT BREAKER] Supabase disabled for 60 seconds due to consecutive connection test failures.`);
       }
 
-      const resolvedUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+      const resolvedUrl = customSupabaseUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
       const roleKey = customSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
       const anonKey = customSupabaseKey || process.env.SUPABASE_ANON_KEY || "";
       const isServiceRoleKeyAnon = !isServiceRoleKey(roleKey);
