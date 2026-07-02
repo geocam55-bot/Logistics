@@ -1012,7 +1012,29 @@ async function runSelfHealingOnce() {
               driverLicenseExpire: "2027-01-22"
             }
           ];
-          const { error: seedUErr } = await supabase.from("users").upsert(defaultUsers);
+          let seedUErr;
+          try {
+            const { error } = await supabase.from("users").upsert(defaultUsers);
+            if (error) {
+              const errMsg = error.message || String(error);
+              if (errMsg.includes("column") || errMsg.includes("password") || errMsg.includes("status") || error.code === "42703") {
+                console.warn("Supabase users table is missing columns. Retrying user seeding with column stripping and phone serialization...");
+                const strippedUsers = defaultUsers.map(u => {
+                  const { password, status, driverLicenseExpire, ...stripped } = u;
+                  stripped.phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire);
+                  return stripped;
+                });
+                const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);
+                if (retryErr) {
+                  seedUErr = retryErr;
+                }
+              } else {
+                seedUErr = error;
+              }
+            }
+          } catch (err: any) {
+            seedUErr = err;
+          }
           if (seedUErr) console.error("Error seeding default users:", seedUErr);
           else console.log("Seeded default users successfully.");
         }
@@ -1654,8 +1676,26 @@ app.use((req, res, next) => {
     }
 
     if (defaults.users.length > 0) {
-      const { error } = await supabase.from("users").upsert(defaults.users);
-      if (error) throw new Error(`Seeding users failed: ${error.message}`);
+      try {
+        const { error } = await supabase.from("users").upsert(defaults.users);
+        if (error) {
+          const errMsg = error.message || String(error);
+          if (errMsg.includes("column") || errMsg.includes("password") || errMsg.includes("status") || error.code === "42703") {
+            console.warn("[SEED] Supabase users table is missing columns. Retrying user seeding with column stripping and phone serialization...");
+            const strippedUsers = defaults.users.map((u: any) => {
+              const { password, status, driverLicenseExpire, ...stripped } = u;
+              stripped.phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire);
+              return stripped;
+            });
+            const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);
+            if (retryErr) throw retryErr;
+          } else {
+            throw error;
+          }
+        }
+      } catch (err: any) {
+        throw new Error(`Seeding users failed: ${err.message || String(err)}`);
+      }
     }
 
     if (defaults.deliveries.length > 0) {
