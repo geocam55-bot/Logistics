@@ -1319,9 +1319,18 @@ export default function App() {
                 onClick={async () => {
                   setIsCheckingStatus(true);
                   try {
-                    await checkSupabaseStatus();
-                  } catch (e) {
-                    console.error(e);
+                    const status = await checkSupabaseStatus();
+                    if (status) {
+                      if (status.connected) {
+                        alert(`[PROSPACES DIAGNOSTICS]\n\nDatabase Connection: ACTIVE & CONNECTED\n\nEndpoint URL:\n${status.url}\n\nSecurity Status:\n${status.isServiceRoleKeyAnon ? "⚠️ Under Limited/Anon Role Key" : "✅ Service Role Key Configured (Admin Mode)"}\n\nAll operational logs and synchronization queues are healthy.`);
+                      } else {
+                        alert(`[PROSPACES DIAGNOSTICS]\n\nDatabase Connection: OFFLINE / UNCONFIGURED\n\nStatus Error / Details:\n${status.error || "Supabase database credentials are unconfigured or placeholder."}\n\nConfigured URL: ${status.url || 'None'}\n\nAction Required: Click the "Offline / Local Database Sync Mode" status button on the left to set up valid live Supabase credentials!`);
+                      }
+                    } else {
+                      alert(`[PROSPACES DIAGNOSTICS]\n\nDatabase Connection: OFFLINE\n\nCould not fetch diagnostics status from the server endpoint.`);
+                    }
+                  } catch (e: any) {
+                    alert(`[PROSPACES DIAGNOSTICS]\n\nAn unexpected check exception occurred: ${e.message || String(e)}`);
                   } finally {
                     setIsCheckingStatus(false);
                   }
