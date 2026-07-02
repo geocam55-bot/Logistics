@@ -2341,10 +2341,6 @@ app.use((req, res, next) => {
             state.deliveries = state.deliveries.filter((item: any) => item.id !== idStr);
           }
         }
-        // Record the deletion mark so that when a save-state occurs the server will enforce removal
-        if (!deletedTenantRecords[tid]) deletedTenantRecords[tid] = {};
-        if (!deletedTenantRecords[tid][String(table)]) deletedTenantRecords[tid][String(table)] = new Set();
-        deletedTenantRecords[tid][String(table)].add(String(id));
         return res.json({ success: true, supabaseActive: false });
       }
 
