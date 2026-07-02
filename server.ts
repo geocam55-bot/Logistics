@@ -4,6 +4,7 @@ import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { headerMiddleware, getSupabase, setCustomSupabase, getResolvedConfig, isServiceRoleKey, withTimeout, formatDatabaseError, resetCircuitBreaker, recordFailureAndMaybeDisable } from "./lib/serverSupabase";
+import { withSupabaseExpress } from "./lib/withSupabaseExpress";
 
 dotenv.config();
 
@@ -961,6 +962,34 @@ app.use((req, res, next) => {
       res.status(500).json({ error: err.message || "Failed to update custom Supabase credentials." });
     }
   });
+
+  // Example Supabase Server SDK route using @supabase/server
+  app.get(
+    "/api/supabase-server-context",
+    withSupabaseExpress({ auth: "none" }, async (_req, res, ctx) => {
+      res.json({
+        authMode: ctx.authMode,
+        userClaims: ctx.userClaims,
+        jwtClaims: ctx.jwtClaims,
+        authKeyName: ctx.authKeyName,
+        adminAvailable: Boolean(ctx.supabaseAdmin),
+        message: "Supabase Server SDK is initialized and auth context was generated successfully.",
+      });
+    })
+  );
+
+  // Example protected Supabase Server SDK route requiring a valid user JWT
+  app.get(
+    "/api/supabase-server-user",
+    withSupabaseExpress({ auth: "user" }, async (_req, res, ctx) => {
+      res.json({
+        authMode: ctx.authMode,
+        userClaims: ctx.userClaims,
+        jwtClaims: ctx.jwtClaims,
+        profile: await ctx.supabase.from("profiles").select("*").limit(1),
+      });
+    })
+  );
 
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
