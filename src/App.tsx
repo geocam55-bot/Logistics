@@ -397,8 +397,10 @@ export default function App() {
     isServiceRoleKeyAnon?: boolean | null;
     error: string | null;
     url: string;
+    anonKey?: string;
     schemaSql: string;
   } | null>(null);
+  const [supabaseStatusLoaded, setSupabaseStatusLoaded] = useState<boolean>(false);
   const [dismissedRlsWarning, setDismissedRlsWarning] = useState<boolean>(() => localStorage.getItem('prospaces_dismissed_rls_warning') === 'true');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'ERROR'>('IDLE');
@@ -586,6 +588,7 @@ export default function App() {
   };
 
   const checkSupabaseStatus = async () => {
+    setSupabaseStatusLoaded(false);
     try {
       const res = await customFetch("/api/supabase-status");
       if (!res.ok) {
@@ -606,7 +609,7 @@ export default function App() {
       const direct = await checkSupabaseStatusDirect();
       const fallbackState = {
         configured: !!direct.active,
-        connected: !!direct.success,
+        connected: !!direct.active,
         isServiceRoleKeyAnon: true, // safe default fallback
         error: direct.error || direct.details || null,
         url: "Default",
@@ -614,6 +617,8 @@ export default function App() {
       };
       setSupabaseStatus(fallbackState);
       return fallbackState;
+    } finally {
+      setSupabaseStatusLoaded(true);
     }
   };
 
@@ -1324,14 +1329,20 @@ export default function App() {
               <button
                 onClick={() => setShowDbConfig(true)}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-mono border leading-none transition-all duration-200 hover:scale-102 active:scale-98 cursor-pointer ${
-                  supabaseStatus?.connected 
+                  (dbActive || supabaseStatus?.connected) 
                     ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40' 
                     : 'bg-amber-950/40 border-amber-500/30 text-amber-300 hover:bg-amber-900/40 animate-pulse'
                 }`}
                 title="Click to configure live database connection keys & API endpoints"
               >
                 <Database className="h-3.5 w-3.5 text-current shrink-0" />
-                <span>{supabaseStatus?.connected ? 'Live Database Sync Active' : 'Offline / Local Database Sync Mode'}</span>
+                <span>{
+                  dbActive || supabaseStatus?.connected
+                    ? 'Live Database Sync Active'
+                    : supabaseStatusLoaded
+                      ? 'Offline / Local Database Sync Mode'
+                      : 'Checking Database Status…'
+                }</span>
               </button>
 
               <button

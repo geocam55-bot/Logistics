@@ -326,7 +326,7 @@ export function getFrontendSupabase() {
 export async function checkSupabaseStatusDirect(): Promise<any> {
   const supabase = getFrontendSupabase();
   if (!supabase) {
-    return { active: false, details: "Client-side configuration missing/empty environ variables." };
+    return { active: false, success: false, details: "Client-side configuration missing/empty environ variables." };
   }
   
   const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => {
@@ -339,11 +339,16 @@ export async function checkSupabaseStatusDirect(): Promise<any> {
       timeoutPromise
     ]);
     if (error) {
-      return { active: true, error: error.message, details: "Connected to endpoint but received querying error. Schema might need to be created." };
+      return {
+        active: true,
+        success: false,
+        error: error.message,
+        details: "Connected to endpoint but received querying error. Schema might need to be created."
+      };
     }
     return { active: true, success: true, details: "Directly connected to Supabase and queried successfully." };
   } catch (err: any) {
-    return { active: false, details: err.message || String(err) };
+    return { active: false, success: false, details: err.message || String(err) };
   }
 }
 
