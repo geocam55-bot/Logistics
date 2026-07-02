@@ -1004,6 +1004,9 @@ export default function App() {
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
+      const data = await res.json();
+      if (data.supabaseActive === false) throw new Error("Supabase is unconfigured on server.");
+      
       const updated = [...allTenants, newTenant];
       setAllTenants(updated);
       localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
@@ -1031,6 +1034,9 @@ export default function App() {
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
+      const data = await res.json();
+      if (data.supabaseActive === false) throw new Error("Supabase is unconfigured on server.");
+      
       const updated = allTenants.map(t => t.id === updatedTenant.id ? updatedTenant : t);
       setAllTenants(updated);
       localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
@@ -1056,6 +1062,9 @@ export default function App() {
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
+      const data = await res.json();
+      if (data.supabaseActive === false) throw new Error("Supabase is unconfigured on server.");
+
       const updated = allTenants.filter(t => t.id !== id);
       setAllTenants(updated);
       localStorage.setItem('prospaces_all_tenants', JSON.stringify(updated));
@@ -1094,6 +1103,8 @@ export default function App() {
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
+      const data = await res.json();
+      if (data.supabaseActive === false) throw new Error("Supabase is unconfigured on server.");
     } catch (err) {
       console.warn(`API record deletion failed, attempting direct Supabase query fallback:`, err);
       try {

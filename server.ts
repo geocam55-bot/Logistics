@@ -2685,7 +2685,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
       }
       const supabase = getSupabase(req);
       if (!supabase) {
-        return res.status(503).json({ error: "Supabase database is inactive or unconfigured. Cannot add tenant." });
+        return res.json({ success: false, supabaseActive: false, error: "Supabase database is inactive or unconfigured. Cannot add tenant." });
       }
       const { error } = await supabase.from("tenants").upsert([tenant]);
       if (error) throw error;
@@ -2701,7 +2701,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
       const { id } = req.params;
       const supabase = getSupabase(req);
       if (!supabase) {
-        return res.status(503).json({ error: "Supabase database is inactive or unconfigured. Cannot delete tenant." });
+        return res.json({ success: false, supabaseActive: false, error: "Supabase database is inactive or unconfigured. Cannot delete tenant." });
       }
 
       // Safeguard: Cascade delete child tables to prevent orphaned records in our multi-tenant database
