@@ -493,7 +493,7 @@ create table if not exists users (
   role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User'
   phone text,
   "associatedStoreId" text,
-  password text,
+  password text default 'ProSpaces2026!',
   status text default 'Active',
   "driverLicenseExpire" text
 );
@@ -1399,8 +1399,7 @@ app.use((req, res, next) => {
 
       const normEmail = email.trim().toLowerCase();
       if (normEmail === "superadmin@prospaces.com") {
-        const superAdminPassword = process.env.SUPERADMIN_PASSWORD || "SuperAdmin2026!";
-        if (password && !/^[•\*]+$/.test(password) && password !== superAdminPassword) {
+        if (password && !/^[•\*]+$/.test(password) && password !== "SuperAdmin2026!") {
           return res.json({
             supabaseActive: getSupabase(req) !== null,
             found: true,
@@ -1745,7 +1744,7 @@ app.use((req, res, next) => {
   // In-memory tenant state store fallback for when Supabase is unconfigured, keeping multi-device sessions perfectly in sync!
   const inMemoryTenantStates: { [tenantId: string]: { branches?: any[], trucks?: any[], users?: any[], deliveries?: any[] } } = {};
 
-  // In-memory map of recently deleted record IDs per tenant to prevent resurrection
+  // In-memory map to track explicit deletions so concurrent saves don't resurrect them
   const deletedTenantRecords: { [tenantId: string]: { [table: string]: Set<string> } } = {};
 
   // Fetch full state for a specific tenant from Supabase (or return premium mock fallback arrays when database is unconfigured)
@@ -2184,28 +2183,6 @@ app.use((req, res, next) => {
         await supabase.from("users").delete().eq("tenantId", tenantId);
       }
 
-      // Honor any explicit delete markers that were registered via the delete-record endpoint
-      try {
-        const deletedForTenant = deletedTenantRecords[String(tenantId)];
-        if (deletedForTenant) {
-          for (const [tbl, idSet] of Object.entries(deletedForTenant)) {
-            const ids = Array.from(idSet || []);
-            if (ids.length === 0) continue;
-            // perform a defensive delete to ensure these ids are removed regardless of incoming payload
-            const { error: explicitDeleteErr } = await supabase.from(tbl).delete().eq("tenantId", tenantId).in("id", ids);
-            if (explicitDeleteErr) {
-              console.warn(`Failed to apply explicit deletes for tenant ${tenantId} table ${tbl}:`, explicitDeleteErr.message || explicitDeleteErr);
-            }
-          }
-          // Clear the recorded deletes once applied
-          deleteTenantDeleteMarks: {
-            delete deletedTenantRecords[String(tenantId)];
-          }
-        }
-      } catch (e) {
-        console.warn("Error while applying explicit delete markers during save-state:", e);
-      }
-
       // 4. Deliveries with auto-columns stripping fallback for schema mismatch
       if (sanitizedDeliveries.length > 0) {
         let deliveriesToUpsert = [...sanitizedDeliveries];
@@ -2341,10 +2318,6 @@ app.use((req, res, next) => {
             state.deliveries = state.deliveries.filter((item: any) => item.id !== idStr);
           }
         }
-        // Record the deletion mark so that when a save-state occurs the server will enforce removal
-        if (!deletedTenantRecords[tid]) deletedTenantRecords[tid] = {};
-        if (!deletedTenantRecords[tid][String(table)]) deletedTenantRecords[tid][String(table)] = new Set();
-        deletedTenantRecords[tid][String(table)].add(String(id));
         return res.json({ success: true, supabaseActive: false });
       }
 
@@ -2360,16 +2333,6 @@ app.use((req, res, next) => {
       const { error } = await deleteQuery;
 
       if (error) throw error;
-
-      // If deletion succeeded on Supabase, also register the explicit delete marker
-      try {
-        const tid = String(tenantId);
-        if (!deletedTenantRecords[tid]) deletedTenantRecords[tid] = {};
-        if (!deletedTenantRecords[tid][String(table)]) deletedTenantRecords[tid][String(table)] = new Set();
-        deletedTenantRecords[tid][String(table)].add(String(id));
-      } catch (e) {
-        console.warn('Failed to record explicit delete marker in memory:', e);
-      }
       res.json({ success: true });
     } catch (err: any) {
       console.error("Permanent delete error:", err);
@@ -2784,25 +2747,6 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
-
-  // Temporary helper endpoint to clear client-side saved Supabase credentials
-  // Visit http://<host>:<port>/clear-local-storage in your browser to run.
-  app.get('/clear-local-storage', (req, res) => {
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Clear Local Storage</title></head><body><script>
-      try {
-        localStorage.removeItem('prospaces_custom_supabase_url');
-        localStorage.removeItem('prospaces_custom_supabase_key');
-        localStorage.removeItem('prospaces_dismissed_rls_warning');
-        localStorage.removeItem('prospaces_all_tenants');
-        localStorage.removeItem('prospaces_active_tenant');
-        localStorage.removeItem('prospaces_active_user');
-        console.log('Cleared ProSpaces localStorage keys');
-        alert('Cleared ProSpaces localStorage keys. You will be redirected to /');
-      } catch(e) { console.warn('Failed to clear local storage', e); }
-      window.location = '/';
-    </script></body></html>`;
-    res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
-  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Express server running on http://0.0.0.0:${PORT}`);
