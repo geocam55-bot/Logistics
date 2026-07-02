@@ -267,8 +267,18 @@ export function initializeFrontendSupabase(url: string, key: string) {
 export function getFrontendSupabase() {
   if (cachedClient) return cachedClient;
 
-  let url = currentUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  let key = currentKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+  let url = currentUrl;
+  let key = currentKey;
+
+  if (typeof process !== 'undefined' && process.env) {
+    url = url || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+    key = key || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+  } else {
+    // @ts-ignore
+    url = url || (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || "";
+    // @ts-ignore
+    key = key || (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || "";
+  }
 
   if (!url || !key) {
     return null;

@@ -609,7 +609,7 @@ export default function App() {
         connected: !!direct.success,
         isServiceRoleKeyAnon: true, // safe default fallback
         error: direct.error || direct.details || null,
-        url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "Default",
+        url: "Default",
         schemaSql: ""
       };
       setSupabaseStatus(fallbackState);
