@@ -64,6 +64,10 @@ async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promis
   return window.fetch(input, init);
 }
 
+async function fetchServerApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return window.fetch(input, init);
+}
+
 const getThemeClasses = (color: string) => {
   // Always return the classic corporate blue styling to match previous design
   return {
@@ -161,6 +165,17 @@ export default function App() {
     url?: string;
     isServiceRoleKeyAnon?: boolean;
     error?: string | null;
+    dbActive?: boolean;
+    supabaseStatusLoaded?: boolean;
+    lastFetchError?: string | null;
+    tenantStateSource?: string;
+    tenantStateConnected?: boolean;
+    tenantStateError?: string | null;
+    currentTenantId?: string;
+    localCustomDbUrl?: string;
+    localCustomDbKeyPresent?: boolean;
+    syncStatus?: string;
+    lastMutationAgeMs?: number;
   } | null>(null);
 
   // Load custom credentials from localStorage on mount and register them with the backend memory store.
@@ -708,6 +723,7 @@ export default function App() {
         checkSupabaseStatus().catch(() => {});
 
         let data: any;
+        const customOverrideExists = !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key'));
         try {
           const res = await customFetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
           if (!res.ok) {
@@ -718,13 +734,53 @@ export default function App() {
             throw new Error("non-JSON response");
           }
           data = await res.json();
+
+          if (customOverrideExists && data && data.supabaseActive === false) {
+            console.warn("Custom override appears to be causing an offline tenant state response. Retrying tenant state fetch with server default API credentials.");
+            try {
+              const raw = await fetchServerApi(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
+              if (raw.ok) {
+                const defaultContentType = raw.headers.get("content-type") || "";
+                if (defaultContentType.includes("application/json")) {
+                  const defaultData = await raw.json();
+                  if (defaultData && defaultData.supabaseActive) {
+                    data = defaultData;
+                    console.warn("Tenant state recovered using server default API credentials.");
+                  }
+                }
+              }
+            } catch (defaultErr) {
+              console.warn("Server default tenant state retry failed:", defaultErr);
+            }
+          }
         } catch (apiErr) {
-          console.warn("Express backend endpoint /api/tenant/state offline or 404. Trying direct client lookup:", apiErr);
-          const directData = await fetchTenantStateDirect(tenantId);
-          if (directData && directData.supabaseActive) {
-            data = directData;
-          } else {
-            throw apiErr;
+          console.warn("Express backend endpoint /api/tenant/state offline or invalid due to custom override. Trying server default credentials:", apiErr);
+          if (customOverrideExists) {
+            try {
+              const raw = await fetchServerApi(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
+              if (raw.ok) {
+                const contentType = raw.headers.get("content-type") || "";
+                if (contentType.includes("application/json")) {
+                  data = await raw.json();
+                  console.warn("Recovered tenant state using server default API credentials.");
+                } else {
+                  throw new Error("Server default API returned non-JSON response");
+                }
+              } else {
+                throw new Error(`Server default API returned ${raw.status}`);
+              }
+            } catch (defaultErr) {
+              console.warn("Server default tenant state retry failed:", defaultErr);
+            }
+          }
+
+          if (!data) {
+            const directData = await fetchTenantStateDirect(tenantId);
+            if (directData && directData.supabaseActive) {
+              data = directData;
+            } else {
+              throw apiErr;
+            }
           }
         }
 
@@ -1351,13 +1407,91 @@ export default function App() {
                   setIsCheckingStatus(true);
                   try {
                     const status = await checkSupabaseStatus();
+
+                    const tenantDiagnostics = await (async () => {
+                      if (!currentTenant) {
+                        return {
+                          source: 'none',
+                          connected: false,
+                          error: 'No active tenant selected',
+                          data: null
+                        };
+                      }
+
+                      try {
+                        const res = await customFetch(`/api/tenant/state?tenantId=${currentTenant.id}&_t=${Date.now()}`);
+                        if (!res.ok) {
+                          throw new Error(`Server returned ${res.status}`);
+                        }
+                        const contentType = res.headers.get('content-type') || '';
+                        if (!contentType.includes('application/json')) {
+                          throw new Error('API returned non-JSON response');
+                        }
+                        const data = await res.json();
+                        return {
+                          source: 'api',
+                          connected: !!data.supabaseActive,
+                          error: data.error || null,
+                          data
+                        };
+                      } catch (apiErr: any) {
+                        const customOverrideExists = !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key'));
+                        if (customOverrideExists) {
+                          try {
+                            const raw = await fetchServerApi(`/api/tenant/state?tenantId=${currentTenant.id}&_t=${Date.now()}`);
+                            if (raw.ok) {
+                              const contentType = raw.headers.get('content-type') || '';
+                              if (contentType.includes('application/json')) {
+                                const data = await raw.json();
+                                return {
+                                  source: 'api-default',
+                                  connected: !!data.supabaseActive,
+                                  error: data.error || null,
+                                  data
+                                };
+                              }
+                            }
+                          } catch (defaultErr: any) {
+                            console.warn("Server default tenant state retry failed:", defaultErr);
+                          }
+                        }
+                        try {
+                          const directData = await fetchTenantStateDirect(currentTenant.id);
+                          return {
+                            source: 'direct',
+                            connected: !!directData.supabaseActive,
+                            error: null,
+                            data: directData
+                          };
+                        } catch (directErr: any) {
+                          return {
+                            source: 'direct',
+                            connected: false,
+                            error: directErr.message || String(directErr),
+                            data: null
+                          };
+                        }
+                      }
+                    })();
+
                     setDiagnosticsModal({
                       show: true,
                       title: "ProSpaces Database Diagnostics",
-                      connected: !!status?.connected,
+                      connected: !!status?.connected || tenantDiagnostics.connected,
                       url: status?.url || 'Default/Local',
                       isServiceRoleKeyAnon: !!status?.isServiceRoleKeyAnon,
-                      error: status?.connected ? null : (status?.error || "Supabase database credentials are unconfigured or placeholder.")
+                      error: status?.connected ? null : (status?.error || tenantDiagnostics.error || "Supabase database credentials are unconfigured or placeholder."),
+                      dbActive,
+                      supabaseStatusLoaded,
+                      lastFetchError,
+                      tenantStateSource: tenantDiagnostics.source,
+                      tenantStateConnected: tenantDiagnostics.connected,
+                      tenantStateError: tenantDiagnostics.error,
+                      currentTenantId: currentTenant?.id,
+                      localCustomDbUrl: localStorage.getItem('prospaces_custom_supabase_url') || undefined,
+                      localCustomDbKeyPresent: !!localStorage.getItem('prospaces_custom_supabase_key'),
+                      syncStatus,
+                      lastMutationAgeMs: Date.now() - lastMutationTimeRef.current
                     });
                   } catch (e: any) {
                     setDiagnosticsModal({
@@ -1366,7 +1500,15 @@ export default function App() {
                       connected: false,
                       url: 'Error',
                       isServiceRoleKeyAnon: false,
-                      error: e.message || String(e)
+                      error: e.message || String(e),
+                      dbActive,
+                      supabaseStatusLoaded,
+                      lastFetchError,
+                      currentTenantId: currentTenant?.id,
+                      localCustomDbUrl: localStorage.getItem('prospaces_custom_supabase_url') || undefined,
+                      localCustomDbKeyPresent: !!localStorage.getItem('prospaces_custom_supabase_key'),
+                      syncStatus,
+                      lastMutationAgeMs: Date.now() - lastMutationTimeRef.current
                     });
                   } finally {
                     setIsCheckingStatus(false);
@@ -2197,22 +2339,30 @@ export default function App() {
                       : "✅ Service Role Key Configured (Admin Mode)"}
                   </p>
                 </div>
-                {diagnosticsModal.error && (
-                  <div className="border-t border-slate-900 my-2 pt-2">
-                    <span className="text-rose-400">Error Details:</span>
-                    <p className="text-rose-300 break-words mt-0.5 whitespace-pre-wrap">{diagnosticsModal.error}</p>
-                  </div>
-                )}
-              </div>
-
-              {!diagnosticsModal.connected && (
-                <div className="bg-amber-950/20 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-300 leading-relaxed flex items-start space-x-2.5">
-                  <span className="text-amber-500 font-bold shrink-0">⚠️</span>
-                  <span>
-                    Action Required: Click the "Offline / Local Database Sync Mode" status button in the header to set up valid live Supabase credentials!
-                  </span>
+                <div className="border-t border-slate-900 my-2 pt-2">
+                  <span className="text-slate-500">Runtime Status:</span>
+                  <p className="text-slate-300 mt-0.5">dbActive: {diagnosticsModal.dbActive ? 'true' : 'false'}</p>
+                  <p className="text-slate-300 mt-0.5">supabaseStatusLoaded: {diagnosticsModal.supabaseStatusLoaded ? 'true' : 'false'}</p>
+                  <p className="text-slate-300 mt-0.5">lastFetchError: {diagnosticsModal.lastFetchError || 'none'}</p>
                 </div>
-              )}
+                <div className="border-t border-slate-900 my-2 pt-2">
+                  <span className="text-slate-500">Tenant State Diagnostics:</span>
+                  <p className="text-slate-300 mt-0.5">tenantId: {diagnosticsModal.currentTenantId || 'none'}</p>
+                  <p className="text-slate-300 mt-0.5">source: {diagnosticsModal.tenantStateSource || 'none'}</p>
+                  <p className="text-slate-300 mt-0.5">tenantStateConnected: {diagnosticsModal.tenantStateConnected ? 'true' : 'false'}</p>
+                  <p className="text-rose-300 mt-0.5">tenantStateError: {diagnosticsModal.tenantStateError || 'none'}</p>
+                </div>
+                <div className="border-t border-slate-900 my-2 pt-2">
+                  <span className="text-slate-500">Local Credential Override:</span>
+                  <p className="text-slate-300 mt-0.5">custom URL: {diagnosticsModal.localCustomDbUrl ? 'present' : 'none'}</p>
+                  <p className="text-slate-300 mt-0.5">custom key: {diagnosticsModal.localCustomDbKeyPresent ? 'present' : 'none'}</p>
+                </div>
+                <div className="border-t border-slate-900 my-2 pt-2">
+                  <span className="text-slate-500">Sync Lock Info:</span>
+                  <p className="text-slate-300 mt-0.5">syncStatus: {diagnosticsModal.syncStatus || 'unknown'}</p>
+                  <p className="text-slate-300 mt-0.5">lastMutationAgeMs: {diagnosticsModal.lastMutationAgeMs ?? -1}ms</p>
+                </div>
+              </div>
 
               <div className="flex justify-end pt-2">
                 <button
