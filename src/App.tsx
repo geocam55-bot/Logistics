@@ -41,8 +41,7 @@ import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
 // Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
 async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input && 'url' in (input as any) ? (input as any).url : ''));
-  const isStatusEndpoint = url && url.includes('/api/supabase-status');
-  if (!isStatusEndpoint && url && (url.startsWith('/api/') || url.includes('/api/'))) {
+  if (url && (url.startsWith('/api/') || url.includes('/api/'))) {
     const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
     const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
     if (
@@ -61,10 +60,6 @@ async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promis
       init.headers = headers;
     }
   }
-  return window.fetch(input, init);
-}
-
-async function fetchServerApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   return window.fetch(input, init);
 }
 
@@ -165,17 +160,6 @@ export default function App() {
     url?: string;
     isServiceRoleKeyAnon?: boolean;
     error?: string | null;
-    dbActive?: boolean;
-    supabaseStatusLoaded?: boolean;
-    lastFetchError?: string | null;
-    tenantStateSource?: string;
-    tenantStateConnected?: boolean;
-    tenantStateError?: string | null;
-    currentTenantId?: string;
-    localCustomDbUrl?: string;
-    localCustomDbKeyPresent?: boolean;
-    syncStatus?: string;
-    lastMutationAgeMs?: number;
   } | null>(null);
 
   // Load custom credentials from localStorage on mount and register them with the backend memory store.
@@ -183,35 +167,18 @@ export default function App() {
   useEffect(() => {
     const runStartupCheck = async () => {
       try {
+        // Remove any other custom Supabase configurations to eliminate false data
+        localStorage.removeItem('prospaces_custom_supabase_url');
+        localStorage.removeItem('prospaces_custom_supabase_key');
+        setCustomDbUrl('');
+        setCustomDbKey('');
+        initializeFrontendSupabase('', '');
+
         const res = await fetch("/api/supabase-status");
         if (res.ok) {
           const data = await res.json();
-          const savedUrl = localStorage.getItem('prospaces_custom_supabase_url');
-          const savedKey = localStorage.getItem('prospaces_custom_supabase_key');
-          
-          const isSameAsDefault = savedUrl && savedKey && 
-            savedUrl.trim().replace(/\/+$/, '') === (data.url || "").trim().replace(/\/+$/, '') && 
-            savedKey.trim() === (data.anonKey || "").trim();
-
-          if (isSameAsDefault) {
-            console.log("Stale or default credentials found in localStorage. Clearing to use production defaults.");
-            localStorage.removeItem('prospaces_custom_supabase_url');
-            localStorage.removeItem('prospaces_custom_supabase_key');
-            setCustomDbUrl('');
-            setCustomDbKey('');
-            initializeFrontendSupabase('', '');
-            await fetch('/api/setup-custom-supabase', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: '', key: '' })
-            });
-          } else if (savedUrl && savedKey) {
-            initializeFrontendSupabase(savedUrl, savedKey);
-            await fetch('/api/setup-custom-supabase', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: savedUrl, key: savedKey })
-            });
+          if (data.configured && data.anonKey) {
+            initializeFrontendSupabase(data.url, data.anonKey);
           }
         }
       } catch (err) {
@@ -413,10 +380,8 @@ export default function App() {
     isServiceRoleKeyAnon?: boolean | null;
     error: string | null;
     url: string;
-    anonKey?: string;
     schemaSql: string;
   } | null>(null);
-  const [supabaseStatusLoaded, setSupabaseStatusLoaded] = useState<boolean>(false);
   const [dismissedRlsWarning, setDismissedRlsWarning] = useState<boolean>(() => localStorage.getItem('prospaces_dismissed_rls_warning') === 'true');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'ERROR'>('IDLE');
@@ -604,9 +569,8 @@ export default function App() {
   };
 
   const checkSupabaseStatus = async () => {
-    setSupabaseStatusLoaded(false);
     try {
-      const res = await fetch("/api/supabase-status");
+      const res = await customFetch("/api/supabase-status");
       if (!res.ok) {
         throw new Error(`Server returned non-ok status: ${res.status}`);
       }
@@ -625,7 +589,7 @@ export default function App() {
       const direct = await checkSupabaseStatusDirect();
       const fallbackState = {
         configured: !!direct.active,
-        connected: !!direct.active,
+        connected: !!direct.success,
         isServiceRoleKeyAnon: true, // safe default fallback
         error: direct.error || direct.details || null,
         url: "Default",
@@ -633,8 +597,6 @@ export default function App() {
       };
       setSupabaseStatus(fallbackState);
       return fallbackState;
-    } finally {
-      setSupabaseStatusLoaded(true);
     }
   };
 
@@ -723,7 +685,6 @@ export default function App() {
         checkSupabaseStatus().catch(() => {});
 
         let data: any;
-        const customOverrideExists = !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key'));
         try {
           const res = await customFetch(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
           if (!res.ok) {
@@ -734,53 +695,13 @@ export default function App() {
             throw new Error("non-JSON response");
           }
           data = await res.json();
-
-          if (customOverrideExists && data && data.supabaseActive === false) {
-            console.warn("Custom override appears to be causing an offline tenant state response. Retrying tenant state fetch with server default API credentials.");
-            try {
-              const raw = await fetchServerApi(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
-              if (raw.ok) {
-                const defaultContentType = raw.headers.get("content-type") || "";
-                if (defaultContentType.includes("application/json")) {
-                  const defaultData = await raw.json();
-                  if (defaultData && defaultData.supabaseActive) {
-                    data = defaultData;
-                    console.warn("Tenant state recovered using server default API credentials.");
-                  }
-                }
-              }
-            } catch (defaultErr) {
-              console.warn("Server default tenant state retry failed:", defaultErr);
-            }
-          }
         } catch (apiErr) {
-          console.warn("Express backend endpoint /api/tenant/state offline or invalid due to custom override. Trying server default credentials:", apiErr);
-          if (customOverrideExists) {
-            try {
-              const raw = await fetchServerApi(`/api/tenant/state?tenantId=${tenantId}&_t=${Date.now()}`);
-              if (raw.ok) {
-                const contentType = raw.headers.get("content-type") || "";
-                if (contentType.includes("application/json")) {
-                  data = await raw.json();
-                  console.warn("Recovered tenant state using server default API credentials.");
-                } else {
-                  throw new Error("Server default API returned non-JSON response");
-                }
-              } else {
-                throw new Error(`Server default API returned ${raw.status}`);
-              }
-            } catch (defaultErr) {
-              console.warn("Server default tenant state retry failed:", defaultErr);
-            }
-          }
-
-          if (!data) {
-            const directData = await fetchTenantStateDirect(tenantId);
-            if (directData && directData.supabaseActive) {
-              data = directData;
-            } else {
-              throw apiErr;
-            }
+          console.warn("Express backend endpoint /api/tenant/state offline or 404. Trying direct client lookup:", apiErr);
+          const directData = await fetchTenantStateDirect(tenantId);
+          if (directData && directData.supabaseActive) {
+            data = directData;
+          } else {
+            throw apiErr;
           }
         }
 
@@ -1383,115 +1304,30 @@ export default function App() {
 
             {/* Quick Status Bar */}
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowDbConfig(true)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-mono border leading-none transition-all duration-200 hover:scale-102 active:scale-98 cursor-pointer ${
-                  (dbActive || supabaseStatus?.connected) 
-                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40' 
-                    : 'bg-amber-950/40 border-amber-500/30 text-amber-300 hover:bg-amber-900/40 animate-pulse'
+              <div
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-mono border leading-none transition-all duration-200 ${
+                  supabaseStatus?.connected 
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' 
+                    : 'bg-amber-950/40 border-amber-500/30 text-amber-300 animate-pulse'
                 }`}
-                title="Click to configure live database connection keys & API endpoints"
+                title={supabaseStatus?.connected ? "Live Database Sync Verified and Enforced" : "Connecting to unified Supabase server..."}
               >
                 <Database className="h-3.5 w-3.5 text-current shrink-0" />
-                <span>{
-                  dbActive || supabaseStatus?.connected
-                    ? 'Live Database Sync Active'
-                    : supabaseStatusLoaded
-                      ? 'Offline / Local Database Sync Mode'
-                      : 'Checking Database Status…'
-                }</span>
-              </button>
+                <span>{supabaseStatus?.connected ? 'Live Database Sync Active' : 'Connecting...'}</span>
+              </div>
 
               <button
                 onClick={async () => {
                   setIsCheckingStatus(true);
                   try {
                     const status = await checkSupabaseStatus();
-
-                    const tenantDiagnostics = await (async () => {
-                      if (!currentTenant) {
-                        return {
-                          source: 'none',
-                          connected: false,
-                          error: 'No active tenant selected',
-                          data: null
-                        };
-                      }
-
-                      try {
-                        const res = await customFetch(`/api/tenant/state?tenantId=${currentTenant.id}&_t=${Date.now()}`);
-                        if (!res.ok) {
-                          throw new Error(`Server returned ${res.status}`);
-                        }
-                        const contentType = res.headers.get('content-type') || '';
-                        if (!contentType.includes('application/json')) {
-                          throw new Error('API returned non-JSON response');
-                        }
-                        const data = await res.json();
-                        return {
-                          source: 'api',
-                          connected: !!data.supabaseActive,
-                          error: data.error || null,
-                          data
-                        };
-                      } catch (apiErr: any) {
-                        const customOverrideExists = !!(localStorage.getItem('prospaces_custom_supabase_url') && localStorage.getItem('prospaces_custom_supabase_key'));
-                        if (customOverrideExists) {
-                          try {
-                            const raw = await fetchServerApi(`/api/tenant/state?tenantId=${currentTenant.id}&_t=${Date.now()}`);
-                            if (raw.ok) {
-                              const contentType = raw.headers.get('content-type') || '';
-                              if (contentType.includes('application/json')) {
-                                const data = await raw.json();
-                                return {
-                                  source: 'api-default',
-                                  connected: !!data.supabaseActive,
-                                  error: data.error || null,
-                                  data
-                                };
-                              }
-                            }
-                          } catch (defaultErr: any) {
-                            console.warn("Server default tenant state retry failed:", defaultErr);
-                          }
-                        }
-                        try {
-                          const directData = await fetchTenantStateDirect(currentTenant.id);
-                          return {
-                            source: 'direct',
-                            connected: !!directData.supabaseActive,
-                            error: null,
-                            data: directData
-                          };
-                        } catch (directErr: any) {
-                          return {
-                            source: 'direct',
-                            connected: false,
-                            error: directErr.message || String(directErr),
-                            data: null
-                          };
-                        }
-                      }
-                    })();
-
                     setDiagnosticsModal({
                       show: true,
                       title: "ProSpaces Database Diagnostics",
-                      connected: !!status?.connected || tenantDiagnostics.connected,
+                      connected: !!status?.connected,
                       url: status?.url || 'Default/Local',
                       isServiceRoleKeyAnon: !!status?.isServiceRoleKeyAnon,
-                      error: status?.connected ? null : (status?.error || tenantDiagnostics.error || "Supabase database credentials are unconfigured or placeholder."),
-                      dbActive,
-                      supabaseStatusLoaded,
-                      lastFetchError,
-                      tenantStateSource: tenantDiagnostics.source,
-                      tenantStateConnected: tenantDiagnostics.connected,
-                      tenantStateError: tenantDiagnostics.error,
-                      currentTenantId: currentTenant?.id,
-                      localCustomDbUrl: localStorage.getItem('prospaces_custom_supabase_url') || undefined,
-                      localCustomDbKeyPresent: !!localStorage.getItem('prospaces_custom_supabase_key'),
-                      syncStatus,
-                      lastMutationAgeMs: Date.now() - lastMutationTimeRef.current
+                      error: status?.connected ? null : (status?.error || "Supabase database credentials are unconfigured or placeholder.")
                     });
                   } catch (e: any) {
                     setDiagnosticsModal({
@@ -1500,15 +1336,7 @@ export default function App() {
                       connected: false,
                       url: 'Error',
                       isServiceRoleKeyAnon: false,
-                      error: e.message || String(e),
-                      dbActive,
-                      supabaseStatusLoaded,
-                      lastFetchError,
-                      currentTenantId: currentTenant?.id,
-                      localCustomDbUrl: localStorage.getItem('prospaces_custom_supabase_url') || undefined,
-                      localCustomDbKeyPresent: !!localStorage.getItem('prospaces_custom_supabase_key'),
-                      syncStatus,
-                      lastMutationAgeMs: Date.now() - lastMutationTimeRef.current
+                      error: e.message || String(e)
                     });
                   } finally {
                     setIsCheckingStatus(false);
@@ -2191,109 +2019,7 @@ export default function App() {
         />
       )}
 
-      {showDbConfig && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="database-config-modal">
-          <div className="bg-slate-900 text-slate-100 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-800/80 animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800/60 pb-4 mb-4">
-              <div className="flex items-center space-x-2.5">
-                <Database className="h-5 w-5 text-blue-400" />
-                <h3 className="text-base font-bold font-sans text-slate-100">Live Database Configuration</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowDbConfig(false);
-                  setConfigMsg(null);
-                }}
-                className="text-slate-400 hover:text-slate-200 rounded-lg p-1 hover:bg-slate-800/50 transition-all text-xs cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              Connect ProSpaces Fleet Core directly to your own live Supabase Cloud environment. Custom keys are persistent inside your local browser storage and secure in memory.
-            </p>
-
-            {configMsg && (
-              <div className={`mb-4 border rounded-xl p-3 text-xs flex items-start space-x-2.5 leading-relaxed ${
-                configMsg.type === 'success' 
-                  ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' 
-                  : 'bg-rose-950/30 border-rose-500/30 text-rose-300'
-              }`}>
-                <span className="shrink-0 font-bold">{configMsg.type === 'success' ? '✅' : '⚠️'}</span>
-                <span>{configMsg.text}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveDbConfig} className="space-y-4">
-              <div className="space-y-1.5 text-left">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Supabase Project API URL
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="https://your-project-id.supabase.co"
-                  value={customDbUrl}
-                  onChange={(e) => setCustomDbUrl(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-950/50 transition-all"
-                />
-              </div>
-
-              <div className="space-y-1.5 text-left">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Supabase Anon Key / Service Role Key
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="eyJhbGciOi..."
-                  value={customDbKey}
-                  onChange={(e) => setCustomDbKey(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-950/50 transition-all"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
-                <button
-                  type="button"
-                  disabled={configSaving}
-                  onClick={async () => {
-                    if (confirm("Are you sure you want to reset credentials to production defaults?")) {
-                      await handleResetDbConfig();
-                    }
-                  }}
-                  className="flex items-center space-x-1.5 px-3 py-2 text-xs font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 rounded-xl transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                  <span>Reset Defaults</span>
-                </button>
-
-                <div className="flex items-center space-x-3">
-                  <button
-                    type="button"
-                    disabled={configSaving}
-                    onClick={() => {
-                      setShowDbConfig(false);
-                      setConfigMsg(null);
-                    }}
-                    className="px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={configSaving}
-                    className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
-                  >
-                    <span>{configSaving ? 'Verifying & Saving...' : 'Save & Intercept'}</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {diagnosticsModal && diagnosticsModal.show && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="diagnostics-modal">
@@ -2339,30 +2065,22 @@ export default function App() {
                       : "✅ Service Role Key Configured (Admin Mode)"}
                   </p>
                 </div>
-                <div className="border-t border-slate-900 my-2 pt-2">
-                  <span className="text-slate-500">Runtime Status:</span>
-                  <p className="text-slate-300 mt-0.5">dbActive: {diagnosticsModal.dbActive ? 'true' : 'false'}</p>
-                  <p className="text-slate-300 mt-0.5">supabaseStatusLoaded: {diagnosticsModal.supabaseStatusLoaded ? 'true' : 'false'}</p>
-                  <p className="text-slate-300 mt-0.5">lastFetchError: {diagnosticsModal.lastFetchError || 'none'}</p>
-                </div>
-                <div className="border-t border-slate-900 my-2 pt-2">
-                  <span className="text-slate-500">Tenant State Diagnostics:</span>
-                  <p className="text-slate-300 mt-0.5">tenantId: {diagnosticsModal.currentTenantId || 'none'}</p>
-                  <p className="text-slate-300 mt-0.5">source: {diagnosticsModal.tenantStateSource || 'none'}</p>
-                  <p className="text-slate-300 mt-0.5">tenantStateConnected: {diagnosticsModal.tenantStateConnected ? 'true' : 'false'}</p>
-                  <p className="text-rose-300 mt-0.5">tenantStateError: {diagnosticsModal.tenantStateError || 'none'}</p>
-                </div>
-                <div className="border-t border-slate-900 my-2 pt-2">
-                  <span className="text-slate-500">Local Credential Override:</span>
-                  <p className="text-slate-300 mt-0.5">custom URL: {diagnosticsModal.localCustomDbUrl ? 'present' : 'none'}</p>
-                  <p className="text-slate-300 mt-0.5">custom key: {diagnosticsModal.localCustomDbKeyPresent ? 'present' : 'none'}</p>
-                </div>
-                <div className="border-t border-slate-900 my-2 pt-2">
-                  <span className="text-slate-500">Sync Lock Info:</span>
-                  <p className="text-slate-300 mt-0.5">syncStatus: {diagnosticsModal.syncStatus || 'unknown'}</p>
-                  <p className="text-slate-300 mt-0.5">lastMutationAgeMs: {diagnosticsModal.lastMutationAgeMs ?? -1}ms</p>
-                </div>
+                {diagnosticsModal.error && (
+                  <div className="border-t border-slate-900 my-2 pt-2">
+                    <span className="text-rose-400">Error Details:</span>
+                    <p className="text-rose-300 break-words mt-0.5 whitespace-pre-wrap">{diagnosticsModal.error}</p>
+                  </div>
+                )}
               </div>
+
+              {!diagnosticsModal.connected && (
+                <div className="bg-amber-950/20 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-300 leading-relaxed flex items-start space-x-2.5">
+                  <span className="text-amber-500 font-bold shrink-0">⚠️</span>
+                  <span>
+                    Action Required: Click the "Offline / Local Database Sync Mode" status button in the header to set up valid live Supabase credentials!
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-end pt-2">
                 <button

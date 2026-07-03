@@ -1,15 +1,6 @@
 {
-  "timestamp": "2026-07-02T17:20:24.782Z",
+  "timestamp": "2026-07-02T12:51:41.706Z",
   "users": [
-    {
-      "id": "USR-SUPER-ADMIN-01",
-      "tenantId": "system-admin-tenant",
-      "name": "ProSpaces Super Admin",
-      "email": "superadmin@prospaces.com",
-      "role": "SUPER_ADMIN",
-      "phone": "||status:Active ||pw:tV3p&HP# ||status:Active ||lastact:2026-07-02T15:55:13.119Z",
-      "associatedStoreId": "DC-WINAMILL"
-    },
     {
       "id": "USR-57008",
       "tenantId": "system-admin-tenant",
@@ -17,6 +8,15 @@
       "email": "george.campbell@prospaces.com",
       "role": "Admin",
       "phone": " ||pw:George2026! ||status:Active",
+      "associatedStoreId": "DC-WINAMILL"
+    },
+    {
+      "id": "USR-SUPER-ADMIN-01",
+      "tenantId": "system-admin-tenant",
+      "name": "ProSpaces Super Admin",
+      "email": "superadmin@prospaces.com",
+      "role": "SUPER_ADMIN",
+      "phone": "||status:Active ||pw:tV3p&HP# ||status:Active ||lastact:2026-07-02T12:50:23.066Z",
       "associatedStoreId": "DC-WINAMILL"
     },
     {

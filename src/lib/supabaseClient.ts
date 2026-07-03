@@ -220,6 +220,9 @@ export function deserializeType(truck: any): any {
   };
 }
 
+const FALLBACK_SUPABASE_URL = "https://anqyjkjlzniruisqwthl.supabase.co";
+const FALLBACK_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFucXlqa2psem5pcnVpc3F3dGhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNDA3MTgsImV4cCI6MjA5NjkxNjcxOH0.-tJ0nb_eB6EDVVVTKlILibvXy7RwTc5USaXrkmHZY2k";
+
 let cachedClient: any = null;
 let currentUrl = "";
 let currentKey = "";
@@ -271,13 +274,13 @@ export function getFrontendSupabase() {
   let key = currentKey;
 
   if (typeof process !== 'undefined' && process.env) {
-    url = url || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-    key = key || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+    url = url || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
+    key = key || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || FALLBACK_SUPABASE_ANON_KEY;
   } else {
     // @ts-ignore
-    url = url || (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || "";
+    url = url || (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || FALLBACK_SUPABASE_URL;
     // @ts-ignore
-    key = key || (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || "";
+    key = key || (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || FALLBACK_SUPABASE_ANON_KEY;
   }
 
   if (!url || !key) {
@@ -326,7 +329,7 @@ export function getFrontendSupabase() {
 export async function checkSupabaseStatusDirect(): Promise<any> {
   const supabase = getFrontendSupabase();
   if (!supabase) {
-    return { active: false, success: false, details: "Client-side configuration missing/empty environ variables." };
+    return { active: false, details: "Client-side configuration missing/empty environ variables." };
   }
   
   const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => {
@@ -339,16 +342,11 @@ export async function checkSupabaseStatusDirect(): Promise<any> {
       timeoutPromise
     ]);
     if (error) {
-      return {
-        active: true,
-        success: false,
-        error: error.message,
-        details: "Connected to endpoint but received querying error. Schema might need to be created."
-      };
+      return { active: true, error: error.message, details: "Connected to endpoint but received querying error. Schema might need to be created." };
     }
     return { active: true, success: true, details: "Directly connected to Supabase and queried successfully." };
   } catch (err: any) {
-    return { active: false, success: false, details: err.message || String(err) };
+    return { active: false, details: err.message || String(err) };
   }
 }
 

@@ -3,8 +3,7 @@ import path from "path";
 import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import { headerMiddleware, getSupabase, setCustomSupabase, getResolvedConfig, isServiceRoleKey, withTimeout, formatDatabaseError, resetCircuitBreaker, recordFailureAndMaybeDisable } from "./lib/serverSupabase";
-import { withSupabaseExpress } from "./lib/withSupabaseExpress";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -28,6 +27,150 @@ function getGeminiClient(): GoogleGenAI {
     });
   }
   return aiClient;
+}
+
+// Supabase Lazy Initialization
+function isServiceRoleKey(key: string): boolean {
+  if (!key) return false;
+  try {
+    const parts = key.split('.');
+    if (parts.length === 3) {
+      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const decodedPayload = Buffer.from(payloadBase64, 'base64').toString('utf8');
+      const payload = JSON.parse(decodedPayload);
+      return payload.role === 'service_role';
+    }
+  } catch (e) {
+    // ignore
+  }
+  return key.includes("service_role") || (!key.includes("anon") && !key.startsWith("sb_pub") && !key.startsWith("sb_publishable") && key.length > 100);
+}
+
+const FALLBACK_SUPABASE_URL = "https://anqyjkjlzniruisqwthl.supabase.co";
+const FALLBACK_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFucXlqa2psem5pcnVpc3F3dGhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNDA3MTgsImV4cCI6MjA5NjkxNjcxOH0.-tJ0nb_eB6EDVVVTKlILibvXy7RwTc5USaXrkmHZY2k";
+const FALLBACK_SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFucXlqa2psem5pcnVpc3F3dGhsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTM0MDcxOCwiZXhwIjoyMDk2OTE2NzE4fQ.AyJCnr4DR4_5XRxUpxwFN1cdcFm1XLe7jYE2bom1fLw";
+
+let customSupabaseUrl = "";
+let customSupabaseKey = "";
+
+let supabaseClient: any = null;
+let lastSupabaseUrl = "";
+let lastSupabaseKey = "";
+
+// Circuit Breaker for Supabase connections to prevent hanging on invalid/paused credentials
+let supabaseConsecutiveFailures = 0;
+let supabaseTemporarilyDisabled = false;
+let supabaseDisabledUntil = 0;
+
+function getSupabase(reqOrBypass?: any, bypassCircuitBreaker: boolean = false) {
+  let req: any = null;
+  let bypass = bypassCircuitBreaker;
+
+  if (typeof reqOrBypass === "boolean") {
+    bypass = reqOrBypass;
+  } else if (reqOrBypass && typeof reqOrBypass === "object") {
+    req = reqOrBypass;
+  }
+
+  if (supabaseTemporarilyDisabled && !bypass) {
+    if (Date.now() < supabaseDisabledUntil) {
+      return null;
+    } else {
+      // Cooldown finished, try again
+      supabaseTemporarilyDisabled = false;
+      supabaseConsecutiveFailures = 0;
+    }
+  }
+
+  // Force the unified database server using environment variables or hardcoded fallback constants
+  let url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL).trim();
+  let key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || FALLBACK_SUPABASE_SERVICE_ROLE_KEY).trim();
+
+  if (!url || !key) {
+    return null;
+  }
+
+  // Trim and strip surrounding quotes (including escaped, double, single, or backslashed characters)
+  url = url.trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+  key = key.trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+
+  // Strip trailing slashes and common suffix paths like "/rest/v1" or "/rest" that cause duplicate path errors in the client
+  url = url.replace(/\/rest\/v1\/?$/i, '');
+  url = url.replace(/\/rest\/?$/i, '');
+  url = url.replace(/\/+$/, '');
+
+  if (
+    url === "" || 
+    key === "" || 
+    url === "undefined" || 
+    key === "undefined" || 
+    url === "null" || 
+    key === "null" || 
+    url.includes("PLACEHOLDER") || 
+    key.includes("PLACEHOLDER")
+  ) {
+    return null;
+  }
+
+  // Ensure it starts with http:// or https://
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return null;
+  }
+  
+  if (url !== lastSupabaseUrl || key !== lastSupabaseKey) {
+    supabaseClient = null;
+  }
+
+  if (!supabaseClient) {
+    try {
+      supabaseClient = createClient(url, key, {
+        auth: {
+          persistSession: false
+        }
+      });
+      lastSupabaseUrl = url;
+      lastSupabaseKey = key;
+    } catch (e) {
+      console.error("Failed to initialize Supabase client:", e);
+      return null;
+    }
+  }
+  return supabaseClient;
+}
+
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 5000): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Database query timed out (exceeded ${ms}ms threshold)`));
+    }, ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise).then((res) => {
+      clearTimeout(timer);
+      return res;
+    }).catch(err => {
+      clearTimeout(timer);
+      throw err;
+    }),
+    timeoutPromise
+  ]);
+}
+
+function formatDatabaseError(err: any): string {
+  if (!err) return "An unknown database error occurred.";
+  const msg = err.message || String(err);
+  if (
+    msg.includes("Invalid path specified in request URL") ||
+    (msg.includes("relation") && msg.includes("does not exist")) ||
+    msg.includes("42P01")
+  ) {
+    return "Your Supabase database is connected, but the required database tables do not exist yet. Please go to the 'System Architecture' dashboard, copy the SQL setup schema script, and run it in the SQL Editor within your Supabase workspace to initialize the tables.";
+  }
+  if (msg.toLowerCase().includes("row-level security") || msg.toLowerCase().includes("violates row-level security") || msg.toLowerCase().includes("rls")) {
+    return "A Row-Level Security (RLS) policy violation occurred. This means RLS is enabled on your Supabase tables but your connection is restricted. Please add the SUPABASE_SERVICE_ROLE_KEY to your AI Studio Secrets (bypasses RLS on the server-side), or execute the permissive SQL policies block from the System Architecture tab in your Supabase SQL Editor.";
+  }
+  return msg;
 }
 
 function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined): string {
@@ -495,8 +638,10 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Dynamic headers middleware to seamlessly support multi-tenant custom Supabase connections
-app.use(headerMiddleware);
+// Dynamic headers middleware disabled to enforce unified database connections
+app.use((req, res, next) => {
+  next();
+});
 
 // Support Vercel routing where the path might omit or include /api
 if (process.env.VERCEL) {
@@ -951,52 +1096,24 @@ app.use((req, res, next) => {
   next();
 });
 
-  // Endpoint to set custom Supabase credentials at runtime in server memory
+  // Endpoint to set custom Supabase credentials at runtime in server memory (Locked to unified production server)
   app.post("/api/setup-custom-supabase", express.json(), (req, res) => {
     try {
-      const { url, key } = req.body;
-      setCustomSupabase(url || "", key || "");
-      console.log("Custom Supabase credentials set in server memory.");
-      res.json({ success: true, message: "Custom Supabase credentials updated in server memory successfully." });
+      console.log("Custom Supabase credentials bypass: Locked to unified database server.");
+      res.json({ success: true, message: "System locked to the correct unified Supabase database server. Manual bypass ignored." });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to update custom Supabase credentials." });
+      res.status(500).json({ error: err.message || "Failed to process custom Supabase configuration." });
     }
   });
-
-  // Example Supabase Server SDK route using @supabase/server
-  app.get(
-    "/api/supabase-server-context",
-    withSupabaseExpress({ auth: "none" }, async (_req, res, ctx) => {
-      res.json({
-        authMode: ctx.authMode,
-        userClaims: ctx.userClaims,
-        jwtClaims: ctx.jwtClaims,
-        authKeyName: ctx.authKeyName,
-        adminAvailable: Boolean(ctx.supabaseAdmin),
-        message: "Supabase Server SDK is initialized and auth context was generated successfully.",
-      });
-    })
-  );
-
-  // Example protected Supabase Server SDK route requiring a valid user JWT
-  app.get(
-    "/api/supabase-server-user",
-    withSupabaseExpress({ auth: "user" }, async (_req, res, ctx) => {
-      res.json({
-        authMode: ctx.authMode,
-        userClaims: ctx.userClaims,
-        jwtClaims: ctx.jwtClaims,
-        profile: await ctx.supabase.from("profiles").select("*").limit(1),
-      });
-    })
-  );
 
   // Supabase connection and configuration diagnostics endpoint
   app.get("/api/supabase-status", async (req, res) => {
     try {
       // Diagnostic check bypasses the circuit breaker so the user can test/recover connection
       const supabase = getSupabase(req, true);
-      const { resolvedUrl, roleKey, anonKey } = getResolvedConfig();
+      const resolvedUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL).trim();
+      const roleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || FALLBACK_SUPABASE_SERVICE_ROLE_KEY).trim();
+      const anonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_ANON_KEY).trim();
       const isServiceRoleKeyAnon = !isServiceRoleKey(roleKey);
 
       if (!supabase) {
@@ -1097,7 +1214,9 @@ app.use((req, res, next) => {
       }
 
       // Reset circuit breaker variables on successful connection test
-      resetCircuitBreaker();
+      supabaseConsecutiveFailures = 0;
+      supabaseTemporarilyDisabled = false;
+      supabaseDisabledUntil = 0;
 
       res.json({
         configured: true,
@@ -1112,8 +1231,16 @@ app.use((req, res, next) => {
       console.error("Diagnosis Exception:", e);
       
       // Trigger circuit breaker on failed diagnostic check if it's a timeout/unreachable issue
-      recordFailureAndMaybeDisable();
-      const { resolvedUrl, roleKey, anonKey } = getResolvedConfig();
+      supabaseConsecutiveFailures++;
+      if (supabaseConsecutiveFailures >= 2) {
+        supabaseTemporarilyDisabled = true;
+        supabaseDisabledUntil = Date.now() + 60000; // Disable queries for 60 seconds
+        console.warn(`[CIRCUIT BREAKER] Supabase disabled for 60 seconds due to consecutive connection test failures.`);
+      }
+
+      const resolvedUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL).trim();
+      const roleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || FALLBACK_SUPABASE_SERVICE_ROLE_KEY).trim();
+      const anonKey = (process.env.SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY).trim();
       const isServiceRoleKeyAnon = !isServiceRoleKey(roleKey);
       res.json({
         configured: !!resolvedUrl,
@@ -1184,13 +1311,13 @@ app.use((req, res, next) => {
         const superAdminPassword = process.env.SUPERADMIN_PASSWORD || "SuperAdmin2026!";
         if (password && !/^[•\*]+$/.test(password) && password !== superAdminPassword) {
           return res.json({
-            supabaseActive: true,
+            supabaseActive: getSupabase(req) !== null,
             found: true,
             error: "Invalid SuperAdmin password entry."
           });
         }
         return res.json({
-          supabaseActive: true,
+          supabaseActive: getSupabase(req) !== null,
           found: true,
           user: {
             id: "USR-SUPER-ADMIN-01",
@@ -1604,7 +1731,9 @@ app.use((req, res, next) => {
       const deserializedTrucks = (rTrucks.data || []).map((t: any) => deserializeType(t));
 
       // Reset failure counters on query success
-      resetCircuitBreaker();
+      supabaseConsecutiveFailures = 0;
+      supabaseTemporarilyDisabled = false;
+      supabaseDisabledUntil = 0;
 
       res.json({
         supabaseActive: true,
@@ -1617,7 +1746,12 @@ app.use((req, res, next) => {
       // Trigger circuit breaker for timeout or network unreachable errors
       const errMsg = err.message || String(err);
       if (errMsg.includes("timed out") || errMsg.includes("fetch failed") || errMsg.includes("ENOTFOUND") || errMsg.includes("ECONNREFUSED")) {
-        recordFailureAndMaybeDisable();
+        supabaseConsecutiveFailures++;
+        if (supabaseConsecutiveFailures >= 2) {
+          supabaseTemporarilyDisabled = true;
+          supabaseDisabledUntil = Date.now() + 60000; // Disable queries for 60 seconds
+          console.warn(`[CIRCUIT BREAKER] Supabase disabled for 60 seconds due to consecutive state load errors: ${errMsg}`);
+        }
       }
 
       const dbError = formatDatabaseError(err);
