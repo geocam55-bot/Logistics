@@ -3,7 +3,7 @@ import { Tenant, User } from '../types';
 import { TENANTS } from '../data';
 import { getFrontendSupabase, deserializeFromPhone, serializeToPhone } from '../lib/supabaseClient';
 import { Shield, Key, CheckCircle2, ArrowRight, Mail, Lock, Building2, UserCheck, HelpCircle, Loader2 } from 'lucide-react';
-import prospacesLogo from '../assets/images/prospaces_logo_1782485612854.jpg';
+import prospacesLogo from '../assets/images/logo_no_border_tight_1783077241511.jpg';
 
 // Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
 async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

@@ -36,7 +36,7 @@ import {
   Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert, Camera, Sliders, User as UserIcon,
   Compass
 } from 'lucide-react';
-import prospacesLogo from './assets/images/prospaces_logo_1782485612854.jpg';
+import prospacesLogo from './assets/images/logo_no_border_tight_1783077241511.jpg';
 
 // Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
 async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
