@@ -386,6 +386,7 @@ export default function App() {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'ERROR'>('IDLE');
   const lastMutationTimeRef = useRef<number>(0);
+  const recentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const syncStatusRef = useRef<string>('IDLE');
   useEffect(() => {
     syncStatusRef.current = syncStatus;
@@ -674,7 +675,7 @@ export default function App() {
         console.log("[Sync Lock] Skipping database state polling during active synchronization.");
         return;
       }
-      if (Date.now() - lastMutationTimeRef.current < 4000) {
+      if (Date.now() - lastMutationTimeRef.current < 15000) {
         console.log("[Sync Lock] Skipping database state polling to allow recent updates to fully commit.");
         return;
       }
@@ -705,18 +706,23 @@ export default function App() {
           }
         }
 
-        if (Date.now() - lastMutationTimeRef.current < 4000) {
+        if (Date.now() - lastMutationTimeRef.current < 15000) {
           console.log("[Sync Lock] Ignoring incoming state fetch response to preserve recent user mutations.");
           setSyncStatus('IDLE');
           return;
         }
 
         if (data.supabaseActive) {
-          // Populate React state directly from live Supabase Tables
-          setDeliveries(data.deliveries || []);
-          setTrucks(data.trucks || []);
-          setBranches(data.branches || []);
-          setUsers(deduplicateUsers(data.users || []));
+          // Populate React state directly from live Supabase Tables and filter out recently deleted IDs
+          const filteredDeliveries = (data.deliveries || []).filter((d: any) => !recentlyDeletedIdsRef.current.has(d.id));
+          const filteredTrucks = (data.trucks || []).filter((t: any) => !recentlyDeletedIdsRef.current.has(t.id));
+          const filteredBranches = (data.branches || []).filter((b: any) => !recentlyDeletedIdsRef.current.has(b.id));
+          const filteredUsers = (data.users || []).filter((u: any) => !recentlyDeletedIdsRef.current.has(u.id));
+
+          setDeliveries(filteredDeliveries);
+          setTrucks(filteredTrucks);
+          setBranches(filteredBranches);
+          setUsers(deduplicateUsers(filteredUsers));
           setLastSyncTime(new Date().toLocaleTimeString());
           setDbActive(true);
           setSyncStatus('IDLE');
@@ -732,10 +738,15 @@ export default function App() {
           const cachedBranches = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
           const cachedUsers = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
 
-          setDeliveries(cachedDeliveries ? JSON.parse(cachedDeliveries) : (data.branches ? (data.deliveries || []) : []));
-          setTrucks(cachedTrucks ? JSON.parse(cachedTrucks) : (data.branches ? (data.trucks || []) : []));
-          setBranches(cachedBranches ? JSON.parse(cachedBranches) : (data.branches || []));
-          setUsers(deduplicateUsers(cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : [])));
+          const rawDeliveries = cachedDeliveries ? JSON.parse(cachedDeliveries) : (data.branches ? (data.deliveries || []) : []);
+          const rawTrucks = cachedTrucks ? JSON.parse(cachedTrucks) : (data.branches ? (data.trucks || []) : []);
+          const rawBranches = cachedBranches ? JSON.parse(cachedBranches) : (data.branches || []);
+          const rawUsers = cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : []);
+
+          setDeliveries(rawDeliveries.filter((d: any) => !recentlyDeletedIdsRef.current.has(d.id)));
+          setTrucks(rawTrucks.filter((t: any) => !recentlyDeletedIdsRef.current.has(t.id)));
+          setBranches(rawBranches.filter((b: any) => !recentlyDeletedIdsRef.current.has(b.id)));
+          setUsers(deduplicateUsers(rawUsers.filter((u: any) => !recentlyDeletedIdsRef.current.has(u.id))));
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox)`);
           setDbActive(false);
           setSyncStatus('IDLE');
@@ -754,10 +765,15 @@ export default function App() {
           const cachedBranches = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
           const cachedUsers = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
 
-          setDeliveries(cachedDeliveries ? JSON.parse(cachedDeliveries) : []);
-          setTrucks(cachedTrucks ? JSON.parse(cachedTrucks) : []);
-          setBranches(cachedBranches ? JSON.parse(cachedBranches) : []);
-          setUsers(deduplicateUsers(cachedUsers ? JSON.parse(cachedUsers) : []));
+          const rawDeliveries = cachedDeliveries ? JSON.parse(cachedDeliveries) : [];
+          const rawTrucks = cachedTrucks ? JSON.parse(cachedTrucks) : [];
+          const rawBranches = cachedBranches ? JSON.parse(cachedBranches) : [];
+          const rawUsers = cachedUsers ? JSON.parse(cachedUsers) : [];
+
+          setDeliveries(rawDeliveries.filter((d: any) => !recentlyDeletedIdsRef.current.has(d.id)));
+          setTrucks(rawTrucks.filter((t: any) => !recentlyDeletedIdsRef.current.has(t.id)));
+          setBranches(rawBranches.filter((b: any) => !recentlyDeletedIdsRef.current.has(b.id)));
+          setUsers(deduplicateUsers(rawUsers.filter((u: any) => !recentlyDeletedIdsRef.current.has(u.id))));
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Local Fallback)`);
         } catch (fbErr) {
           console.error("Fallback state load failed:", fbErr);
@@ -775,6 +791,7 @@ export default function App() {
   // Periodic state polling to retrieve live driver GPS and order updates on desktop/other mobiles
   useEffect(() => {
     if (!currentTenant) return;
+    if (currentUser?.role === 'SUPER_ADMIN') return;
 
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -783,13 +800,14 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [currentTenant]);
+  }, [currentTenant, currentUser?.role]);
 
   const lastHeartbeatRef = useRef<number>(0);
 
   // Periodic user online heartbeat
   useEffect(() => {
     if (!currentUser || !currentTenant) return;
+    if (currentUser.role === 'SUPER_ADMIN') return;
     const now = Date.now();
     // Throttle heartbeat to once every 10 seconds
     if (now - lastHeartbeatRef.current < 10000) return;
@@ -822,6 +840,7 @@ export default function App() {
   // Auto-heal/reconcile state to ensure logged-in user and driver vehicles are always present and properly linked
   useEffect(() => {
     if (!currentUser || !currentTenant) return;
+    if (currentUser.role === 'SUPER_ADMIN') return;
     
     // We only heal if state has finished loading (i.e. branches is populated, indicating we have state)
     if (branches.length === 0) return;
@@ -1081,6 +1100,7 @@ export default function App() {
 
   const deleteRecordWithFallback = async (table: string, id: string, tenantId: string) => {
     lastMutationTimeRef.current = Date.now();
+    recentlyDeletedIdsRef.current.add(id);
     try {
       const res = await customFetch(`/api/tenant/delete-record?table=${table}&id=${id}&tenantId=${tenantId}`, { method: 'DELETE' });
       if (!res.ok) {

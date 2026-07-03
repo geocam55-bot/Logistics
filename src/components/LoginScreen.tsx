@@ -100,28 +100,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       }
     }
 
-    if (
-      norm.includes('fundy') || 
-      norm.includes('bof') || 
-      norm.includes('comeau') || 
-      norm.includes('peterson') || 
-      norm.includes('robichaud') ||
-      norm.includes('gentry') ||
-      norm.includes('leah')
-    ) {
-      return list.find(t => t.id === 'bay-of-fundy') || list[1] || list[0] || defaultTenant;
-    } else if (
-      norm.includes('cabot') || 
-      norm.includes('ctc') || 
-      norm.includes('mcdonald') || 
-      norm.includes('beaton') || 
-      norm.includes('oneil') || 
-      norm.includes('chisholm')
-    ) {
-      return list.find(t => t.id === 'cabot-trail') || list[2] || list[0] || defaultTenant;
-    } else {
-      return list[0] || defaultTenant;
-    }
+    return list[0] || defaultTenant;
   };
 
   // Get active tenant state based on the typed email

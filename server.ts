@@ -708,11 +708,11 @@ async function runSelfHealingOnce() {
         await supabase.from("tenants").upsert([prospacesTenant]);
         console.log("Seeded/validated 'prospaces' tenant.");
 
-        // 2. Migrate users from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
+        // 2. Migrate users from agfydicwfv8u0rqr5apc to prospaces
         const { data: usersToMigrate } = await supabase
           .from("users")
           .select("*")
-          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
+          .in("tenantId", ["agfydicwfv8u0rqr5apc"]);
           
         if (usersToMigrate && usersToMigrate.length > 0) {
           for (const user of usersToMigrate) {
@@ -756,11 +756,11 @@ async function runSelfHealingOnce() {
           }
         }
 
-        // 3. Migrate branches from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
+        // 3. Migrate branches from agfydicwfv8u0rqr5apc to prospaces
         const { data: branchesToMigrate } = await supabase
           .from("branches")
           .select("*")
-          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
+          .in("tenantId", ["agfydicwfv8u0rqr5apc"]);
           
         if (branchesToMigrate && branchesToMigrate.length > 0) {
           for (const branch of branchesToMigrate) {
@@ -779,11 +779,11 @@ async function runSelfHealingOnce() {
           }
         }
 
-        // 4. Migrate trucks from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
+        // 4. Migrate trucks from agfydicwfv8u0rqr5apc to prospaces
         const { data: trucksToMigrate } = await supabase
           .from("trucks")
           .select("*")
-          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
+          .in("tenantId", ["agfydicwfv8u0rqr5apc"]);
           
         if (trucksToMigrate && trucksToMigrate.length > 0) {
           for (const truck of trucksToMigrate) {
@@ -822,11 +822,11 @@ async function runSelfHealingOnce() {
           }
         }
 
-        // 5. Migrate deliveries from agfydicwfv8u0rqr5apc & ronaatlantic to prospaces
+        // 5. Migrate deliveries from agfydicwfv8u0rqr5apc to prospaces
         const { data: deliveriesToMigrate } = await supabase
           .from("deliveries")
           .select("*")
-          .in("tenantId", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
+          .in("tenantId", ["agfydicwfv8u0rqr5apc"]);
           
         if (deliveriesToMigrate && deliveriesToMigrate.length > 0) {
           for (const del of deliveriesToMigrate) {
@@ -859,196 +859,10 @@ async function runSelfHealingOnce() {
         await supabase
           .from("tenants")
           .delete()
-          .in("id", ["agfydicwfv8u0rqr5apc", "ronaatlantic"]);
-        console.log("Cleaned up temporary tenants 'agfydicwfv8u0rqr5apc' and 'ronaatlantic'.");
+          .in("id", ["agfydicwfv8u0rqr5apc"]);
+        console.log("Cleaned up temporary tenant 'agfydicwfv8u0rqr5apc'.");
 
-        // 7. Auto-Seed default data for prospaces if tables are empty
-        console.log("Verifying if prospaces tables require default seeding...");
-        
-        // A. Seed branches if empty
-        const { data: currentBranches, error: errB } = await supabase
-          .from("branches")
-          .select("id")
-          .eq("tenantId", "prospaces");
-        if (!errB && (!currentBranches || currentBranches.length === 0)) {
-          console.log("Branches are empty for prospaces. Auto-seeding default branches...");
-          const defaultBranches = [
-            {
-              id: "01075",
-              tenantId: "prospaces",
-              name: "ProSpaces - Tantallon",
-              type: "STORE",
-              address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
-            },
-            {
-              id: "01065",
-              tenantId: "prospaces",
-              name: "ProSpaces - ALMON",
-              type: "STORE",
-              address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
-            },
-            {
-              id: "01070",
-              tenantId: "prospaces",
-              name: "ProSpaces - Elmsdale",
-              type: "DC",
-              address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
-            },
-            {
-              id: "DC-WINAMILL",
-              tenantId: "prospaces",
-              name: "44444 - 500 Windmill Road",
-              type: "DC",
-              address: "500 Windmill Road, Dartmouth, Nova Scotia, B3B 1B3, Canada"
-            }
-          ];
-          const { error: seedBErr } = await supabase.from("branches").upsert(defaultBranches);
-          if (seedBErr) console.error("Error seeding default branches:", seedBErr);
-          else console.log("Seeded default branches successfully.");
-        }
-
-        // B. Seed users if empty
-        const { data: currentUsers, error: errU } = await supabase
-          .from("users")
-          .select("id")
-          .eq("tenantId", "prospaces");
-        if (!errU && (!currentUsers || currentUsers.length === 0)) {
-          console.log("Users are empty for prospaces. Auto-seeding default users...");
-          const defaultUsers = [
-            {
-              id: "USR-57008",
-              tenantId: "prospaces",
-              name: "George Campbell",
-              email: "george.campbell@prospaces.com",
-              role: "Admin",
-              phone: " ||pw:George2026! ||status:Active",
-              associatedStoreId: "DC-WINAMILL",
-              password: "George2026!",
-              status: "Active"
-            },
-            {
-              id: "USR-1869",
-              tenantId: "prospaces",
-              name: "Joshua Campbell",
-              email: "joshua.campbell@prospaces.com",
-              role: "Driver",
-              phone: " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
-              associatedStoreId: "DC-WINAMILL",
-              password: "Joshua2026!",
-              status: "Active",
-              driverLicenseExpire: "2027-01-22"
-            }
-          ];
-          let seedUErr;
-          try {
-            const { error } = await supabase.from("users").upsert(defaultUsers);
-            if (error) {
-              const errMsg = error.message || String(error);
-              if (errMsg.includes("column") || errMsg.includes("password") || errMsg.includes("status") || error.code === "42703") {
-                console.warn("Supabase users table is missing columns. Retrying user seeding with column stripping and phone serialization...");
-                const strippedUsers = defaultUsers.map(u => {
-                  const { password, status, driverLicenseExpire, ...stripped } = u;
-                  stripped.phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire);
-                  return stripped;
-                });
-                const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);
-                if (retryErr) {
-                  seedUErr = retryErr;
-                }
-              } else {
-                seedUErr = error;
-              }
-            }
-          } catch (err: any) {
-            seedUErr = err;
-          }
-          if (seedUErr) {
-            const cleanMsg = seedUErr.message || (typeof seedUErr === "object" ? JSON.stringify(seedUErr) : String(seedUErr));
-            console.error("Error seeding default users:", cleanMsg);
-          } else console.log("Seeded default users successfully.");
-        }
-
-        // C. Seed trucks if empty
-        const { data: currentTrucks, error: errT } = await supabase
-          .from("trucks")
-          .select("id")
-          .eq("tenantId", "prospaces");
-        if (!errT && (!currentTrucks || currentTrucks.length === 0)) {
-          console.log("Trucks are empty for prospaces. Auto-seeding default trucks...");
-          const defaultTrucks = [
-            {
-              id: "TRUCK-87",
-              tenantId: "prospaces",
-              name: "Truck-1",
-              type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
-              driver: "George Campbell",
-              branchId: "01075"
-            },
-            {
-              id: "TRUCK-28",
-              tenantId: "prospaces",
-              name: "Truck-2",
-              type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
-              driver: "Joshua Campbell",
-              branchId: "DC-WINAMILL"
-            }
-          ];
-          const { error: seedTErr } = await supabase.from("trucks").upsert(defaultTrucks);
-          if (seedTErr) console.error("Error seeding default trucks:", seedTErr);
-          else console.log("Seeded default trucks successfully.");
-        }
-
-        // D. Seed deliveries if empty
-        const { data: currentDeliveries, error: errD } = await supabase
-          .from("deliveries")
-          .select("id")
-          .eq("tenantId", "prospaces");
-        if (!errD && (!currentDeliveries || currentDeliveries.length === 0)) {
-          console.log("Deliveries are empty for prospaces. Auto-seeding default deliveries...");
-          const defaultDeliveries = [
-            {
-              id: "263890",
-              tenantId: "prospaces",
-              invoiceNumber: "263890",
-              epicorSalesOrder: "263890",
-              customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
-              deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
-              phone: "902-555-0199",
-              originBranch: "01075",
-              destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
-              status: "REGISTERED",
-              registeredAt: "6/16/2026, 11:15:48 AM",
-              pickedAt: null,
-              deliveredAt: null,
-              returnedAt: null,
-              returnReason: null,
-              assignedTruck: "TRUCK-87",
-              assignedDriver: "George Campbell",
-              customerSignature: null,
-              deliveryPhoto: null,
-              history: [
-                {
-                  notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
-                  status: "REGISTERED",
-                  location: "ProSpaces - Tantallon",
-                  operator: "Azure OCR Automate Stream",
-                  timestamp: "6/16/2026, 11:15:48 AM"
-                },
-                {
-                  notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
-                  status: "REGISTERED",
-                  location: "ProSpaces - Tantallon",
-                  operator: "Logistics Board Coordinator",
-                  timestamp: "2026-06-16T14:16:19.891Z"
-                }
-              ]
-            }
-          ];
-          const { error: seedDErr } = await supabase.from("deliveries").upsert(defaultDeliveries);
-          if (seedDErr) console.error("Error seeding default deliveries:", seedDErr);
-          else console.log("Seeded default deliveries successfully.");
-        }
-
+        // 7. Auto-seeding disabled as requested by the user to ensure we only work with live database data.
         console.log("Database self-healing and alignment complete.");
 
         // Database Diagnostic helper
@@ -1496,113 +1310,10 @@ app.use((req, res, next) => {
   // Helper to construct the premium default mock and seed state for a given tenant ID
   function getDefaultTenantState(tid: string) {
     return {
-      branches: [
-        {
-          id: "01075",
-          tenantId: tid,
-          name: "ProSpaces - Tantallon",
-          type: "STORE",
-          address: "3680 Hammonds Plains Rd, Upper Tantallon, NS B3Z 1H3, Canada"
-        },
-        {
-          id: "01065",
-          tenantId: tid,
-          name: "ProSpaces - ALMON",
-          type: "STORE",
-          address: "6055 Almon St, Halifax, NS B3K 1T9, Canada"
-        },
-        {
-          id: "01070",
-          tenantId: tid,
-          name: "ProSpaces - Elmsdale",
-          type: "DC",
-          address: "84 Mason Ln, Elmsdale, NS B2S 3J3, Canada"
-        },
-        {
-          id: "DC-WINAMILL",
-          tenantId: tid,
-          name: "ProSpaces - WINDMILL",
-          type: "DC",
-          address: "500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada"
-        }
-      ],
-      trucks: [
-        {
-          id: "TRUCK-87",
-          tenantId: tid,
-          name: "Truck-1",
-          type: "Heavy-Duty Flatbed ||regdue:2026-11-29 ||lat:44.7082 ||lng:-63.5938",
-          driver: "George Campbell",
-          branchId: "01075"
-        },
-        {
-          id: "TRUCK-28",
-          tenantId: tid,
-          name: "Truck-2",
-          type: "Flatbed Boom Truck ||regdue:2026-11-29 ||lat:44.6295 ||lng:-63.6651",
-          driver: "Joshua Campbell",
-          branchId: "DC-WINAMILL"
-        }
-      ],
-      users: [
-        {
-          id: "USR-57008",
-          tenantId: tid,
-          name: "George Campbell",
-          email: "george.campbell@prospaces.com",
-          role: "Admin",
-          phone: " ||pw:George2026! ||status:Active",
-          associatedStoreId: "DC-WINAMILL"
-        },
-        {
-          id: "USR-1869",
-          tenantId: tid,
-          name: "Joshua Campbell",
-          email: "joshua.campbell@prospaces.com",
-          role: "Driver",
-          phone: " ||pw:Joshua2026! ||status:Active ||licexp:2027-01-22",
-          associatedStoreId: "DC-WINAMILL"
-        }
-      ],
-      deliveries: [
-        {
-          id: "263890",
-          tenantId: tid,
-          invoiceNumber: "263890",
-          epicorSalesOrder: "263890",
-          customerName: "SOLD TO: BC SALES 3685 HAMMONDS PLAINS SALES BC  STILLWATER LAKE  902-821-2124     NS",
-          deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
-          phone: "902-555-0199",
-          originBranch: "01075",
-          destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
-          status: "REGISTERED",
-          registeredAt: "6/16/2026, 11:15:48 AM",
-          pickedAt: null,
-          deliveredAt: null,
-          returnedAt: null,
-          returnReason: null,
-          assignedTruck: "TRUCK-87",
-          assignedDriver: "George Campbell",
-          customerSignature: null,
-          deliveryPhoto: null,
-          history: [
-            {
-              notes: "Ingested automatically into logistics. Ready for truck pre-allocation or dispatch. Physical copy archived on server.",
-              status: "REGISTERED",
-              location: "ProSpaces - Tantallon",
-              operator: "Azure OCR Automate Stream",
-              timestamp: "6/16/2026, 11:15:48 AM"
-            },
-            {
-              notes: "Allocated truck to delivery path: Truck-1 (Driver: George Campbell).",
-              status: "REGISTERED",
-              location: "ProSpaces - Tantallon",
-              operator: "Logistics Board Coordinator",
-              timestamp: "2026-06-16T14:16:19.891Z"
-            }
-          ]
-        }
-      ]
+      branches: [],
+      trucks: [],
+      users: [],
+      deliveries: []
     };
   }
 
@@ -1703,29 +1414,7 @@ app.use((req, res, next) => {
         throw new Error(primaryError?.message || "Error pulling multi-tenant tables from Supabase.");
       }
 
-      // Automatically seed the live tables if they are active but contain 0 records for this tenant
-      if ((rBranches.data || []).length === 0) {
-        console.log(`Live database has 0 registers/branches for tenant '${tenantId}'. Automatically seeding default templates...`);
-        try {
-          await seedDefaultState(supabase, String(tenantId));
-          // Re-fetch to load the seeded records from the database with a safe timeout
-          const [fBranches, fTrucks, fUsers, fDeliveries] = await withTimeout<any>(
-            Promise.all([
-              supabase.from("branches").select("*").eq("tenantId", tenantId),
-              supabase.from("trucks").select("*").eq("tenantId", tenantId),
-              supabase.from("users").select("*").eq("tenantId", tenantId),
-              supabase.from("deliveries").select("*").eq("tenantId", tenantId)
-            ]),
-            5000
-          );
-          rBranches = fBranches;
-          rTrucks = fTrucks;
-          rUsers = fUsers;
-          rDeliveries = fDeliveries;
-        } catch (seedErr: any) {
-          console.error("Auto-seeding failed, continuing with empty result set:", seedErr);
-        }
-      }
+      // No automatic mock seeding - working exclusively with live database records
 
       const deserializedUsers = (rUsers.data || []).map((u: any) => deserializeFromPhone(u));
       const deserializedTrucks = (rTrucks.data || []).map((t: any) => deserializeType(t));
@@ -1985,7 +1674,7 @@ app.use((req, res, next) => {
           .from("branches")
           .delete()
           .eq("tenantId", tenantId)
-          .not("id", "in", `(${branchIds.map(id => `"${id}"`).join(",")})`);
+          .not("id", "in", `(${branchIds.map((id: any) => `"${id}"`).join(",")})`);
         if (deleteErr) {
           console.warn("Non-blocking branches sync deletion failed:", deleteErr.message);
         }
@@ -2047,7 +1736,7 @@ app.use((req, res, next) => {
             .from("trucks")
             .delete()
             .eq("tenantId", tenantId)
-            .not("id", "in", `(${truckIds.map(id => `"${id}"`).join(",")})`);
+            .not("id", "in", `(${truckIds.map((id: any) => `"${id}"`).join(",")})`);
           if (deleteErr) {
             console.warn("Non-blocking trucks sync deletion failed:", deleteErr.message);
           }
@@ -2082,7 +1771,7 @@ app.use((req, res, next) => {
             .from("users")
             .delete()
             .eq("tenantId", tenantId)
-            .not("id", "in", `(${userIds.map(id => `"${id}"`).join(",")})`);
+            .not("id", "in", `(${userIds.map((id: any) => `"${id}"`).join(",")})`);
           if (deleteErr) {
             console.warn("Non-blocking users sync deletion failed:", deleteErr.message);
           }
@@ -2105,10 +1794,6 @@ app.use((req, res, next) => {
             if (explicitDeleteErr) {
               console.warn(`Failed to apply explicit deletes for tenant ${tenantId} table ${tbl}:`, explicitDeleteErr.message || explicitDeleteErr);
             }
-          }
-          // Clear the recorded deletes once applied
-          deleteTenantDeleteMarks: {
-            delete deletedTenantRecords[String(tenantId)];
           }
         }
       } catch (e) {
@@ -2171,7 +1856,7 @@ app.use((req, res, next) => {
           .from("deliveries")
           .delete()
           .eq("tenantId", tenantId)
-          .not("id", "in", `(${deliveryIds.map(id => `"${id}"`).join(",")})`);
+          .not("id", "in", `(${deliveryIds.map((id: any) => `"${id}"`).join(",")})`);
         if (deleteErr) {
           console.warn("Non-blocking deliveries sync deletion failed:", deleteErr.message);
         }
@@ -2202,7 +1887,6 @@ app.use((req, res, next) => {
             }
           }
         }
-        delete deletedTenantRecords[tidStr];
       }
 
       res.json({ success: true });
@@ -2235,6 +1919,18 @@ app.use((req, res, next) => {
       if (tblStr === "branches" && idStr === "DC-WINAMILL") {
         deletedTenantRecords[tidStr][tblStr].add("500");
       }
+
+      // Expire this delete mark after 10 minutes to prevent resurrection from stale frontend heartbeats
+      setTimeout(() => {
+        try {
+          if (deletedTenantRecords[tidStr] && deletedTenantRecords[tidStr][tblStr]) {
+            deletedTenantRecords[tidStr][tblStr].delete(idStr);
+            if (tblStr === "branches" && idStr === "DC-WINAMILL") {
+              deletedTenantRecords[tidStr][tblStr].delete("500");
+            }
+          }
+        } catch (e) {}
+      }, 600000);
 
       const supabase = getSupabase(req);
       if (!supabase) {
@@ -2269,9 +1965,20 @@ app.use((req, res, next) => {
       // If deletion succeeded on Supabase, also register the explicit delete marker
       try {
         const tid = String(tenantId);
+        const tbl = String(table);
+        const recordId = String(id);
         if (!deletedTenantRecords[tid]) deletedTenantRecords[tid] = {};
-        if (!deletedTenantRecords[tid][String(table)]) deletedTenantRecords[tid][String(table)] = new Set();
-        deletedTenantRecords[tid][String(table)].add(String(id));
+        if (!deletedTenantRecords[tid][tbl]) deletedTenantRecords[tid][tbl] = new Set();
+        deletedTenantRecords[tid][tbl].add(recordId);
+
+        // Expire this delete mark after 10 minutes
+        setTimeout(() => {
+          try {
+            if (deletedTenantRecords[tid] && deletedTenantRecords[tid][tbl]) {
+              deletedTenantRecords[tid][tbl].delete(recordId);
+            }
+          } catch (e) {}
+        }, 600000);
       } catch (e) {
         console.warn('Failed to record explicit delete marker in memory:', e);
       }
