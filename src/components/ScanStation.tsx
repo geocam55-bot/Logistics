@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
+import { DeliveryRecord, DeliveryStatus, Branch, Truck, User as AppUser } from '../types';
 import { Scan, Truck as TruckIcon, User, Package, MapPin, Eye, Phone, CheckSquare, Sparkles, X, FileSignature, CornerUpLeft, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface ScanStationProps {
@@ -9,9 +9,10 @@ interface ScanStationProps {
   onDeleteDelivery?: (id: string) => void;
   trucks: Truck[];
   branches?: Branch[];
+  users: AppUser[];
 }
 
-export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDeleteDelivery, trucks, branches }: ScanStationProps) {
+export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDeleteDelivery, trucks, branches, users }: ScanStationProps) {
   const BRANCHES = branches || [];
   // Input fields
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -43,6 +44,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
 
   // Form 2
   const [selectedTruck, setSelectedTruck] = useState(trucks[0]?.id || '');
+  const [selectedPicker, setSelectedPicker] = useState('');
 
   // Form 3
   const [deliveryOutcome, setDeliveryOutcome] = useState<'SUCCESS' | 'RETURN'>('SUCCESS');
@@ -719,6 +721,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         setActiveFormType('PICK');
         const storeTrucks = trucks.filter(t => t.branchId === existing.originBranch);
         setSelectedTruck(storeTrucks.length > 0 ? storeTrucks[0].id : (trucks[0]?.id || ''));
+        setSelectedPicker('');
       } else if (existing.status === DeliveryStatus.PICKED_AND_LOADED) {
         // Next Step: Customer Hand-off / Deliver (Phase 3)
         setActiveFormType('DELIVER_RETURN');
@@ -802,8 +805,14 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   const handlePickSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!scannedRecord) return;
+    if (!selectedPicker) {
+      alert("A picker must be chosen and cannot be left blank.");
+      return;
+    }
 
     const selectedTruckDetails = trucks.find(t => t.id === selectedTruck);
+    const pickerUser = users.find(u => u.id === selectedPicker) || users.find(u => u.name === selectedPicker);
+    const pickerName = pickerUser ? pickerUser.name : selectedPicker;
     
     const updated: DeliveryRecord = {
       ...scannedRecord,
@@ -811,14 +820,15 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
       pickedAt: new Date().toISOString(),
       assignedTruck: selectedTruck,
       assignedDriver: selectedTruckDetails?.driver || 'Dave MacNeil',
+      assignedPicker: pickerName,
       history: [
         ...scannedRecord.history,
         {
           status: DeliveryStatus.PICKED_AND_LOADED,
           timestamp: new Date().toISOString(),
           location: BRANCHES.find(b => b.id === scannedRecord.originBranch)?.name || 'Lumber Yard',
-          operator: `${selectedTruckDetails?.driver || 'Driver'}`,
-          notes: `Double checked with original invoice. Loaded into truck ${selectedTruckDetails?.name || selectedTruck}.`
+          operator: `Picker: ${pickerName} / Driver: ${selectedTruckDetails?.driver || 'Driver'}`,
+          notes: `Cargo successfully picked by ${pickerName} and loaded into truck ${selectedTruckDetails?.name || selectedTruck}.`
         }
       ]
     };
@@ -1799,6 +1809,28 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     </>
                   );
                 })()}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Assign Warehouse Picker *</label>
+                <select
+                  required
+                  value={selectedPicker}
+                  onChange={(e) => setSelectedPicker(e.target.value)}
+                  className="w-full border border-slate-200 px-3 py-2 rounded-lg text-xs bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                >
+                  <option value="">-- Select Registered Picker (Required) --</option>
+                  {users.filter(u => u.role === 'Picker').map(u => (
+                    <option key={u.id} value={u.id}>
+                      👤 {u.name} ({u.email})
+                    </option>
+                  ))}
+                </select>
+                {users.filter(u => u.role === 'Picker').length === 0 && (
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5 font-sans leading-relaxed">
+                    ⚠️ No users with <strong>Picker</strong> role are currently registered in the database. Add an operational Picker profile in the <strong>Fleet Setup &gt; Users Setup</strong> view first, or register one in the portal login page.
+                  </div>
+                )}
               </div>
 
               <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs space-y-2 text-blue-800">

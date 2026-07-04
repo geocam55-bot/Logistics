@@ -20,6 +20,7 @@ import {
   deserializeType
 } from './lib/supabaseClient';
 import Dashboard from './components/Dashboard';
+import LiveDashboard from './components/LiveDashboard';
 import ScanStation from './components/ScanStation';
 import DeliveryQueue from './components/DeliveryQueue';
 import ArchitectureView from './components/ArchitectureView';
@@ -27,6 +28,7 @@ import FleetSetup from './components/FleetSetup';
 import StoresSetup from './components/StoresSetup';
 import UsersSetup from './components/UsersSetup';
 import LoginScreen from './components/LoginScreen';
+import LandingPage from './components/LandingPage';
 import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import UserProfileModal, { renderUserAvatarHelper } from './components/UserProfileModal';
 import GpsSetup from './components/GpsSetup';
@@ -34,7 +36,7 @@ import {
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck, Key,
   Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert, Camera, Sliders, User as UserIcon,
-  Compass
+  Compass, Sparkles, Activity
 } from 'lucide-react';
 import prospacesLogo from './assets/images/logo_no_border_tight_1783077241511.jpg';
 
@@ -104,6 +106,7 @@ function deduplicateUsers(usersList: User[]): User[] {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [showLogin, setShowLogin] = useState<boolean>(false);
   const [allTenants, setAllTenants] = useState<Tenant[]>(() => {
     const cached = localStorage.getItem('prospaces_all_tenants');
     if (cached) {
@@ -203,7 +206,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     const role = currentUser.role;
-    if (role === 'Driver') {
+    if (role === 'Driver' || role === 'Picker') {
       if (!['dashboard', 'queue', 'scanner'].includes(activeTab)) {
         setActiveTab('dashboard');
       }
@@ -216,7 +219,7 @@ export default function App() {
 
   // Driver Live GPS Geolocation Sync to database
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'Driver') return;
+    if (!currentUser || (currentUser.role !== 'Driver' && currentUser.role !== 'Picker')) return;
 
     if (!navigator.geolocation) {
       console.warn("Device geolocation is not supported by this browser.");
@@ -928,8 +931,8 @@ export default function App() {
       });
     }
 
-    // 2. If Driver is logged in, ensure their truck exists in the trucks list
-    if (currentUser.role === 'Driver') {
+    // 2. If Driver or Picker is logged in, ensure their truck exists in the trucks list
+    if (currentUser.role === 'Driver' || currentUser.role === 'Picker') {
       const truckExists = newTrucks.some(t => t.driver.toLowerCase() === currentUser.name.toLowerCase());
       if (!truckExists) {
         const isJoshua = currentUser.name.toLowerCase().includes("joshua");
@@ -1282,7 +1285,25 @@ export default function App() {
 
 
   if (!currentTenant || !currentUser) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} tenantsList={allTenants} />;
+    if (showLogin) {
+      return (
+        <LoginScreen 
+          onLoginSuccess={(tenant, user) => {
+            handleLoginSuccess(tenant, user);
+            setShowLogin(false);
+          }} 
+          tenantsList={allTenants} 
+          onBackToLanding={() => setShowLogin(false)}
+        />
+      );
+    }
+    return (
+      <LandingPage 
+        onStartTrial={() => setShowLogin(true)} 
+        onBookDemo={() => setShowLogin(true)} 
+        onLoginClick={() => setShowLogin(true)} 
+      />
+    );
   }
 
   // Check if logged in user is a SUPER_ADMIN
@@ -1692,7 +1713,19 @@ export default function App() {
             <span>HQ Dashboard</span>
           </button>
 
-          {['Admin', 'Dispatcher', 'Driver'].includes(currentUser?.role || '') && (
+          <button
+            onClick={() => setActiveTab('live-dashboard')}
+            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
+              activeTab === 'live-dashboard' 
+                ? theme.activeBtn
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
+            <span>Live Dashboard</span>
+          </button>
+
+          {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
             <button
               onClick={() => setActiveTab('scanner')}
               className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
@@ -1749,6 +1782,18 @@ export default function App() {
               <span>Fleet Setup</span>
             </button>
           )}
+
+          <button
+            onClick={() => setActiveTab('landing-preview')}
+            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
+              activeTab === 'landing-preview' 
+                ? theme.activeBtn
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+            <span>Website Preview</span>
+          </button>
 
         </div>
 
@@ -1828,6 +1873,14 @@ export default function App() {
               currentUser={currentUser}
             />
           )}
+          {activeTab === 'live-dashboard' && (
+            <LiveDashboard 
+              deliveries={deliveries} 
+              trucks={trucks} 
+              branches={branches}
+              users={users}
+            />
+          )}
           {activeTab === 'scanner' && (
             <ScanStation 
               deliveries={deliveries} 
@@ -1835,6 +1888,7 @@ export default function App() {
               onDeleteDelivery={handleDeleteDelivery}
               trucks={trucks} 
               branches={branches}
+              users={users}
             />
           )}
           {activeTab === 'queue' && (
@@ -1844,6 +1898,7 @@ export default function App() {
               onAddOrUpdateDelivery={handleAddOrUpdateDelivery}
               onDeleteDelivery={handleDeleteDelivery}
               branches={branches}
+              users={users}
             />
           )}
           {activeTab === 'stores' && (
@@ -1912,6 +1967,16 @@ export default function App() {
               defaultSegment="blueprint"
               allowedSegments={['blueprint', 'supabase-db']}
             />
+          )}
+          {activeTab === 'landing-preview' && (
+            <div className="bg-white border border-slate-200/60 rounded-2xl shadow-xs overflow-hidden">
+              <LandingPage 
+                onStartTrial={() => setActiveTab('dashboard')} 
+                onBookDemo={() => setActiveTab('dashboard')} 
+                onLoginClick={() => setActiveTab('dashboard')} 
+                isEmbedPreview={true}
+              />
+            </div>
           )}
         </div>
 

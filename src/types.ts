@@ -24,6 +24,7 @@ export interface DeliveryRecord {
   returnReason?: string;
   assignedTruck?: string;
   assignedDriver?: string;
+  assignedPicker?: string;
   customerSignature?: string; // Base64 or mock SVG
   deliveryPhoto?: string; // Mock image description or actual mock URL
   pdfUrl?: string; // Link to the uploaded physical invoice/receipt PDF
@@ -67,7 +68,7 @@ export interface Truck {
   gpsLng?: number;
 }
 
-export type UserRole = 'Driver' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';
+export type UserRole = 'Driver' | 'Picker' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';
 
 export interface User {
   id: string;

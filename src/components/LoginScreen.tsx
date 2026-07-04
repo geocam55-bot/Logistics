@@ -29,15 +29,16 @@ async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promis
 interface LoginScreenProps {
   onLoginSuccess: (tenant: Tenant, user: User) => void;
   tenantsList?: Tenant[];
+  onBackToLanding?: () => void;
 }
 
-export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreenProps) {
+export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLanding }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
   // Registration parameters
   const [customName, setCustomName] = useState('');
-  const [customRole, setCustomRole] = useState<'Admin' | 'Dispatcher' | 'Driver'>('Dispatcher');
+  const [customRole, setCustomRole] = useState<'Admin' | 'Dispatcher' | 'Driver' | 'Picker'>('Dispatcher');
   const [customPhone, setCustomPhone] = useState('');
   const [customStoreId, setCustomStoreId] = useState('');
   
@@ -568,7 +569,18 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
       <div className="w-full md:w-7/12 bg-white flex flex-col justify-between py-10 px-6 sm:px-12 md:px-16 lg:px-24">
         
         {/* Navigation Action Area */}
-        <div className="flex items-center justify-end pointer-events-none md:pointer-events-auto shrink-0 mb-6 font-medium">
+        <div className="flex items-center justify-between shrink-0 mb-6 font-medium">
+          {onBackToLanding ? (
+            <button
+              onClick={onBackToLanding}
+              className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center space-x-1.5 transition-colors cursor-pointer"
+            >
+              <span>&larr;</span>
+              <span>Back to Website</span>
+            </button>
+          ) : (
+            <div />
+          )}
           <span className="text-[10px] font-bold text-slate-300 font-mono tracking-widest uppercase">
             SECURED ENDPOINT
           </span>
@@ -773,8 +785,8 @@ export default function LoginScreen({ onLoginSuccess, tenantsList }: LoginScreen
                 <label className="block text-xs font-semibold text-slate-700">
                   Operational Portal Role
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Admin', 'Dispatcher', 'Driver'].map((role) => {
+                <div className="grid grid-cols-4 gap-2">
+                  {['Admin', 'Dispatcher', 'Driver', 'Picker'].map((role) => {
                     const isActive = customRole === role;
                     return (
                       <button

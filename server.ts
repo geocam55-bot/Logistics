@@ -1522,6 +1522,28 @@ app.use((req, res, next) => {
             status: "Active",
             driverLicenseExpire: "2027-01-22",
             associatedStoreId: "DC-WINAMILL"
+          },
+          {
+            id: "USR-5501",
+            tenantId: String(req.query.tenantId),
+            name: "Albert Einstein (Picker)",
+            email: "albert.picker@prospaces.com",
+            role: "Picker",
+            phone: " ||pw:Albert2026! ||status:Active",
+            password: "Albert2026!",
+            status: "Active",
+            associatedStoreId: "DC-WINAMILL"
+          },
+          {
+            id: "USR-5502",
+            tenantId: String(req.query.tenantId),
+            name: "David Smith (Picker)",
+            email: "david.picker@prospaces.com",
+            role: "Picker",
+            phone: " ||pw:David2026! ||status:Active",
+            password: "David2026!",
+            status: "Active",
+            associatedStoreId: "DC-WINAMILL"
           }
         ],
         deliveries: [

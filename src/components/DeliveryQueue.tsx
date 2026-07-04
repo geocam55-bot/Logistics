@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { DeliveryRecord, DeliveryStatus, Branch, Truck } from '../types';
+import { DeliveryRecord, DeliveryStatus, Branch, Truck, User as AppUser } from '../types';
 import { 
   Search, MapPin, Eye, Clock, User, Phone, CheckCircle2, 
   AlertTriangle, ChevronDown, ChevronUp, FileText, 
@@ -12,12 +12,14 @@ interface DeliveryQueueProps {
   onAddOrUpdateDelivery: (record: DeliveryRecord) => void;
   onDeleteDelivery: (id: string) => void;
   branches?: Branch[];
+  users: AppUser[];
 }
 
-export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches }: DeliveryQueueProps) {
+export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches, users }: DeliveryQueueProps) {
   const BRANCHES = branches || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
+  const [selectedDateFilter, setSelectedDateFilter] = useState('');
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | DeliveryStatus>('ALL');
 
@@ -44,6 +46,13 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
   const [formSignature, setFormSignature] = useState('');
   const [formPhoto, setFormPhoto] = useState('');
   const [formPdfUrl, setFormPdfUrl] = useState('');
+  const [formPicker, setFormPicker] = useState('');
+  const [formDeliveredAt, setFormDeliveredAt] = useState('');
+  const [formRegisteredAt, setFormRegisteredAt] = useState('');
+
+  // Picker selection quick popup state
+  const [pickerModalDeliveryId, setPickerModalDeliveryId] = useState<string | null>(null);
+  const [quickSelectedPicker, setQuickSelectedPicker] = useState('');
 
   const handleOpenAddModal = () => {
     const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
@@ -67,6 +76,9 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     setFormSignature('');
     setFormPhoto('');
     setFormPdfUrl('');
+    setFormPicker('');
+    setFormRegisteredAt(new Date().toISOString().substring(0, 10));
+    setFormDeliveredAt('');
     
     setIsModalOpen(true);
   };
@@ -89,6 +101,9 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     setFormSignature(record.customerSignature || '');
     setFormPhoto(record.deliveryPhoto || '');
     setFormPdfUrl(record.pdfUrl || '');
+    setFormPicker(record.assignedPicker || '');
+    setFormRegisteredAt(record.registeredAt ? record.registeredAt.substring(0, 10) : new Date().toISOString().substring(0, 10));
+    setFormDeliveredAt(record.deliveredAt ? record.deliveredAt.substring(0, 10) : '');
     
     setIsModalOpen(true);
   };
@@ -100,8 +115,16 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
       return;
     }
 
+    if (formStatus === DeliveryStatus.PICKED_AND_LOADED && !formPicker) {
+      alert("A picker must be chosen and cannot be left blank when moving to Loaded on Truck.");
+      return;
+    }
+
     const matchedTruck = trucks.find(t => t.id === formAssignedTruck);
     const originStoreName = BRANCHES.find(b => b.id === formOriginBranch)?.name || 'Local Store';
+    
+    const pickerUser = users.find(u => u.id === formPicker) || users.find(u => u.name === formPicker);
+    const pickerName = pickerUser ? pickerUser.name : formPicker;
 
     if (editingRecord) {
       // Edit Mode
@@ -111,12 +134,16 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
       let newHistory = [...editingRecord.history];
       
       if (isStatusChanged) {
+        let historyNotes = `Status manually updated from ${editingRecord.status} to ${formStatus} via Action form.`;
+        if (formStatus === DeliveryStatus.PICKED_AND_LOADED && pickerName) {
+          historyNotes = `Cargo manually moved to Loaded on Truck stage. Picker assigned: ${pickerName}.`;
+        }
         newHistory.push({
           status: formStatus,
           timestamp: new Date().toISOString(),
           location: originStoreName,
           operator: 'Logistics Board Coordinator',
-          notes: `Status manually updated from ${editingRecord.status} to ${formStatus} via Action form.`
+          notes: historyNotes
         });
       }
       
@@ -151,8 +178,13 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         orderTotal: formOrderTotal || undefined,
         destinationNotes: formNotes || undefined,
         status: formStatus,
+        registeredAt: formRegisteredAt ? new Date(formRegisteredAt).toISOString() : (editingRecord?.registeredAt || new Date().toISOString()),
+        deliveredAt: formStatus === DeliveryStatus.DELIVERED 
+          ? (formDeliveredAt ? new Date(formDeliveredAt).toISOString() : (editingRecord?.deliveredAt || new Date().toISOString())) 
+          : undefined,
         assignedTruck: formAssignedTruck || undefined,
         assignedDriver: matchedTruck?.driver || undefined,
+        assignedPicker: formStatus === DeliveryStatus.PICKED_AND_LOADED ? pickerName : (editingRecord?.assignedPicker || undefined),
         returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
         customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || editingRecord.customerSignature || 'Physical Signoff Done') : undefined,
         deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || editingRecord.deliveryPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
@@ -195,9 +227,13 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         orderTotal: formOrderTotal || undefined,
         destinationNotes: formNotes || undefined,
         status: formStatus,
-        registeredAt: new Date().toISOString(),
+        registeredAt: formRegisteredAt ? new Date(formRegisteredAt).toISOString() : new Date().toISOString(),
+        deliveredAt: formStatus === DeliveryStatus.DELIVERED 
+          ? (formDeliveredAt ? new Date(formDeliveredAt).toISOString() : new Date().toISOString()) 
+          : undefined,
         assignedTruck: formAssignedTruck || undefined,
         assignedDriver: matchedTruck?.driver || undefined,
+        assignedPicker: formStatus === DeliveryStatus.PICKED_AND_LOADED ? pickerName : undefined,
         returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
         customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || 'Physical Handoff Validated') : undefined,
         deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
@@ -257,8 +293,22 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
   };
 
   const handleLoadCargo = (deliveryId: string) => {
-    const delivery = deliveries.find(d => d.id === deliveryId);
+    setPickerModalDeliveryId(deliveryId);
+    setQuickSelectedPicker('');
+  };
+
+  const handleConfirmQuickPickerLoad = () => {
+    if (!pickerModalDeliveryId) return;
+    if (!quickSelectedPicker) {
+      alert("A picker must be chosen and cannot be left blank.");
+      return;
+    }
+
+    const delivery = deliveries.find(d => d.id === pickerModalDeliveryId);
     if (!delivery) return;
+
+    const pickerUser = users.find(u => u.id === quickSelectedPicker) || users.find(u => u.name === quickSelectedPicker);
+    const pickerName = pickerUser ? pickerUser.name : quickSelectedPicker;
 
     const originStoreName = BRANCHES.find(b => b.id === delivery.originBranch)?.name || 'Local Store';
     
@@ -268,18 +318,21 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         status: DeliveryStatus.PICKED_AND_LOADED,
         timestamp: new Date().toISOString(),
         location: originStoreName,
-        operator: 'Logistics Board Coordinator',
-        notes: `Cargo confirmed physically loaded onto assigned truck.`
+        operator: `Picker: ${pickerName} / Board Coordinator`,
+        notes: `Cargo manually confirmed loaded onto truck. Picker assigned: ${pickerName}.`
       }
     ];
 
     const updatedRecord: DeliveryRecord = {
       ...delivery,
       status: DeliveryStatus.PICKED_AND_LOADED,
+      assignedPicker: pickerName,
       history: updatedHistory
     };
 
     onAddOrUpdateDelivery(updatedRecord);
+    setPickerModalDeliveryId(null);
+    setQuickSelectedPicker('');
   };
 
   // Toggle record expanded state
@@ -306,13 +359,25 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     // 3. Text Search Filter (Barcode or Customer or invoice)
     const text = searchQuery.toLowerCase();
     if (text) {
-      return (
+      if (!(
         record.id.toLowerCase().includes(text) ||
         record.customerName.toLowerCase().includes(text) ||
         record.invoiceNumber.toLowerCase().includes(text) ||
         record.epicorSalesOrder.toLowerCase().includes(text) ||
         record.deliveryAddress.toLowerCase().includes(text)
-      );
+      )) {
+        return false;
+      }
+    }
+
+    // 4. Date Filter (track by deliveredAt if delivered, or registeredAt if not yet delivered)
+    if (selectedDateFilter) {
+      const recordDate = record.deliveredAt 
+        ? record.deliveredAt.substring(0, 10) 
+        : record.registeredAt?.substring(0, 10);
+      if (recordDate !== selectedDateFilter) {
+        return false;
+      }
     }
 
     return true;
@@ -350,6 +415,26 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-white border border-slate-200 pl-9 pr-3 py-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
             />
+          </div>
+
+          {/* Datepicker Filter */}
+          <div className="relative">
+            <input 
+              type="date"
+              value={selectedDateFilter}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              className="border border-slate-200 px-3 py-2 text-xs rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono w-full sm:w-auto"
+              title="Filter deliveries by date (Delivered Date for completed, or Registration Date for pending)"
+            />
+            {selectedDateFilter && (
+              <button
+                type="button"
+                onClick={() => setSelectedDateFilter('')}
+                className="absolute right-7 top-2 text-[10px] font-bold text-red-500 hover:text-red-700 bg-white px-1 rounded"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {/* Branch selector */}
@@ -484,9 +569,17 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
 
                   {/* Middle Column: Logistics Driver & Origin Store */}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <div className="flex items-center space-x-1 py-1 px-2.5 bg-slate-50 rounded text-slate-700">
-                      <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      <span className="font-mono text-[11px]">{new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center space-x-1.5 py-1 px-2.5 bg-slate-50 rounded text-slate-700 text-[10px]" title="Registration / Staging Date">
+                        <Clock className="h-3 w-3 text-slate-400" />
+                        <span className="font-mono font-semibold">Reg: {new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                      {delivery.deliveredAt && (
+                        <div className="flex items-center space-x-1.5 py-1 px-2.5 bg-green-50 border border-green-100 rounded text-green-800 text-[10px]" title="Actual Delivery Date">
+                          <CheckCircle2 className="h-3 w-3 text-green-500 animate-pulse" />
+                          <span className="font-mono font-bold">Delivered: {new Date(delivery.deliveredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="py-1 px-2.5 bg-slate-50 border border-slate-100 rounded text-[11px] text-slate-600">
@@ -517,6 +610,14 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         );
                       }
                     })()}
+
+                    {delivery.assignedPicker && (
+                      <div className="py-1 px-2.5 bg-emerald-50 border border-emerald-100 text-emerald-900 font-semibold rounded-lg text-[11px] flex items-center space-x-1 shadow-sm font-sans">
+                        <span className="text-xs">👤</span>
+                        <span className="text-gray-500 font-medium">Picker:</span>
+                        <span className="text-emerald-800 font-semibold">{delivery.assignedPicker}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column: Status Banner */}
@@ -1013,6 +1114,43 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                   </select>
                 </div>
 
+                {/* Staging / Registration Date */}
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Staging / Registration Date *</label>
+                  <input 
+                    type="date"
+                    required
+                    value={formRegisteredAt}
+                    onChange={(e) => setFormRegisteredAt(e.target.value)}
+                    className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Picker selection if Picked & Loaded is chosen */}
+                {formStatus === DeliveryStatus.PICKED_AND_LOADED && (
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Assign Warehouse Picker *</label>
+                    <select
+                      required
+                      value={formPicker}
+                      onChange={(e) => setFormPicker(e.target.value)}
+                      className="w-full bg-white border border-slate-200 p-2 text-xs rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">-- Select Registered Picker (Required) --</option>
+                      {users.filter(u => u.role === 'Picker').map(u => (
+                        <option key={u.id} value={u.id}>
+                          👤 {u.name} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                    {users.filter(u => u.role === 'Picker').length === 0 && (
+                      <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 font-sans leading-relaxed">
+                        ⚠️ No users with <strong>Picker</strong> role are currently registered in the database. Setup an operational Picker profile in <strong>Fleet Setup &gt; Users Setup</strong> or via login screen registration.
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Return reason if exception is chosen */}
                 {formStatus === DeliveryStatus.RETURNED && (
                   <div>
@@ -1031,6 +1169,16 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                 {/* Sign-off properties if Delivered */}
                 {formStatus === DeliveryStatus.DELIVERED && (
                   <>
+                    <div>
+                      <label className="block text-green-600 font-bold mb-1 font-mono uppercase text-[10px]">Actual Date Delivered *</label>
+                      <input 
+                        type="date"
+                        required
+                        value={formDeliveredAt || new Date().toISOString().substring(0, 10)}
+                        onChange={(e) => setFormDeliveredAt(e.target.value)}
+                        className="w-full bg-green-50 border border-green-200 p-2 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-green-500"
+                      />
+                    </div>
                     <div>
                       <label className="block text-indigo-600 font-bold mb-1 font-mono uppercase text-[10px]">Recipient Handover File Signature</label>
                       <input 
@@ -1140,6 +1288,70 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Picker Assignment Modal (Manual "Loaded on Truck" confirmation flow) */}
+      {pickerModalDeliveryId && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-55 backdrop-blur-xs">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setPickerModalDeliveryId(null)}
+          />
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 max-w-md w-full relative z-10 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center space-x-2 text-blue-700 mb-4">
+              <User className="h-5 w-5" />
+              <h4 className="font-sans font-bold text-slate-900 text-lg">
+                Assign Warehouse Picker
+              </h4>
+            </div>
+            
+            <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+              Moving manual ticket <strong className="text-slate-900 font-semibold">{pickerModalDeliveryId}</strong> to the <strong>Loaded on Truck</strong> stage requires identifying the picker responsible for staging the cargo.
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-slate-500 font-bold mb-1 font-mono uppercase text-[10px]">Select Registered Picker *</label>
+                <select
+                  required
+                  value={quickSelectedPicker}
+                  onChange={(e) => setQuickSelectedPicker(e.target.value)}
+                  className="w-full bg-white border border-slate-200 p-2.5 text-xs rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">-- Choose Picker (Required) --</option>
+                  {users.filter(u => u.role === 'Picker').map(u => (
+                    <option key={u.id} value={u.id}>
+                      👤 {u.name} ({u.email})
+                    </option>
+                  ))}
+                </select>
+                {users.filter(u => u.role === 'Picker').length === 0 && (
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 mt-2 font-sans leading-relaxed">
+                    ⚠️ No users with the <strong>Picker</strong> role are registered. Please create a Picker in <strong>Fleet Setup &gt; Users Setup</strong> first, or register one in the portal registration.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setPickerModalDeliveryId(null)}
+                className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition-colors font-semibold cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!quickSelectedPicker}
+                onClick={handleConfirmQuickPickerLoad}
+                className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 shadow-sm transition-colors font-bold cursor-pointer text-xs flex items-center space-x-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Confirm &amp; Load Truck</span>
               </button>
             </div>
           </div>
