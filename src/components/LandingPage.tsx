@@ -52,6 +52,7 @@ export default function LandingPage({
   // Interactive Simulation states
   const [activeTab, setActiveTab] = useState<'routes' | 'tracking' | 'crm'>('routes');
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [tourStep, setTourStep] = useState(0);
 
   // Live dashboard mockup state
@@ -145,12 +146,12 @@ export default function LandingPage({
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-11 w-auto object-contain"
+                className="h-16 w-auto object-contain"
                 referrerPolicy="no-referrer"
               />
               <div className="flex flex-col">
-                <span className="font-sans font-black text-slate-900 text-lg tracking-tight leading-none">ProSpaces</span>
-                <span className="text-orange-600 text-[10px] font-mono uppercase tracking-wider font-extrabold mt-0.5">Logistics Module</span>
+                <span className="font-sans font-black text-slate-900 text-2xl tracking-tight leading-none">ProSpaces</span>
+                <span className="text-orange-600 text-xs font-mono uppercase tracking-wider font-extrabold mt-1">Logistics Module</span>
               </div>
             </div>
 
@@ -163,7 +164,7 @@ export default function LandingPage({
                 Features
               </button>
               <button 
-                onClick={() => handleScrollTo('workflow-section')}
+                onClick={() => setShowComingSoon(true)}
                 className="text-slate-600 hover:text-slate-900 font-bold text-sm cursor-pointer transition-colors"
               >
                 CRM Integration
@@ -178,12 +179,6 @@ export default function LandingPage({
 
             {/* Action Buttons */}
             <div className="hidden md:flex items-center space-x-3">
-              <button 
-                onClick={onLoginClick}
-                className="px-4 py-2 text-slate-700 hover:text-slate-900 font-bold text-sm transition-colors cursor-pointer"
-              >
-                Portal Sign-In
-              </button>
               <button 
                 onClick={onBookDemo}
                 className="px-5 py-2.5 bg-[#FF5A1F] hover:bg-[#E54B13] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-orange-500/10 cursor-pointer hover:-translate-y-0.5 duration-150"
@@ -221,7 +216,10 @@ export default function LandingPage({
                   Features
                 </button>
                 <button 
-                  onClick={() => handleScrollTo('workflow-section')}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowComingSoon(true);
+                  }}
                   className="block w-full text-left px-3 py-2 text-slate-600 hover:text-slate-900 font-bold text-sm rounded-lg"
                 >
                   CRM Integration
@@ -233,12 +231,6 @@ export default function LandingPage({
                   Fleet Tracking
                 </button>
                 <div className="border-t border-slate-100 pt-3 flex flex-col space-y-2">
-                  <button 
-                    onClick={onLoginClick}
-                    className="w-full py-2 px-3 text-center text-slate-600 hover:text-slate-900 font-bold text-sm rounded-lg"
-                  >
-                    Portal Sign-In
-                  </button>
                   <button 
                     onClick={onBookDemo}
                     className="w-full py-2.5 bg-[#FF5A1F] text-white font-bold text-sm rounded-xl text-center shadow-sm"
@@ -276,18 +268,11 @@ export default function LandingPage({
               
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
                 <button 
-                  onClick={onStartTrial}
+                  onClick={onLoginClick}
                   className="w-full sm:w-auto px-8 py-4 bg-[#FF5A1F] hover:bg-[#E54B13] text-white font-bold rounded-xl transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center space-x-2 cursor-pointer group"
                 >
-                  <span>Start Free Trial</span>
+                  <span>Enter Logistic Workspace</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-                <button 
-                  onClick={() => setShowVideoModal(true)}
-                  className="w-full sm:w-auto px-6 py-4 bg-white hover:bg-slate-50 text-slate-700 font-bold border border-slate-200 rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-xs"
-                >
-                  <Play className="h-4 w-4 text-orange-500 fill-orange-500" />
-                  <span>Watch 2-Minute Tour</span>
                 </button>
               </div>
 
@@ -417,53 +402,52 @@ export default function LandingPage({
       {/* 3. "Trusted By" Association Bar */}
       <section className="bg-slate-50 border-y border-slate-100 py-10" id="trusted-bar">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-[11px] font-mono uppercase tracking-widest text-slate-400 font-bold mb-6 select-none">
-            TRUSTED BY NATIONAL DEALER GROUPS & ASSOCIATIONS
+          <p className="text-center text-[11px] font-mono uppercase tracking-widest text-slate-400 font-extrabold mb-6 select-none">
+            BUILT BY THE PROSPACES CRM TEAM FOR
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 items-center justify-items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 items-center justify-items-center">
             
-            {/* Logo 1 */}
-            <div className="flex items-center space-x-2 text-slate-400 hover:text-slate-600 transition-colors select-none font-bold text-xs uppercase font-mono group">
-              <Building className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+            {/* Item 1 */}
+            <div className="flex items-center space-x-3 text-slate-600 hover:text-slate-900 transition-colors select-none font-bold text-xs uppercase font-mono group">
+              <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-xs group-hover:border-slate-200 transition-colors">
+                <Home className="h-5 w-5 text-[#FF5A1F] transition-transform duration-300 group-hover:scale-110" />
+              </div>
               <div className="flex flex-col">
-                <span className="leading-none text-[10px]">Building Material</span>
-                <span className="font-extrabold tracking-tight">Dealers</span>
+                <span className="font-extrabold tracking-tight leading-tight">Home Improvement</span>
+                <span className="text-slate-400 text-[10px] leading-tight">Centers</span>
               </div>
             </div>
 
-            {/* Logo 2 */}
-            <div className="flex items-center space-x-2 text-slate-400 hover:text-slate-600 transition-colors select-none font-bold text-xs uppercase font-mono group">
-              <Home className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+            {/* Item 2 */}
+            <div className="flex items-center space-x-3 text-slate-600 hover:text-slate-900 transition-colors select-none font-bold text-xs uppercase font-mono group">
+              <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-xs group-hover:border-slate-200 transition-colors">
+                <Building className="h-5 w-5 text-blue-600 transition-transform duration-300 group-hover:scale-110" />
+              </div>
               <div className="flex flex-col">
-                <span className="leading-none text-[10px]">Lumber</span>
-                <span className="font-extrabold tracking-tight">Association</span>
+                <span className="font-extrabold tracking-tight leading-tight">Lumber & Building</span>
+                <span className="text-slate-400 text-[10px] leading-tight">Material Dealers</span>
               </div>
             </div>
 
-            {/* Logo 3 */}
-            <div className="flex items-center space-x-2 text-slate-400 hover:text-slate-600 transition-colors select-none font-bold text-xs uppercase font-mono group">
-              <Building className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+            {/* Item 3 */}
+            <div className="flex items-center space-x-3 text-slate-600 hover:text-slate-900 transition-colors select-none font-bold text-xs uppercase font-mono group">
+              <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-xs group-hover:border-slate-200 transition-colors">
+                <User className="h-5 w-5 text-emerald-600 transition-transform duration-300 group-hover:scale-110" />
+              </div>
               <div className="flex flex-col">
-                <span className="leading-none text-[10px]">Building</span>
-                <span className="font-extrabold tracking-tight">Material</span>
+                <span className="font-extrabold tracking-tight leading-tight">Pro Desk</span>
+                <span className="text-slate-400 text-[10px] leading-tight">Sales Teams</span>
               </div>
             </div>
 
-            {/* Logo 4 */}
-            <div className="flex items-center space-x-2 text-slate-400 hover:text-slate-600 transition-colors select-none font-bold text-xs uppercase font-mono group">
-              <Building className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
-              <div className="flex flex-col">
-                <span className="leading-none text-[10px]">Lumber</span>
-                <span className="font-extrabold tracking-tight">Association</span>
+            {/* Item 4 */}
+            <div className="flex items-center space-x-3 text-slate-600 hover:text-slate-900 transition-colors select-none font-bold text-xs uppercase font-mono group">
+              <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-xs group-hover:border-slate-200 transition-colors">
+                <RefreshCw className="h-5 w-5 text-purple-600 transition-transform duration-300 group-hover:scale-110" />
               </div>
-            </div>
-
-            {/* Logo 5 */}
-            <div className="flex items-center space-x-2 text-slate-400 hover:text-slate-600 transition-colors col-span-2 sm:col-span-1 select-none font-bold text-xs uppercase font-mono group">
-              <Building className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
               <div className="flex flex-col">
-                <span className="leading-none text-[10px]">Lumber</span>
-                <span className="font-extrabold tracking-tight">Association</span>
+                <span className="font-extrabold tracking-tight leading-tight">Multi-Location</span>
+                <span className="text-slate-400 text-[10px] leading-tight">Operations</span>
               </div>
             </div>
 
@@ -811,12 +795,12 @@ export default function LandingPage({
                 <img 
                   src={prospacesLogo} 
                   alt="ProSpaces Logo" 
-                  className="h-10 w-auto object-contain brightness-110"
+                  className="h-14 w-auto object-contain brightness-110"
                   referrerPolicy="no-referrer"
                 />
                 <div className="flex flex-col">
-                  <span className="font-sans font-black text-white text-base tracking-tight leading-none">ProSpaces</span>
-                  <span className="text-orange-500 text-[9px] font-mono uppercase tracking-wider font-extrabold mt-0.5">Logistics Module</span>
+                  <span className="font-sans font-black text-white text-xl tracking-tight leading-none">ProSpaces</span>
+                  <span className="text-orange-500 text-[10px] font-mono uppercase tracking-wider font-extrabold mt-1">Logistics Module</span>
                 </div>
               </div>
               <p className="text-slate-500 text-xs leading-relaxed">
@@ -829,7 +813,7 @@ export default function LandingPage({
               <h4 className="text-white font-mono text-[10px] font-black tracking-widest uppercase mb-4">Core Ecosystem</h4>
               <ul className="space-y-2.5 text-xs">
                 <li><button onClick={() => handleScrollTo('features-section')} className="hover:text-white transition-colors cursor-pointer">Logistics Features</button></li>
-                <li><button onClick={() => handleScrollTo('workflow-section')} className="hover:text-white transition-colors cursor-pointer">CRM Integration</button></li>
+                <li><button onClick={() => setShowComingSoon(true)} className="hover:text-white transition-colors cursor-pointer">CRM Integration</button></li>
                 <li><button onClick={() => handleScrollTo('dashboard-section')} className="hover:text-white transition-colors cursor-pointer">Dispatch Dashboard</button></li>
                 <li><button onClick={onLoginClick} className="hover:text-white transition-colors cursor-pointer">Secure Portal Login</button></li>
               </ul>
@@ -1050,6 +1034,44 @@ export default function LandingPage({
                 </button>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {showComingSoon && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-55 animate-in fade-in duration-150">
+            <div 
+              className="fixed inset-0" 
+              onClick={() => setShowComingSoon(false)}
+            />
+            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full relative z-10 overflow-hidden animate-in zoom-in duration-150 p-6 sm:p-8 flex flex-col items-center text-center space-y-6">
+              
+              {/* Glowing Icon Wrapper */}
+              <div className="h-16 w-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FF5A1F] relative">
+                <span className="absolute inset-0 bg-orange-400 rounded-2xl animate-ping opacity-15" />
+                <Sparkles className="h-7 w-7" />
+              </div>
+
+              {/* Text */}
+              <div className="space-y-2">
+                <h3 className="font-sans font-black text-slate-900 text-xl tracking-tight leading-none">
+                  CRM Auto-Sync Coming Soon
+                </h3>
+                <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">
+                  Our engineering team is actively finalising the deep two-way integration with the core <strong>ProSpaces CRM</strong> ecosystem.
+                </p>
+                <p className="text-slate-400 text-xs leading-relaxed italic">
+                  When deployed, this will seamlessly synchronize contractor accounts, credit approvals, automated invoice dispatch, and dispatch status updates in real-time.
+                </p>
+              </div>
+
+              {/* Action buttons */}
+              <button
+                onClick={() => setShowComingSoon(false)}
+                className="w-full py-3 bg-[#FF5A1F] hover:bg-[#E54B13] text-white font-bold rounded-xl transition-all shadow-lg shadow-orange-500/20 text-sm cursor-pointer"
+              >
+                Return to Workspace
+              </button>
             </div>
           </div>
         )}
