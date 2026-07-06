@@ -162,15 +162,12 @@ const getTruckCoords = (truck: any, simProgress: Record<string, number>, branche
 
   const homeBranch = branches.find(b => b.id === truck.branchId);
   if (homeBranch) {
-    const latMatch = (homeBranch.address || '').match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i);
-    const lngMatch = (homeBranch.address || '').match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i);
-    if (latMatch && lngMatch) {
-      origLat = parseFloat(latMatch[1]);
-      origLng = parseFloat(lngMatch[1]);
-      destLat = origLat + 0.003;
-      destLng = origLng + 0.003;
-      isMoving = true;
-    }
+    const branchCoords = getBranchCoordinates(homeBranch.id, homeBranch.name, homeBranch.address);
+    origLat = branchCoords.lat;
+    origLng = branchCoords.lng;
+    destLat = origLat + 0.003;
+    destLng = origLng + 0.003;
+    isMoving = true;
   }
 
   const progress = simProgress[truck.id] ?? 0.15;
@@ -202,8 +199,8 @@ const getPercentCoordsFromGps = (lat: number, lng: number): { x: number; y: numb
   return { x, y };
 };
 
-const getBranchCoordinates = (id: string, name: string): { x: number; y: number; lat: number; lng: number } => {
-  const { lat, lng } = getGpsForLocation(id, name);
+const getBranchCoordinates = (id: string, name: string, address?: string): { x: number; y: number; lat: number; lng: number } => {
+  const { lat, lng } = getGpsForLocation(id, address || name);
   const coords = getPercentCoordsFromGps(lat, lng);
   return { x: coords.x, y: coords.y, lat, lng };
 };
@@ -409,7 +406,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   });
   
   // Custom Map Visual Themes
-  const [mapTheme, setMapTheme] = useState<'default' | 'satellite' | 'terrain' | 'traffic'>('default');
+  const [mapTheme, setMapTheme] = useState<'default' | 'streets' | 'satellite' | 'terrain' | 'traffic'>('streets');
 
   // Map engine configuration (Supports TomTom and OpenStreetMap/CartoDB fallbacks)
   const [mapEngine, setMapEngine] = useState<'carto' | 'tomtom'>('carto');
@@ -553,7 +550,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     if (selectedTruck) {
       const homeBranch = activeBranches.find(b => b.id === selectedTruck.branchId);
       if (homeBranch) {
-        const coords = getGpsForLocation(homeBranch.id, homeBranch.name);
+        const coords = getGpsForLocation(homeBranch.id, homeBranch.address || homeBranch.name);
         if (coords && coords.lat !== 0 && coords.lng !== 0) {
           setHqCoords(coords);
           return;
@@ -601,14 +598,15 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     if (!hasRealGps) {
       const assignedDelivery = deliveries.find(d => d.assignedTruck === selectedTruck.id && d.status !== DeliveryStatus.DELIVERED);
       if (assignedDelivery) {
-        const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+        const matchedOrigBranch = activeBranches.find(b => b.id === assignedDelivery.originBranch);
+        const orig = getBranchCoordinates(assignedDelivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
         targetLat = orig.lat;
         targetLng = orig.lng;
       } else {
         const homeBranch = activeBranches.find(b => b.id === selectedTruck.branchId);
         const isProSpaces = selectedTruck.tenantId === 'prospaces';
         const orig = homeBranch 
-          ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+          ? getBranchCoordinates(homeBranch.id, homeBranch.name, homeBranch.address) 
           : isProSpaces 
             ? { lat: 44.6488, lng: -63.5752 } 
             : { lat: 37.2872, lng: -121.9500 };
@@ -659,6 +657,16 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     layersRef.current.trucks = L.layerGroup().addTo(map);
     layersRef.current.routes = L.layerGroup().addTo(map);
 
+    // Set up ResizeObserver to handle container layout changes and prevent grey "blocking" grids
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     // Map click handler to relocate Dispatcher HQ coordinates - only if Shift key is held to prevent accidental relocation!
     map.on('click', (e: L.LeafletMouseEvent) => {
       const isShiftKey = e.originalEvent && e.originalEvent.shiftKey;
@@ -686,6 +694,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     });
 
     return () => {
+      resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -708,13 +717,25 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     let urlTemplate = '';
     let attribution = '';
     let hasSubdomains = false;
+    let customSubdomains = '';
 
     if (mapTheme === 'terrain') {
       // Use premium Esri Topography & Terrain basemap
       urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
       attribution = 'Tiles &copy; Esri &mdash; Esri, USGS, NOAA';
+    } else if (mapTheme === 'streets') {
+      // Use premium Esri World Street Map (highly detailed streets, roads, and names with zero blocking/rate limits)
+      urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+      attribution = 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, TomTom, and the GIS User Community';
+    } else if (mapTheme === 'osm') {
+      // Use standard OpenStreetMap with correct 'abc' subdomain configuration to prevent 404 blockages
+      urlTemplate = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+      hasSubdomains = true;
+      customSubdomains = 'abc';
     } else if (mapEngine === 'tomtom' && tomTomApiKey) {
       hasSubdomains = true;
+      customSubdomains = 'abcd';
       if (mapTheme === 'satellite') {
         urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/sat/main/{z}/{x}/{y}.jpg?key=${tomTomApiKey}`;
         attribution = '&copy; TomTom Satellite Imagery';
@@ -732,16 +753,18 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         // default or traffic
         urlTemplate = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
         attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+        hasSubdomains = true;
+        customSubdomains = 'abcd';
       }
     }
 
     const tileOptions: L.TileLayerOptions = {
       attribution,
-      maxZoom: 18,
+      maxZoom: (mapTheme === 'streets' || mapTheme === 'osm') ? 19 : 18,
     };
 
-    if (hasSubdomains) {
-      tileOptions.subdomains = 'abcd';
+    if (hasSubdomains && customSubdomains) {
+      tileOptions.subdomains = customSubdomains;
     }
 
     const tileLayer = L.tileLayer(urlTemplate, tileOptions).addTo(mapRef.current);
@@ -803,7 +826,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     // Plot Branches/DC Nodes
     if (bGroup) {
       activeBranches.forEach(branch => {
-        const coords = getBranchCoordinates(branch.id, branch.name);
+        const coords = getBranchCoordinates(branch.id, branch.name, branch.address);
         const isDC = branch.type === 'DC';
         const count = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
 
@@ -874,7 +897,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             }
           }
         }
-        const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
+        const matchedOrigBranch = activeBranches.find(b => b.id === delivery.originBranch);
+        const origCoords = getBranchCoordinates(delivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
         const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
 
         const deliveryIcon = L.divIcon({
@@ -919,7 +943,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     }
 
     activeBranches.forEach(branch => {
-      const coords = getBranchCoordinates(branch.id, branch.name);
+      const coords = getBranchCoordinates(branch.id, branch.name, branch.address);
       if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) {
         allPlottedCoords.push([coords.lat, coords.lng]);
       }
@@ -934,7 +958,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           if (!online) return; // Skip bounds plotting if driver is offline
         }
       }
-      const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
+      const matchedOrigBranch = activeBranches.find(b => b.id === delivery.originBranch);
+      const origCoords = getBranchCoordinates(delivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
       const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
       if (destCoords && !isNaN(destCoords.lat) && !isNaN(destCoords.lng)) {
         allPlottedCoords.push([destCoords.lat, destCoords.lng]);
@@ -952,7 +977,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
         const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
         if (assignedDelivery) {
-          const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+          const matchedOrigBranch = activeBranches.find(b => b.id === assignedDelivery.originBranch);
+          const orig = getBranchCoordinates(assignedDelivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
           const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
           origLat = isNaN(orig.lat) ? 44.6488 : orig.lat;
           origLng = isNaN(orig.lng) ? -63.5752 : orig.lng;
@@ -963,7 +989,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           const homeBranch = activeBranches.find(b => b.id === truck.branchId);
           const isProSpaces = truck.tenantId === 'prospaces';
           const orig = homeBranch 
-            ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+            ? getBranchCoordinates(homeBranch.id, homeBranch.name, homeBranch.address) 
             : isProSpaces 
               ? { lat: 44.6488, lng: -63.5752 } 
               : { lat: 37.2872, lng: -121.9500 };
@@ -1348,6 +1374,28 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
               <button
                 type="button"
+                onClick={() => setMapTheme('streets')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'streets' 
+                    ? 'bg-blue-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Detailed Streets
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapTheme('osm')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  mapTheme === 'osm' 
+                    ? 'bg-indigo-600 text-white shadow-xs' 
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                OpenStreetMap
+              </button>
+              <button
+                type="button"
                 onClick={() => setMapTheme('default')}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
                   mapTheme === 'default' 
@@ -1355,7 +1403,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     : 'text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                Default
+                Simplified
               </button>
               <button
                 type="button"
@@ -1742,7 +1790,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
               {/* 2. Branch/DC Nodes */}
               {activeBranches.map(branch => {
-                const coords = getBranchCoordinates(branch.id, branch.name);
+                const coords = getBranchCoordinates(branch.id, branch.name, branch.address);
                 const isDC = branch.type === 'DC';
                 const countOfActiveDeliveriesAtBranch = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
 
@@ -1800,7 +1848,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 }
                 return true;
               }).map(delivery => {
-                const origCoords = getBranchCoordinates(delivery.originBranch, activeBranches.find(b => b.id === delivery.originBranch)?.name || '');
+                const matchedOrigBranch = activeBranches.find(b => b.id === delivery.originBranch);
+                const origCoords = getBranchCoordinates(delivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
                 const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
                 const isAssigned = !!delivery.assignedTruck;
 
@@ -1840,7 +1889,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
                 const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
                 if (assignedDelivery) {
-                  const orig = getBranchCoordinates(assignedDelivery.originBranch, activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || '');
+                  const matchedOrigBranch = activeBranches.find(b => b.id === assignedDelivery.originBranch);
+                  const orig = getBranchCoordinates(assignedDelivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
                   const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
                   origLat = orig.lat; origLng = orig.lng;
                   destLat = dest.lat; destLng = dest.lng;
@@ -1849,7 +1899,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
                   const isProSpaces = truck.tenantId === 'prospaces';
                   const orig = homeBranch 
-                    ? getBranchCoordinates(homeBranch.id, homeBranch.name) 
+                    ? getBranchCoordinates(homeBranch.id, homeBranch.name, homeBranch.address) 
                     : isProSpaces 
                       ? { lat: 44.6488, lng: -63.5752 } 
                       : { lat: 37.2872, lng: -121.9500 };
