@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Truck, Branch } from '../types';
 import { 
-  Compass, Plus, Radio, Server, Wifi, Cpu, Settings2, Trash2, 
+  Compass, Plus, Radio, Server, Wifi, Cpu, Settings2, Trash2, Edit2,
   MapPin, Activity, CheckCircle2, ShieldAlert, Navigation2, Check
 } from 'lucide-react';
 
@@ -15,6 +15,7 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
   // Input states for building a GPS connection record
   const [selectedTruckId, setSelectedTruckId] = useState('');
   const [deviceId, setDeviceId] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
   const [deviceName, setDeviceName] = useState('Samsara VG54 Core Gateway');
   const [simIccid, setSimIccid] = useState('Bell Mobility Business IoT');
   const [initialLat, setInitialLat] = useState('44.6488');
@@ -24,8 +25,8 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Filter trucks that do NOT have a stationary GPS configured yet
-  const unconfiguredTrucks = trucks.filter(t => !t.gpsDeviceId);
+  // Filter trucks that do NOT have a stationary GPS configured yet, OR are currently selected for editing
+  const unconfiguredTrucks = trucks.filter(t => !t.gpsDeviceId || t.id === selectedTruckId);
 
   // Common pre-configured devices for easy setup
   const DEVICE_MODELS = [
@@ -33,7 +34,9 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
     'Geotab GO9 Telematics',
     'CalAmp LMU-3030 OBD-II',
     'Garmin Fleet 790 Android Pro',
-    'Sierra Wireless RV50X LTE'
+    'Sierra Wireless RV50X LTE',
+    'Fleet Complete MGS800 OBD-II',
+    'Fleet Complete FT1 Telematics'
   ];
 
   // Common SIM carrier plans
@@ -75,6 +78,7 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
       ...targetTruck,
       gpsSource: 'truck', // Auto-switch to newly configured truck GPS
       gpsDeviceId: deviceId.trim(),
+      gpsSerialNumber: serialNumber.trim(),
       gpsDeviceName: deviceName,
       gpsSimIccid: simIccid,
       gpsStatus: 'Connected',
@@ -88,6 +92,7 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
     // Reset Form
     setSelectedTruckId('');
     setDeviceId('');
+    setSerialNumber('');
     setErrorMsg(null);
     setSuccessMsg(`Stationary GPS Hardware [${deviceId.trim()}] successfully paired with ${targetTruck.name}! Truck default tracking source set to 'Stationary Truck GPS'.`);
     
@@ -103,6 +108,17 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
       gpsLastHandshake: new Date().toISOString()
     };
     onUpdateTruck(updated);
+  };
+
+  const handleEditConnection = (truck: Truck) => {
+    setSelectedTruckId(truck.id);
+    setDeviceId(truck.gpsDeviceId || '');
+    setSerialNumber(truck.gpsSerialNumber || '');
+    setDeviceName(truck.gpsDeviceName || 'Samsara VG54 Core Gateway');
+    setSimIccid(truck.gpsSimIccid || 'Bell Mobility Business IoT');
+    
+    // Smooth scroll to top for editing
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRemoveConnection = (truck: Truck) => {
@@ -237,17 +253,30 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-1">SIM Card / Cellular Carrier</label>
-              <select
-                value={simIccid}
-                onChange={(e) => setSimIccid(e.target.value)}
-                className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
-              >
-                {CARRIER_PLANS.map(plan => (
-                  <option key={plan} value={plan}>{plan}</option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">GPS Serial Number</label>
+                <input
+                  type="text"
+                  placeholder="e.g. SN-12345678"
+                  value={serialNumber}
+                  onChange={(e) => setSerialNumber(e.target.value)}
+                  className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">SIM Card / Cellular Carrier</label>
+                <select
+                  value={simIccid}
+                  onChange={(e) => setSimIccid(e.target.value)}
+                  className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                >
+                  {CARRIER_PLANS.map(plan => (
+                    <option key={plan} value={plan}>{plan}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-3">
@@ -341,7 +370,8 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                       </td>
                       <td className="px-3 py-2.5 font-mono text-slate-700 font-semibold">
                         <div>{truck.gpsDeviceId}</div>
-                        <div className="text-[9px] text-gray-400 font-sans">{truck.gpsDeviceName}</div>
+                        {truck.gpsSerialNumber && <div className="text-[10px] text-gray-500 font-mono mt-0.5">SN: {truck.gpsSerialNumber}</div>}
+                        <div className="text-[9px] text-gray-400 font-sans mt-0.5">{truck.gpsDeviceName}</div>
                       </td>
                       <td className="px-3 py-2.5 text-slate-500 text-[10px]">
                         {truck.gpsSimIccid}
@@ -352,14 +382,24 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveConnection(truck)}
-                          className="p-1 hover:bg-red-50 text-red-500 hover:text-red-700 border border-slate-100 hover:border-red-100 rounded-md transition-colors cursor-pointer"
-                          title="Decouple hardware connection"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditConnection(truck)}
+                            className="p-1 hover:bg-blue-50 text-blue-500 hover:text-blue-700 border border-slate-100 hover:border-blue-100 rounded-md transition-colors cursor-pointer"
+                            title="Edit hardware connection"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveConnection(truck)}
+                            className="p-1 hover:bg-red-50 text-red-500 hover:text-red-700 border border-slate-100 hover:border-red-100 rounded-md transition-colors cursor-pointer"
+                            title="Decouple hardware connection"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

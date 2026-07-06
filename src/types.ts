@@ -54,12 +54,16 @@ export interface Truck {
   type: string;
   driver: string;
   branchId: string; // Associated branch/DC (e.g. WINDMILL_DC or 01075_TANTALLON)
+  vin?: string;
+  userField1?: string;
+  userField2?: string;
   registrationDueDate?: string;
   lat?: number;
   lng?: number;
   tenantId?: string;
   gpsSource?: 'mobile' | 'truck';
   gpsDeviceId?: string;
+  gpsSerialNumber?: string;
   gpsDeviceName?: string;
   gpsSimIccid?: string;
   gpsStatus?: string;

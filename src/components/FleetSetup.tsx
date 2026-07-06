@@ -43,6 +43,9 @@ export default function FleetSetup({
   const [driverName, setDriverName] = useState('');
   const [targetBranchId, setTargetBranchId] = useState('');
   const [registrationDueDate, setRegistrationDueDate] = useState('');
+  const [vin, setVin] = useState('');
+  const [userField1, setUserField1] = useState('');
+  const [userField2, setUserField2] = useState('');
 
   // Get trucks assigned to the currently selected branch
   const filteredTrucks = trucks.filter(t => t.branchId === selectedBranchId);
@@ -68,6 +71,9 @@ export default function FleetSetup({
     setTruckType('Flatbed Boom Truck');
     setDriverName('');
     setRegistrationDueDate('');
+    setVin('');
+    setUserField1('');
+    setUserField2('');
     setTargetBranchId(selectedBranchId || (branches[0]?.id || ''));
     setIsAdding(true);
     setEditingTruckId(null);
@@ -80,6 +86,9 @@ export default function FleetSetup({
     setDriverName(truck.driver);
     setTargetBranchId(truck.branchId);
     setRegistrationDueDate(truck.registrationDueDate || '');
+    setVin(truck.vin || '');
+    setUserField1(truck.userField1 || '');
+    setUserField2(truck.userField2 || '');
     setEditingTruckId(truck.id);
     setIsAdding(false);
   };
@@ -97,7 +106,10 @@ export default function FleetSetup({
       type: truckType,
       driver: driverName.trim(),
       branchId: targetBranchId,
-      registrationDueDate: registrationDueDate || undefined
+      registrationDueDate: registrationDueDate || undefined,
+      vin: vin.trim() || undefined,
+      userField1: userField1.trim() || undefined,
+      userField2: userField2.trim() || undefined
     };
 
     if (editingTruckId) {
@@ -115,6 +127,9 @@ export default function FleetSetup({
     setTruckName('');
     setDriverName('');
     setRegistrationDueDate('');
+    setVin('');
+    setUserField1('');
+    setUserField2('');
   };
 
   const handleDelete = (id: string) => {
@@ -330,6 +345,39 @@ export default function FleetSetup({
                     />
                   </div>
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 block mb-1">VIN #</label>
+                    <input 
+                      type="text" 
+                      placeholder="Vehicle Identification Number"
+                      value={vin}
+                      onChange={(e) => setVin(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 block mb-1">User Field 1</label>
+                    <input 
+                      type="text" 
+                      placeholder="Optional custom data"
+                      value={userField1}
+                      onChange={(e) => setUserField1(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 block mb-1">User Field 2</label>
+                    <input 
+                      type="text" 
+                      placeholder="Optional custom data"
+                      value={userField2}
+                      onChange={(e) => setUserField2(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
 
                 <div className="flex space-x-2 pt-1.5 border-t border-slate-200/50">
                   <button 
@@ -419,6 +467,32 @@ export default function FleetSetup({
                             </>
                           )}
                         </div>
+                        
+                        {/* Custom Fields Row */}
+                        {(truck.vin || truck.userField1 || truck.userField2) && (
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 mt-1.5 bg-slate-50 p-1.5 rounded border border-slate-100">
+                            {truck.vin && (
+                              <span className="flex items-center">
+                                <span className="font-semibold text-slate-400 mr-1">VIN:</span>
+                                <span className="font-mono text-slate-700">{truck.vin}</span>
+                              </span>
+                            )}
+                            {truck.vin && (truck.userField1 || truck.userField2) && <span className="text-gray-300">&bull;</span>}
+                            {truck.userField1 && (
+                              <span className="flex items-center">
+                                <span className="font-semibold text-slate-400 mr-1">F1:</span>
+                                <span className="text-slate-700">{truck.userField1}</span>
+                              </span>
+                            )}
+                            {truck.userField1 && truck.userField2 && <span className="text-gray-300">&bull;</span>}
+                            {truck.userField2 && (
+                              <span className="flex items-center">
+                                <span className="font-semibold text-slate-400 mr-1">F2:</span>
+                                <span className="text-slate-700">{truck.userField2}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
