@@ -50,7 +50,7 @@ export default function LandingPage({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Interactive Simulation states
-  const [activeTab, setActiveTab] = useState<'routes' | 'tracking' | 'crm'>('routes');
+  const [activeTab, setActiveTab] = useState<'routes' | 'tracking' | 'pod'>('routes');
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [tourStep, setTourStep] = useState(0);
@@ -87,6 +87,11 @@ export default function LandingPage({
       el.scrollIntoView({ behavior: 'smooth' });
     }
     setMobileMenuOpen(false);
+  };
+
+  const handleScrollToFeature = (tab: 'routes' | 'tracking' | 'pod') => {
+    setActiveTab(tab);
+    handleScrollTo('features-section');
   };
 
   // Video/Tour simulation steps
@@ -164,10 +169,10 @@ export default function LandingPage({
                 Features
               </button>
               <button 
-                onClick={() => setShowComingSoon(true)}
+                onClick={() => handleScrollToFeature('pod')}
                 className="text-slate-600 hover:text-slate-900 font-bold text-sm cursor-pointer transition-colors"
               >
-                CRM Integration
+                Proof of Delivery
               </button>
               <button 
                 onClick={() => handleScrollTo('dashboard-section')}
@@ -217,12 +222,11 @@ export default function LandingPage({
                 </button>
                 <button 
                   onClick={() => {
-                    setMobileMenuOpen(false);
-                    setShowComingSoon(true);
+                    handleScrollToFeature('pod');
                   }}
                   className="block w-full text-left px-3 py-2 text-slate-600 hover:text-slate-900 font-bold text-sm rounded-lg"
                 >
-                  CRM Integration
+                  Proof of Delivery
                 </button>
                 <button 
                   onClick={() => handleScrollTo('dashboard-section')}
@@ -274,18 +278,6 @@ export default function LandingPage({
                   <span>Enter Logistic Workspace</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </button>
-              </div>
-
-              {/* Trust Badge Indicators */}
-              <div className="pt-6 border-t border-slate-100 flex items-center space-x-6 sm:justify-center lg:justify-start text-xs text-slate-400 font-medium font-mono">
-                <div className="flex items-center space-x-1.5">
-                  <Check className="h-4 w-4 text-emerald-500" />
-                  <span>No credit card required</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <Check className="h-4 w-4 text-emerald-500" />
-                  <span>Instant CRM integration</span>
-                </div>
               </div>
             </div>
 
@@ -488,14 +480,14 @@ export default function LandingPage({
               Live Tracking
             </button>
             <button
-              onClick={() => setActiveTab('crm')}
+              onClick={() => setActiveTab('pod')}
               className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                activeTab === 'crm' 
+                activeTab === 'pod' 
                   ? 'bg-blue-50 text-blue-800 border border-blue-200' 
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              CRM Billing Sync
+              Proof of Delivery
             </button>
           </div>
 
@@ -558,31 +550,31 @@ export default function LandingPage({
               </div>
             </div>
 
-            {/* Card 3: Automated CRM Sync */}
+            {/* Card 3: Digital Proof of Delivery */}
             <div 
               className={`bg-white rounded-2xl border p-8 shadow-sm transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTab === 'crm' ? 'border-[#FF5A1F] ring-2 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200'
+                activeTab === 'pod' ? 'border-[#FF5A1F] ring-2 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200'
               }`}
-              onClick={() => setActiveTab('crm')}
+              onClick={() => setActiveTab('pod')}
             >
               <div className="h-12 w-12 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <RefreshCw className="h-6 w-6" />
+                <FileText className="h-6 w-6" />
               </div>
               <h3 className="text-slate-900 font-sans font-black text-lg mb-2">
-                Automated CRM Sync
+                Digital Proof of Delivery
               </h3>
               <p className="text-slate-500 text-sm leading-relaxed mb-4">
-                Sales knows when the job is done. Signed digital tickets, dropoff photography, and electronic handoffs automatically file back to client profiles in ProSpaces CRM.
+                Instant delivery verification. Capture dropoff photography, precise GPS drop coordinates, and electronic customer signatures directly from the driver app.
               </p>
-
+              
               {/* Simple illustrative SVG widget inside the card */}
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100/50 flex items-center justify-between">
                 <div className="space-y-1">
-                  <span className="text-[9px] text-slate-400 font-mono uppercase font-bold block leading-none">CRM STATUS</span>
-                  <span className="text-xs font-bold text-emerald-700 block">Signed & Invoice Dispatched</span>
+                  <span className="text-[9px] text-slate-400 font-mono uppercase font-bold block leading-none">POD STATUS</span>
+                  <span className="text-xs font-bold text-emerald-700 block">Photo & Signature Uploaded</span>
                 </div>
                 <span className="text-[9px] text-indigo-600 bg-indigo-50 border border-indigo-100 font-mono font-bold px-1.5 py-0.5 rounded leading-none">
-                  Instant Auto-sync
+                  Secure Verification
                 </span>
               </div>
             </div>
@@ -813,7 +805,7 @@ export default function LandingPage({
               <h4 className="text-white font-mono text-[10px] font-black tracking-widest uppercase mb-4">Core Ecosystem</h4>
               <ul className="space-y-2.5 text-xs">
                 <li><button onClick={() => handleScrollTo('features-section')} className="hover:text-white transition-colors cursor-pointer">Logistics Features</button></li>
-                <li><button onClick={() => setShowComingSoon(true)} className="hover:text-white transition-colors cursor-pointer">CRM Integration</button></li>
+                <li><button onClick={() => handleScrollToFeature('pod')} className="hover:text-white transition-colors cursor-pointer">Proof of Delivery</button></li>
                 <li><button onClick={() => handleScrollTo('dashboard-section')} className="hover:text-white transition-colors cursor-pointer">Dispatch Dashboard</button></li>
                 <li><button onClick={onLoginClick} className="hover:text-white transition-colors cursor-pointer">Secure Portal Login</button></li>
               </ul>
