@@ -18,8 +18,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
   const [serialNumber, setSerialNumber] = useState('');
   const [deviceName, setDeviceName] = useState('Samsara VG54 Core Gateway');
   const [simIccid, setSimIccid] = useState('Bell Mobility Business IoT');
-  const [initialLat, setInitialLat] = useState('44.6488');
-  const [initialLng, setInitialLng] = useState('-63.5752');
   
   // Status feedback states
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -48,15 +46,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
     'T-Mobile US LTE Fleet Custom'
   ];
 
-  // Location quick presets
-  const LOCATION_PRESETS = [
-    { name: 'Halifax Harbor HQ Depot', lat: '44.6488', lng: '-63.5752' },
-    { name: 'Dartmouth Windmill Road DC', lat: '44.6835', lng: '-63.6015' },
-    { name: 'Tantallon Store Footprint', lat: '44.6842', lng: '-63.8823' },
-    { name: 'Bedford Highway Corridor', lat: '44.7214', lng: '-63.6652' },
-    { name: 'Sackville Terminal Depo', lat: '44.7642', lng: '-63.6823' }
-  ];
-
   const handleBuildConnection = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTruckId) {
@@ -71,9 +60,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
     const targetTruck = trucks.find(t => t.id === selectedTruckId);
     if (!targetTruck) return;
 
-    const latVal = parseFloat(initialLat);
-    const lngVal = parseFloat(initialLng);
-
     const updatedTruck: Truck = {
       ...targetTruck,
       gpsSource: 'truck', // Auto-switch to newly configured truck GPS
@@ -83,8 +69,9 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
       gpsSimIccid: simIccid,
       gpsStatus: 'Connected',
       gpsLastHandshake: new Date().toISOString(),
-      gpsLat: !isNaN(latVal) ? latVal : 44.6488,
-      gpsLng: !isNaN(lngVal) ? lngVal : -63.5752
+      // We will now rely on live tracking components instead of initial setup coords
+      gpsLat: 44.6488,
+      gpsLng: -63.5752
     };
 
     onUpdateTruck(updatedTruck);
@@ -138,24 +125,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
     }
   };
 
-  const handleSimulatePing = (truck: Truck, latStr: string, lngStr: string) => {
-    const latVal = parseFloat(latStr);
-    const lngVal = parseFloat(lngStr);
-    if (isNaN(latVal) || isNaN(lngVal)) {
-      alert('Please enter valid numeric latitude and longitude values.');
-      return;
-    }
-
-    const updated: Truck = {
-      ...truck,
-      gpsLat: latVal,
-      gpsLng: lngVal,
-      gpsStatus: 'Connected',
-      gpsLastHandshake: new Date().toISOString()
-    };
-    onUpdateTruck(updated);
-  };
-
   return (
     <div className="space-y-6 animate-fade-in" id="gps-setup-view">
       
@@ -198,19 +167,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                 value={selectedTruckId}
                 onChange={(e) => {
                   setSelectedTruckId(e.target.value);
-                  // Auto fill initial lat/lng from associated branch coordinates if possible
-                  const matched = trucks.find(t => t.id === e.target.value);
-                  if (matched) {
-                    const branch = branches.find(b => b.id === matched.branchId);
-                    if (branch) {
-                      const latMatch = (branch.address || '').match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i);
-                      const lngMatch = (branch.address || '').match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i);
-                      if (latMatch && lngMatch) {
-                        setInitialLat(latMatch[1]);
-                        setInitialLng(lngMatch[1]);
-                      }
-                    }
-                  }
                 }}
                 className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
               >
@@ -276,57 +232,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                     <option key={plan} value={plan}>{plan}</option>
                   ))}
                 </select>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-3">
-              <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block font-mono">
-                ⚓ Initial Telemetry Deployment Coordinates
-              </span>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-semibold text-gray-500 block mb-1">Latitude</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 44.6488"
-                    value={initialLat}
-                    onChange={(e) => setInitialLat(e.target.value)}
-                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-gray-500 block mb-1">Longitude</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. -63.5752"
-                    value={initialLng}
-                    onChange={(e) => setInitialLng(e.target.value)}
-                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Location presets */}
-              <div className="pt-2 border-t border-slate-200/50">
-                <span className="text-[9px] font-semibold text-gray-400 uppercase block mb-1">Anchor Presets</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {LOCATION_PRESETS.map((preset, i) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => {
-                        setInitialLat(preset.lat);
-                        setInitialLng(preset.lng);
-                      }}
-                      className="text-[9px] px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-gray-600 font-medium rounded-md cursor-pointer transition-colors"
-                    >
-                      📍 {preset.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -434,7 +339,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                     <th className="px-3 py-2 text-left">Truck Details</th>
                     <th className="px-3 py-2 text-center">Live Tracking Mode Choice</th>
                     <th className="px-3 py-2 text-left">Lat / Lng coordinates</th>
-                    <th className="px-3 py-2 text-right">Simulator overrides</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -493,58 +397,6 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                             </div>
                           ) : (
                             <span className="text-gray-400 italic font-sans">{displayLat}</span>
-                          )}
-                        </td>
-
-                        <td className="px-3 py-3 text-right">
-                          {isGpsConfigured && isUsingTruckGps ? (
-                            <div className="space-y-1.5 max-w-[150px] ml-auto">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block">Simulate Ping coords</span>
-                              <div className="flex gap-1">
-                                <input
-                                  type="text"
-                                  placeholder="Lat"
-                                  defaultValue={truck.gpsLat || 44.6488}
-                                  onBlur={(e) => handleSimulatePing(truck, e.target.value, String(truck.gpsLng || -63.5752))}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSimulatePing(truck, (e.target as HTMLInputElement).value, String(truck.gpsLng || -63.5752));
-                                    }
-                                  }}
-                                  className="w-full text-[10px] font-mono border border-slate-200 px-1.5 py-0.5 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Lng"
-                                  defaultValue={truck.gpsLng || -63.5752}
-                                  onBlur={(e) => handleSimulatePing(truck, String(truck.gpsLat || 44.6488), e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSimulatePing(truck, String(truck.gpsLat || 44.6488), (e.target as HTMLInputElement).value);
-                                    }
-                                  }}
-                                  className="w-full text-[10px] font-mono border border-slate-200 px-1.5 py-0.5 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </div>
-                              <div className="flex justify-end gap-1 flex-wrap">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSimulatePing(truck, '44.6835', '-63.6015')}
-                                  className="text-[8px] bg-slate-100 hover:bg-slate-200 px-1 py-0.25 text-slate-600 rounded font-semibold cursor-pointer"
-                                >
-                                  Windmill DC
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSimulatePing(truck, '44.6488', '-63.5752')}
-                                  className="text-[8px] bg-slate-100 hover:bg-slate-200 px-1 py-0.25 text-slate-600 rounded font-semibold cursor-pointer"
-                                >
-                                  Halifax HQ
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-gray-400 italic">Configure / Select Truck GPS to override</span>
                           )}
                         </td>
                       </tr>
