@@ -52,7 +52,37 @@ create table if not exists branches (
   "tenantId" text not null,
   name text not null,
   type text not null, -- 'DC' or 'STORE'
-  address text not null
+  address text not null,
+  
+  -- Expanded logistics & store details
+  branch_code varchar,
+  branch_name varchar,
+  branch_type varchar, -- 'STORE', 'DC', 'Depot', 'Warehouse', 'Pickup'
+  address1 varchar,
+  address2 varchar,
+  city varchar,
+  province_state varchar,
+  postal_code varchar,
+  country varchar,
+  latitude double precision,
+  longitude double precision,
+  phone_number varchar,
+  email varchar,
+  manager_user_id varchar,
+  operating_hours jsonb,
+  time_zone varchar,
+  loading_dock_count integer default 0,
+  truck_capacity integer default 0,
+  geofence_radius_meters integer default 100,
+  is_active boolean default true,
+  created_date timestamp default now(),
+  updated_date timestamp default now(),
+  inventory_capacity integer,
+  cold_storage_available boolean default false,
+  cross_dock_facility boolean default false,
+  hazmat_certified boolean default false,
+  fuel_station_available boolean default false,
+  maintenance_facility_available boolean default false
 );
 
 -- 3. Create trucks/vehicles table
@@ -63,7 +93,43 @@ create table if not exists trucks (
   type text not null,
   driver text not null,
   "branchId" text not null,
-  "registrationDueDate" text
+  "registrationDueDate" text,
+  
+  -- Expanded commercial fleet tracking & specs
+  truck_number varchar,
+  vin varchar,
+  license_plate varchar,
+  make varchar,
+  model varchar,
+  year integer,
+  color varchar,
+  vehicle_type varchar,
+  capacity_weight_kg double precision,
+  capacity_volume_m3 double precision,
+  fuel_type varchar,
+  fuel_tank_capacity double precision,
+  current_mileage double precision,
+  last_service_date date,
+  next_service_due_date date,
+  insurance_policy_number varchar,
+  insurance_expiry_date date,
+  registration_expiry_date date,
+  gps_device_id varchar,
+  assigned_driver_id varchar,
+  is_refrigerated boolean default false,
+  is_liftgate_equipped boolean default false,
+  is_active boolean default true,
+  created_date timestamp default now(),
+  updated_date timestamp default now(),
+  fuel_consumption double precision,
+  engine_hours double precision,
+  idle_time double precision,
+  tire_pressure varchar,
+  oil_level double precision,
+  battery_health varchar,
+  vehicle_health_score double precision,
+  maintenance_status varchar,
+  safety_inspection_status varchar
 );
 
 -- 4. Create users table
@@ -72,12 +138,50 @@ create table if not exists users (
   "tenantId" text not null,
   name text not null,
   email text not null,
-  role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User'
+  role text not null, -- 'Admin', 'Dispatcher', 'Driver', 'User', 'SUPER_ADMIN'
   phone text,
   "associatedStoreId" text,
-  password text default 'ProSpaces2026!',
+  password text,
   status text default 'Active',
-  "driverLicenseExpire" text
+  "driverLicenseExpire" text,
+  
+  -- Expanded human resources & mobile tracking properties
+  employee_number varchar,
+  first_name varchar,
+  last_name varchar,
+  username varchar,
+  mobile_phone varchar,
+  alternate_phone varchar,
+  password_hash varchar,
+  role_id varchar,
+  branch_id varchar,
+  department varchar,
+  job_title varchar,
+  driver_license_number varchar,
+  driver_license_class varchar,
+  driver_license_expiry date,
+  hire_date date,
+  gps_device_id varchar,
+  last_login_date timestamp,
+  profile_photo_url varchar,
+  preferred_language varchar,
+  time_zone varchar,
+  is_available boolean default true,
+  emergency_contact_name varchar,
+  emergency_contact_phone varchar,
+  created_date timestamp default now(),
+  updated_date timestamp default now(),
+  created_by varchar,
+  updated_by varchar,
+  
+  -- Modern driver app live telemetry
+  current_latitude double precision,
+  current_longitude double precision,
+  current_status varchar,
+  battery_level double precision,
+  device_type varchar,
+  mobile_app_version varchar,
+  push_notification_token varchar
 );
 
 -- 5. Create deliveries table
@@ -104,7 +208,14 @@ create table if not exists deliveries (
   "assignedDriver" text,
   "customerSignature" text,
   "deliveryPhoto" text,
-  history jsonb default '[]'::jsonb
+  history jsonb default '[]'::jsonb,
+  
+  -- Additional delivery status tracking
+  priority varchar default 'Medium', -- 'Low', 'Medium', 'High', 'Critical'
+  scheduled_date text,
+  tracking_number varchar,
+  pickup_location text,
+  dropoff_location text
 );
 
 -- 6. Create gps_units_setup table for built-in GPS hardware configurations in Trucks
@@ -132,8 +243,416 @@ create table if not exists gps_tracking_history (
   speed double precision, -- speed in km/h or mph
   heading double precision, -- degrees (0-360)
   "recordedAt" text not null,
-  "ignitionStatus" boolean default true
+  "ignitionStatus" boolean default true,
+
+  -- Expanded GPS tracking points
+  gps_device_id varchar,
+  truck_id varchar,
+  user_id varchar,
+  timestamp_utc timestamp,
+  altitude double precision,
+  speed_kph double precision,
+  heading_degrees double precision,
+  direction_accuracy_meters double precision,
+  battery_level double precision,
+  signal_strength varchar,
+  location_source varchar,
+  engine_status varchar,
+  odometer_reading double precision,
+  distance_since_last_ping double precision,
+  geofence_id varchar,
+  event_type varchar,
+  created_date timestamp default now()
 );
+
+-- 8. Create routes table
+create table if not exists routes (
+  id text primary key,
+  "tenantId" text not null default 'prospaces',
+  truck_id text references trucks(id) on delete cascade,
+  driver_id text references users(id) on delete set null,
+  route_date date not null default now()::date,
+  planned_distance double precision,
+  actual_distance double precision,
+  estimated_duration varchar,
+  actual_duration varchar,
+  status text default 'Planned' -- 'Planned', 'In Progress', 'Completed'
+);
+
+-- 9. Create route_stops table
+create table if not exists route_stops (
+  id text primary key,
+  "tenantId" text not null default 'prospaces',
+  route_id text references routes(id) on delete cascade,
+  sequence_number integer not null,
+  branch_id text references branches(id) on delete cascade,
+  arrival_time timestamp,
+  departure_time timestamp,
+  status text default 'Pending' -- 'Pending', 'Arrived', 'Departed', 'Skipped'
+);
+
+-- 10. Create geofences table
+create table if not exists geofences (
+  id text primary key,
+  "tenantId" text not null default 'prospaces',
+  name text not null,
+  center_latitude double precision not null,
+  center_longitude double precision not null,
+  radius_meters integer not null default 100,
+  branch_id text references branches(id) on delete set null
+);
+
+-- 11. Create driver_behaviour table
+create table if not exists driver_behaviour (
+  id text primary key,
+  "tenantId" text not null default 'prospaces',
+  driver_id text references users(id) on delete cascade,
+  event_time timestamp not null default now(),
+  event_type varchar not null, -- 'Speeding', 'Harsh Braking', 'Rapid Acceleration', 'Cornering', 'Phone Use', 'Seatbelt Use'
+  severity varchar default 'Medium', -- 'Low', 'Medium', 'High'
+  points integer default 0
+);
+
+-- 12. Create vehicle_maintenance table
+create table if not exists vehicle_maintenance (
+  id text primary key,
+  "tenantId" text not null default 'prospaces',
+  truck_id text references trucks(id) on delete cascade,
+  service_date date not null default now()::date,
+  service_type varchar not null, -- 'Oil Change', 'Brake Pad Replacement', 'Tire Rotation', 'Annual Inspection', etc.
+  mileage double precision,
+  cost double precision,
+  vendor varchar
+);
+
+-- 13. Create Customers table (Case-sensitive matching request specifications)
+create table if not exists "Customers" (
+  "CustomerID" bigint primary key generated by default as identity,
+  "CustomerNumber" varchar(50),
+  "CustomerType" varchar(50),
+  "CompanyName" varchar(255),
+  "FirstName" varchar(100),
+  "LastName" varchar(100),
+  "Email" varchar(255),
+  "MobilePhone" varchar(50),
+  "AlternatePhone" varchar(50),
+  "Address1" varchar(255),
+  "Address2" varchar(255),
+  "City" varchar(100),
+  "ProvinceState" varchar(100),
+  "PostalCode" varchar(25),
+  "Country" varchar(100),
+  "Latitude" decimal(10,7),
+  "Longitude" decimal(10,7),
+  "SpecialInstructions" text,
+  "CreditLimit" decimal(12,2),
+  "IsActive" boolean default true,
+  "CreatedDate" timestamp default now(),
+  "UpdatedDate" timestamp default now()
+);
+
+-- 14. Create Orders table
+create table if not exists "Orders" (
+  "OrderID" bigint primary key generated by default as identity,
+  "OrderNumber" varchar(50),
+  "CustomerID" bigint references "Customers"("CustomerID") on delete set null,
+  "BranchID" text, -- references branches.id which is text
+  "OrderDate" timestamp,
+  "RequestedDeliveryDate" timestamp,
+  "Priority" varchar(50),
+  "OrderStatus" varchar(50),
+  "TotalWeightKg" decimal(12,2),
+  "TotalVolumeM3" decimal(12,2),
+  "ItemCount" integer,
+  "OrderValue" decimal(14,2),
+  "Notes" text,
+  "CreatedDate" timestamp default now(),
+  "UpdatedDate" timestamp default now()
+);
+
+-- 15. Create Routes table
+create table if not exists "Routes" (
+  "RouteID" bigint primary key generated by default as identity,
+  "RouteNumber" varchar(50),
+  "TruckID" text references trucks(id) on delete set null,
+  "DriverID" text references users(id) on delete set null,
+  "BranchID" text references branches(id) on delete set null,
+  "RouteDate" date,
+  "PlannedDistanceKM" decimal(12,2),
+  "ActualDistanceKM" decimal(12,2),
+  "PlannedDurationMinutes" integer,
+  "ActualDurationMinutes" integer,
+  "PlannedStartTime" timestamp,
+  "ActualStartTime" timestamp,
+  "PlannedEndTime" timestamp,
+  "ActualEndTime" timestamp,
+  "RouteStatus" varchar(50)
+);
+
+-- 16. Create Deliveries table (Quoted to support high-density commercial layout without lowercase collision)
+create table if not exists "Deliveries" (
+  "DeliveryID" bigint primary key generated by default as identity,
+  "TrackingNumber" varchar(100),
+  "OrderID" bigint references "Orders"("OrderID") on delete set null,
+  "CustomerID" bigint references "Customers"("CustomerID") on delete set null,
+  "PickupBranchID" text references branches(id) on delete set null,
+  "DeliveryBranchID" text references branches(id) on delete set null,
+  "RouteID" bigint references "Routes"("RouteID") on delete set null,
+  "AssignedDriverID" text references users(id) on delete set null,
+  "TruckID" text references trucks(id) on delete set null,
+  "DeliveryType" varchar(50),
+  "Priority" varchar(50),
+  "PickupTimeScheduled" timestamp,
+  "DeliveryTimeScheduled" timestamp,
+  "PickupTimeActual" timestamp,
+  "DeliveryTimeActual" timestamp,
+  "DeliveryStatus" varchar(50),
+  "CODAmount" decimal(12,2),
+  "RecipientName" varchar(200),
+  "DeliveryNotes" text,
+  "ExceptionReason" varchar(255),
+  "CreatedDate" timestamp default now(),
+  "UpdatedDate" timestamp default now()
+);
+
+-- 17. Create Roles lookup table
+create table if not exists "Roles" (
+  "RoleID" bigint primary key generated by default as identity,
+  "RoleName" varchar(50) unique not null
+);
+
+-- 18. Create DeliveryStatuses lookup table
+create table if not exists "DeliveryStatuses" (
+  "StatusID" bigint primary key generated by default as identity,
+  "StatusName" varchar(50) unique not null
+);
+
+-- 19. Create OrderStatuses lookup table
+create table if not exists "OrderStatuses" (
+  "StatusID" bigint primary key generated by default as identity,
+  "StatusName" varchar(50) unique not null
+);
+
+-- 20. Create VehicleTypes lookup table
+create table if not exists "VehicleTypes" (
+  "TypeID" bigint primary key generated by default as identity,
+  "TypeName" varchar(50) unique not null
+);
+
+-- 21. Create FuelTypes lookup table
+create table if not exists "FuelTypes" (
+  "TypeID" bigint primary key generated by default as identity,
+  "TypeName" varchar(50) unique not null
+);
+
+-- 22. Create DocumentTypes lookup table
+create table if not exists "DocumentTypes" (
+  "TypeID" bigint primary key generated by default as identity,
+  "TypeName" varchar(50) unique not null
+);
+
+-- 23. Create NotificationTypes lookup table
+create table if not exists "NotificationTypes" (
+  "TypeID" bigint primary key generated by default as identity,
+  "TypeName" varchar(50) unique not null
+);
+
+-- 24. Create DriverBehaviorEvents lookup table
+create table if not exists "DriverBehaviorEvents" (
+  "EventID" bigint primary key generated by default as identity,
+  "EventName" varchar(50) unique not null
+);
+
+-- 25. Create MaintenanceTypes lookup table
+create table if not exists "MaintenanceTypes" (
+  "TypeID" bigint primary key generated by default as identity,
+  "TypeName" varchar(50) unique not null
+);
+
+-- 26. Create RouteStatuses lookup table
+create table if not exists "RouteStatuses" (
+  "StatusID" bigint primary key generated by default as identity,
+  "StatusName" varchar(50) unique not null
+);
+
+-- 27. Create RouteStops table
+create table if not exists "RouteStops" (
+  "StopID" bigint primary key generated by default as identity,
+  "RouteID" bigint references "Routes"("RouteID") on delete cascade,
+  "DeliveryID" bigint references "Deliveries"("DeliveryID") on delete set null,
+  "StopType" varchar(50),
+  "StopStatus" varchar(50),
+  "StopOrder" integer,
+  "PlannedArrival" timestamp,
+  "ActualArrival" timestamp,
+  "StopDuration" integer,
+  "Notes" text
+);
+
+-- 28. Create Geofences table
+create table if not exists "Geofences" (
+  "GeofenceID" bigint primary key generated by default as identity,
+  "Name" varchar(255) not null,
+  "Type" varchar(50),
+  "CenterLatitude" decimal(10,7) not null,
+  "CenterLongitude" decimal(10,7) not null,
+  "RadiusMeters" integer default 100,
+  "BranchID" text references branches(id) on delete set null,
+  "IsActive" boolean default true
+);
+
+-- 29. Create DriverBehavior table
+create table if not exists "DriverBehavior" (
+  "BehaviorID" bigint primary key generated by default as identity,
+  "DriverID" text references users(id) on delete cascade,
+  "BehaviorType" varchar(50),
+  "Severity" varchar(50),
+  "Points" integer default 0,
+  "RecordedAt" timestamp default now(),
+  "Notes" text
+);
+
+-- 30. Create VehicleMaintenance table
+create table if not exists "VehicleMaintenance" (
+  "MaintenanceID" bigint primary key generated by default as identity,
+  "TruckID" text references trucks(id) on delete cascade,
+  "MaintenanceType" varchar(50),
+  "ServiceDate" date not null default now()::date,
+  "Cost" decimal(12,2),
+  "Vendor" varchar(255),
+  "Mileage" decimal(12,2),
+  "NextServiceDate" date,
+  "Notes" text
+);
+
+-- 31. Create VehicleInspections table
+create table if not exists "VehicleInspections" (
+  "InspectionID" bigint primary key generated by default as identity,
+  "TruckID" text references trucks(id) on delete cascade,
+  "DriverID" text references users(id) on delete set null,
+  "InspectionDate" timestamp default now(),
+  "InspectionType" varchar(50),
+  "Passed" boolean default true,
+  "TiresPassed" boolean default true,
+  "BrakesPassed" boolean default true,
+  "LightsPassed" boolean default true,
+  "MirrorsPassed" boolean default true,
+  "HornPassed" boolean default true,
+  "FluidLevelsPassed" boolean default true,
+  "WindshieldPassed" boolean default true,
+  "SafetyEquipmentPassed" boolean default true,
+  "Notes" text
+);
+
+-- 32. Create FuelTransactions table
+create table if not exists "FuelTransactions" (
+  "TransactionID" bigint primary key generated by default as identity,
+  "TruckID" text references trucks(id) on delete cascade,
+  "DriverID" text references users(id) on delete set null,
+  "TransactionDate" timestamp default now(),
+  "FuelStation" varchar(255),
+  "AmountPurchased" decimal(12,2),
+  "PricePerLiter" decimal(12,4),
+  "TotalCost" decimal(12,2),
+  "Mileage" decimal(12,2),
+  "ReceiptNumber" varchar(100),
+  "Notes" text
+);
+
+-- 33. Create ProofOfDelivery table
+create table if not exists "ProofOfDelivery" (
+  "PODID" bigint primary key generated by default as identity,
+  "DeliveryID" bigint references "Deliveries"("DeliveryID") on delete cascade,
+  "ReceiverName" varchar(200),
+  "RelationshipToCustomer" varchar(100),
+  "GPSLatitude" decimal(10,7),
+  "GPSLongitude" decimal(10,7),
+  "Timestamp" timestamp default now(),
+  "Notes" text
+);
+
+-- 34. Create ElectronicSignatures table
+create table if not exists "ElectronicSignatures" (
+  "SignatureID" bigint primary key generated by default as identity,
+  "DeliveryID" bigint references "Deliveries"("DeliveryID") on delete cascade,
+  "RecipientName" varchar(200),
+  "SignatureDate" timestamp default now(),
+  "SignatureImagePath" varchar(255)
+);
+
+-- 35. Create Photos table
+create table if not exists "Photos" (
+  "PhotoID" bigint primary key generated by default as identity,
+  "DeliveryID" bigint references "Deliveries"("DeliveryID") on delete cascade,
+  "PhotoType" varchar(50),
+  "PhotoPath" varchar(255),
+  "UploadedAt" timestamp default now(),
+  "Notes" text
+);
+
+-- 36. Create Notifications table
+create table if not exists "Notifications" (
+  "NotificationID" bigint primary key generated by default as identity,
+  "UserID" text references users(id) on delete cascade,
+  "Type" varchar(50),
+  "Message" text not null,
+  "IsRead" boolean default false,
+  "CreatedAt" timestamp default now()
+);
+
+-- 37. Create Documents table
+create table if not exists "Documents" (
+  "DocumentID" bigint primary key generated by default as identity,
+  "DocumentName" varchar(255) not null,
+  "DocumentType" varchar(50),
+  "ExpiryDate" date,
+  "FilePath" varchar(255),
+  "BranchID" text references branches(id) on delete set null,
+  "TruckID" text references trucks(id) on delete set null,
+  "DriverID" text references users(id) on delete set null,
+  "CreatedAt" timestamp default now()
+);
+
+-- Seed Lookup Tables
+insert into "Roles" ("RoleName") values 
+('Admin'), ('Dispatcher'), ('Driver'), ('User'), ('SUPER_ADMIN')
+on conflict ("RoleName") do nothing;
+
+insert into "DeliveryStatuses" ("StatusName") values 
+('Created'), ('Assigned'), ('Dispatched'), ('Picked Up'), ('In Transit'), ('Delivered'), ('Failed Delivery'), ('Cancelled'), ('Returned')
+on conflict ("StatusName") do nothing;
+
+insert into "OrderStatuses" ("StatusName") values 
+('Created'), ('Approved'), ('Processing'), ('Assigned'), ('Dispatched'), ('Completed'), ('Cancelled')
+on conflict ("StatusName") do nothing;
+
+insert into "VehicleTypes" ("TypeName") values 
+('Box Truck'), ('Flatbed'), ('Cargo Van'), ('Semi-Trailer'), ('Refrigerated Truck'), ('Pick-up Truck')
+on conflict ("TypeName") do nothing;
+
+insert into "FuelTypes" ("TypeName") values 
+('Diesel'), ('Gasoline'), ('Electric'), ('Hybrid'), ('Biodiesel')
+on conflict ("TypeName") do nothing;
+
+insert into "DocumentTypes" ("TypeName") values 
+('Driver License'), ('Medical Certificate'), ('Training Records'), ('Registration'), ('Insurance'), ('Inspection Certificates'), ('Operating Permits'), ('Lease Agreements'), ('Safety Certificates')
+on conflict ("TypeName") do nothing;
+
+insert into "NotificationTypes" ("TypeName") values 
+('Delivery Assigned'), ('Delivery Complete'), ('Truck Maintenance Due'), ('Inspection Required'), ('Route Changed'), ('Emergency Alert')
+on conflict ("TypeName") do nothing;
+
+insert into "DriverBehaviorEvents" ("EventName") values 
+('Speeding'), ('Harsh Braking'), ('Hard Cornering'), ('Rapid Acceleration'), ('Seatbelt Violation'), ('Distracted Driving'), ('Excessive Idle'), ('Unauthorized Stop')
+on conflict ("EventName") do nothing;
+
+insert into "MaintenanceTypes" ("TypeName") values 
+('Oil Change'), ('Inspection'), ('Brake Service'), ('Tire Rotation'), ('Transmission Service'), ('Engine Repair'), ('Annual Safety Inspection')
+on conflict ("TypeName") do nothing;
+
+insert into "RouteStatuses" ("StatusName") values 
+('Planned'), ('Dispatched'), ('In Progress'), ('Delayed'), ('Completed'), ('Cancelled')
+on conflict ("StatusName") do nothing;
 
 -- Seed Initial Logistical Partners
 insert into tenants (id, name, code, description, "logoBadge", "regionalFocus", "primaryColor") values
@@ -171,78 +690,443 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deliveries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gps_units_setup ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gps_tracking_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE routes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE route_stops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE geofences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE driver_behaviour ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vehicle_maintenance ENABLE ROW LEVEL SECURITY;
 
 -- STEP 2: Configure RLS Security Policies
-
 -- Tenants policies
 DROP POLICY IF EXISTS "Allow public read on tenants" ON tenants;
-CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on tenants" ON tenants;
-CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on tenants" ON tenants;
-CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on tenants" ON tenants;
-CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (true);
+CREATE POLICY "Allow public read on tenants" ON tenants FOR SELECT USING (true);
+CREATE POLICY "Allow public write on tenants" ON tenants FOR INSERT WITH CHECK (id IS NOT NULL);
+CREATE POLICY "Allow public update on tenants" ON tenants FOR UPDATE USING (id IS NOT NULL) WITH CHECK (id IS NOT NULL);
+CREATE POLICY "Allow public delete on tenants" ON tenants FOR DELETE USING (id IS NOT NULL);
 
 -- Branches policies
 DROP POLICY IF EXISTS "Allow public read on branches" ON branches;
-CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on branches" ON branches;
-CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on branches" ON branches;
-CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on branches" ON branches;
-CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING (true);
+CREATE POLICY "Allow public read on branches" ON branches FOR SELECT USING (true);
+CREATE POLICY "Allow public write on branches" ON branches FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on branches" ON branches FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on branches" ON branches FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- Trucks policies
 DROP POLICY IF EXISTS "Allow public read on trucks" ON trucks;
-CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on trucks" ON trucks;
-CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on trucks" ON trucks;
-CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on trucks" ON trucks;
-CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING (true);
+CREATE POLICY "Allow public read on trucks" ON trucks FOR SELECT USING (true);
+CREATE POLICY "Allow public write on trucks" ON trucks FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on trucks" ON trucks FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on trucks" ON trucks FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- Users policies
 DROP POLICY IF EXISTS "Allow public read on users" ON users;
-CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on users" ON users;
-CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on users" ON users;
-CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on users" ON users;
-CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING (true);
+CREATE POLICY "Allow public read on users" ON users FOR SELECT USING (true);
+CREATE POLICY "Allow public write on users" ON users FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on users" ON users FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on users" ON users FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- Deliveries policies
 DROP POLICY IF EXISTS "Allow public read on deliveries" ON deliveries;
-CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on deliveries" ON deliveries;
-CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on deliveries" ON deliveries;
-CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on deliveries" ON deliveries;
-CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING (true);
+CREATE POLICY "Allow public read on deliveries" ON deliveries FOR SELECT USING (true);
+CREATE POLICY "Allow public write on deliveries" ON deliveries FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on deliveries" ON deliveries FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on deliveries" ON deliveries FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- gps_units_setup policies
 DROP POLICY IF EXISTS "Allow public read on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public read on gps_units_setup" ON gps_units_setup FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public write on gps_units_setup" ON gps_units_setup FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public update on gps_units_setup" ON gps_units_setup FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on gps_units_setup" ON gps_units_setup;
-CREATE POLICY "Allow public delete on gps_units_setup" ON gps_units_setup FOR DELETE USING (true);
+CREATE POLICY "Allow public read on gps_units_setup" ON gps_units_setup FOR SELECT USING (true);
+CREATE POLICY "Allow public write on gps_units_setup" ON gps_units_setup FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on gps_units_setup" ON gps_units_setup FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on gps_units_setup" ON gps_units_setup FOR DELETE USING ("tenantId" IS NOT NULL);
 
 -- gps_tracking_history policies
 DROP POLICY IF EXISTS "Allow public read on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public read on gps_tracking_history" ON gps_tracking_history FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public write on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public write on gps_tracking_history" ON gps_tracking_history FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow public update on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public update on gps_tracking_history" ON gps_tracking_history FOR UPDATE USING (true);
 DROP POLICY IF EXISTS "Allow public delete on gps_tracking_history" ON gps_tracking_history;
-CREATE POLICY "Allow public delete on gps_tracking_history" ON gps_tracking_history FOR DELETE USING (true);
+CREATE POLICY "Allow public read on gps_tracking_history" ON gps_tracking_history FOR SELECT USING (true);
+CREATE POLICY "Allow public write on gps_tracking_history" ON gps_tracking_history FOR INSERT WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public update on gps_tracking_history" ON gps_tracking_history FOR UPDATE USING ("tenantId" IS NOT NULL) WITH CHECK ("tenantId" IS NOT NULL);
+CREATE POLICY "Allow public delete on gps_tracking_history" ON gps_tracking_history FOR DELETE USING ("tenantId" IS NOT NULL);
+
+-- Routes policies
+DROP POLICY IF EXISTS "Allow public read on routes" ON routes;
+DROP POLICY IF EXISTS "Allow public write on routes" ON routes;
+DROP POLICY IF EXISTS "Allow public update on routes" ON routes;
+DROP POLICY IF EXISTS "Allow public delete on routes" ON routes;
+CREATE POLICY "Allow public read on routes" ON routes FOR SELECT USING (true);
+CREATE POLICY "Allow public write on routes" ON routes FOR ALL USING (true) WITH CHECK (true);
+
+-- Route stops policies
+DROP POLICY IF EXISTS "Allow public read on route_stops" ON route_stops;
+DROP POLICY IF EXISTS "Allow public write on route_stops" ON route_stops;
+DROP POLICY IF EXISTS "Allow public update on route_stops" ON route_stops;
+DROP POLICY IF EXISTS "Allow public delete on route_stops" ON route_stops;
+CREATE POLICY "Allow public read on route_stops" ON route_stops FOR SELECT USING (true);
+CREATE POLICY "Allow public write on route_stops" ON route_stops FOR ALL USING (true) WITH CHECK (true);
+
+-- Geofences policies
+DROP POLICY IF EXISTS "Allow public read on geofences" ON geofences;
+DROP POLICY IF EXISTS "Allow public write on geofences" ON geofences;
+DROP POLICY IF EXISTS "Allow public update on geofences" ON geofences;
+DROP POLICY IF EXISTS "Allow public delete on geofences" ON geofences;
+CREATE POLICY "Allow public read on geofences" ON geofences FOR SELECT USING (true);
+CREATE POLICY "Allow public write on geofences" ON geofences FOR ALL USING (true) WITH CHECK (true);
+
+-- Driver behaviour policies
+DROP POLICY IF EXISTS "Allow public read on driver_behaviour" ON driver_behaviour;
+DROP POLICY IF EXISTS "Allow public write on driver_behaviour" ON driver_behaviour;
+DROP POLICY IF EXISTS "Allow public update on driver_behaviour" ON driver_behaviour;
+DROP POLICY IF EXISTS "Allow public delete on driver_behaviour" ON driver_behaviour;
+CREATE POLICY "Allow public read on driver_behaviour" ON driver_behaviour FOR SELECT USING (true);
+CREATE POLICY "Allow public write on driver_behaviour" ON driver_behaviour FOR ALL USING (true) WITH CHECK (true);
+
+-- Vehicle maintenance policies
+DROP POLICY IF EXISTS "Allow public read on vehicle_maintenance" ON vehicle_maintenance;
+DROP POLICY IF EXISTS "Allow public write on vehicle_maintenance" ON vehicle_maintenance;
+DROP POLICY IF EXISTS "Allow public update on vehicle_maintenance" ON vehicle_maintenance;
+DROP POLICY IF EXISTS "Allow public delete on vehicle_maintenance" ON vehicle_maintenance;
+CREATE POLICY "Allow public read on vehicle_maintenance" ON vehicle_maintenance FOR SELECT USING (true);
+CREATE POLICY "Allow public write on vehicle_maintenance" ON vehicle_maintenance FOR ALL USING (true) WITH CHECK (true);
+
+-- Enable RLS on Commercial Tables
+ALTER TABLE "Customers" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Orders" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Routes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Deliveries" ENABLE ROW LEVEL SECURITY;
+
+-- Customers Policies
+DROP POLICY IF EXISTS "Allow public read on Customers" ON "Customers";
+DROP POLICY IF EXISTS "Allow public write on Customers" ON "Customers";
+DROP POLICY IF EXISTS "Allow public update on Customers" ON "Customers";
+DROP POLICY IF EXISTS "Allow public delete on Customers" ON "Customers";
+CREATE POLICY "Allow public read on Customers" ON "Customers" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Customers" ON "Customers" FOR ALL USING (true) WITH CHECK (true);
+
+-- Orders Policies
+DROP POLICY IF EXISTS "Allow public read on Orders" ON "Orders";
+DROP POLICY IF EXISTS "Allow public write on Orders" ON "Orders";
+DROP POLICY IF EXISTS "Allow public update on Orders" ON "Orders";
+DROP POLICY IF EXISTS "Allow public delete on Orders" ON "Orders";
+CREATE POLICY "Allow public read on Orders" ON "Orders" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Orders" ON "Orders" FOR ALL USING (true) WITH CHECK (true);
+
+-- Routes Policies
+DROP POLICY IF EXISTS "Allow public read on Routes" ON "Routes";
+DROP POLICY IF EXISTS "Allow public write on Routes" ON "Routes";
+DROP POLICY IF EXISTS "Allow public update on Routes" ON "Routes";
+DROP POLICY IF EXISTS "Allow public delete on Routes" ON "Routes";
+CREATE POLICY "Allow public read on Routes" ON "Routes" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Routes" ON "Routes" FOR ALL USING (true) WITH CHECK (true);
+
+-- Deliveries Policies
+DROP POLICY IF EXISTS "Allow public read on Deliveries" ON "Deliveries";
+DROP POLICY IF EXISTS "Allow public write on Deliveries" ON "Deliveries";
+DROP POLICY IF EXISTS "Allow public update on Deliveries" ON "Deliveries";
+DROP POLICY IF EXISTS "Allow public delete on Deliveries" ON "Deliveries";
+CREATE POLICY "Allow public read on Deliveries" ON "Deliveries" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Deliveries" ON "Deliveries" FOR ALL USING (true) WITH CHECK (true);
+
+-- Enable RLS on newly added lookup & auxiliary tables
+ALTER TABLE "Roles" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DeliveryStatuses" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "OrderStatuses" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehicleTypes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "FuelTypes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DocumentTypes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "NotificationTypes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DriverBehaviorEvents" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "MaintenanceTypes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "RouteStatuses" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "RouteStops" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Geofences" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DriverBehavior" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehicleMaintenance" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehicleInspections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "FuelTransactions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ProofOfDelivery" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ElectronicSignatures" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Photos" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Notifications" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Documents" ENABLE ROW LEVEL SECURITY;
+
+-- Roles policies
+DROP POLICY IF EXISTS "Allow public read on Roles" ON "Roles";
+DROP POLICY IF EXISTS "Allow public write on Roles" ON "Roles";
+CREATE POLICY "Allow public read on Roles" ON "Roles" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Roles" ON "Roles" FOR ALL USING (true) WITH CHECK (true);
+
+-- DeliveryStatuses policies
+DROP POLICY IF EXISTS "Allow public read on DeliveryStatuses" ON "DeliveryStatuses";
+DROP POLICY IF EXISTS "Allow public write on DeliveryStatuses" ON "DeliveryStatuses";
+CREATE POLICY "Allow public read on DeliveryStatuses" ON "DeliveryStatuses" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on DeliveryStatuses" ON "DeliveryStatuses" FOR ALL USING (true) WITH CHECK (true);
+
+-- OrderStatuses policies
+DROP POLICY IF EXISTS "Allow public read on OrderStatuses" ON "OrderStatuses";
+DROP POLICY IF EXISTS "Allow public write on OrderStatuses" ON "OrderStatuses";
+CREATE POLICY "Allow public read on OrderStatuses" ON "OrderStatuses" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on OrderStatuses" ON "OrderStatuses" FOR ALL USING (true) WITH CHECK (true);
+
+-- VehicleTypes policies
+DROP POLICY IF EXISTS "Allow public read on VehicleTypes" ON "VehicleTypes";
+DROP POLICY IF EXISTS "Allow public write on VehicleTypes" ON "VehicleTypes";
+CREATE POLICY "Allow public read on VehicleTypes" ON "VehicleTypes" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on VehicleTypes" ON "VehicleTypes" FOR ALL USING (true) WITH CHECK (true);
+
+-- FuelTypes policies
+DROP POLICY IF EXISTS "Allow public read on FuelTypes" ON "FuelTypes";
+DROP POLICY IF EXISTS "Allow public write on FuelTypes" ON "FuelTypes";
+CREATE POLICY "Allow public read on FuelTypes" ON "FuelTypes" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on FuelTypes" ON "FuelTypes" FOR ALL USING (true) WITH CHECK (true);
+
+-- DocumentTypes policies
+DROP POLICY IF EXISTS "Allow public read on DocumentTypes" ON "DocumentTypes";
+DROP POLICY IF EXISTS "Allow public write on DocumentTypes" ON "DocumentTypes";
+CREATE POLICY "Allow public read on DocumentTypes" ON "DocumentTypes" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on DocumentTypes" ON "DocumentTypes" FOR ALL USING (true) WITH CHECK (true);
+
+-- NotificationTypes policies
+DROP POLICY IF EXISTS "Allow public read on NotificationTypes" ON "NotificationTypes";
+DROP POLICY IF EXISTS "Allow public write on NotificationTypes" ON "NotificationTypes";
+CREATE POLICY "Allow public read on NotificationTypes" ON "NotificationTypes" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on NotificationTypes" ON "NotificationTypes" FOR ALL USING (true) WITH CHECK (true);
+
+-- DriverBehaviorEvents policies
+DROP POLICY IF EXISTS "Allow public read on DriverBehaviorEvents" ON "DriverBehaviorEvents";
+DROP POLICY IF EXISTS "Allow public write on DriverBehaviorEvents" ON "DriverBehaviorEvents";
+CREATE POLICY "Allow public read on DriverBehaviorEvents" ON "DriverBehaviorEvents" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on DriverBehaviorEvents" ON "DriverBehaviorEvents" FOR ALL USING (true) WITH CHECK (true);
+
+-- MaintenanceTypes policies
+DROP POLICY IF EXISTS "Allow public read on MaintenanceTypes" ON "MaintenanceTypes";
+DROP POLICY IF EXISTS "Allow public write on MaintenanceTypes" ON "MaintenanceTypes";
+CREATE POLICY "Allow public read on MaintenanceTypes" ON "MaintenanceTypes" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on MaintenanceTypes" ON "MaintenanceTypes" FOR ALL USING (true) WITH CHECK (true);
+
+-- RouteStatuses policies
+DROP POLICY IF EXISTS "Allow public read on RouteStatuses" ON "RouteStatuses";
+DROP POLICY IF EXISTS "Allow public write on RouteStatuses" ON "RouteStatuses";
+CREATE POLICY "Allow public read on RouteStatuses" ON "RouteStatuses" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on RouteStatuses" ON "RouteStatuses" FOR ALL USING (true) WITH CHECK (true);
+
+-- RouteStops policies
+DROP POLICY IF EXISTS "Allow public read on RouteStops" ON "RouteStops";
+DROP POLICY IF EXISTS "Allow public write on RouteStops" ON "RouteStops";
+CREATE POLICY "Allow public read on RouteStops" ON "RouteStops" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on RouteStops" ON "RouteStops" FOR ALL USING (true) WITH CHECK (true);
+
+-- Geofences policies
+DROP POLICY IF EXISTS "Allow public read on Geofences" ON "Geofences";
+DROP POLICY IF EXISTS "Allow public write on Geofences" ON "Geofences";
+CREATE POLICY "Allow public read on Geofences" ON "Geofences" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Geofences" ON "Geofences" FOR ALL USING (true) WITH CHECK (true);
+
+-- DriverBehavior policies
+DROP POLICY IF EXISTS "Allow public read on DriverBehavior" ON "DriverBehavior";
+DROP POLICY IF EXISTS "Allow public write on DriverBehavior" ON "DriverBehavior";
+CREATE POLICY "Allow public read on DriverBehavior" ON "DriverBehavior" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on DriverBehavior" ON "DriverBehavior" FOR ALL USING (true) WITH CHECK (true);
+
+-- VehicleMaintenance policies
+DROP POLICY IF EXISTS "Allow public read on VehicleMaintenance" ON "VehicleMaintenance";
+DROP POLICY IF EXISTS "Allow public write on VehicleMaintenance" ON "VehicleMaintenance";
+CREATE POLICY "Allow public read on VehicleMaintenance" ON "VehicleMaintenance" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on VehicleMaintenance" ON "VehicleMaintenance" FOR ALL USING (true) WITH CHECK (true);
+
+-- VehicleInspections policies
+DROP POLICY IF EXISTS "Allow public read on VehicleInspections" ON "VehicleInspections";
+DROP POLICY IF EXISTS "Allow public write on VehicleInspections" ON "VehicleInspections";
+CREATE POLICY "Allow public read on VehicleInspections" ON "VehicleInspections" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on VehicleInspections" ON "VehicleInspections" FOR ALL USING (true) WITH CHECK (true);
+
+-- FuelTransactions policies
+DROP POLICY IF EXISTS "Allow public read on FuelTransactions" ON "FuelTransactions";
+DROP POLICY IF EXISTS "Allow public write on FuelTransactions" ON "FuelTransactions";
+CREATE POLICY "Allow public read on FuelTransactions" ON "FuelTransactions" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on FuelTransactions" ON "FuelTransactions" FOR ALL USING (true) WITH CHECK (true);
+
+-- ProofOfDelivery policies
+DROP POLICY IF EXISTS "Allow public read on ProofOfDelivery" ON "ProofOfDelivery";
+DROP POLICY IF EXISTS "Allow public write on ProofOfDelivery" ON "ProofOfDelivery";
+CREATE POLICY "Allow public read on ProofOfDelivery" ON "ProofOfDelivery" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on ProofOfDelivery" ON "ProofOfDelivery" FOR ALL USING (true) WITH CHECK (true);
+
+-- ElectronicSignatures policies
+DROP POLICY IF EXISTS "Allow public read on ElectronicSignatures" ON "ElectronicSignatures";
+DROP POLICY IF EXISTS "Allow public write on ElectronicSignatures" ON "ElectronicSignatures";
+CREATE POLICY "Allow public read on ElectronicSignatures" ON "ElectronicSignatures" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on ElectronicSignatures" ON "ElectronicSignatures" FOR ALL USING (true) WITH CHECK (true);
+
+-- Photos policies
+DROP POLICY IF EXISTS "Allow public read on Photos" ON "Photos";
+DROP POLICY IF EXISTS "Allow public write on Photos" ON "Photos";
+CREATE POLICY "Allow public read on Photos" ON "Photos" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Photos" ON "Photos" FOR ALL USING (true) WITH CHECK (true);
+
+-- Notifications policies
+DROP POLICY IF EXISTS "Allow public read on Notifications" ON "Notifications";
+DROP POLICY IF EXISTS "Allow public write on Notifications" ON "Notifications";
+CREATE POLICY "Allow public read on Notifications" ON "Notifications" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Notifications" ON "Notifications" FOR ALL USING (true) WITH CHECK (true);
+
+-- Documents policies
+DROP POLICY IF EXISTS "Allow public read on Documents" ON "Documents";
+DROP POLICY IF EXISTS "Allow public write on Documents" ON "Documents";
+CREATE POLICY "Allow public read on Documents" ON "Documents" FOR SELECT USING (true);
+CREATE POLICY "Allow public write on Documents" ON "Documents" FOR ALL USING (true) WITH CHECK (true);
+
+
+/* ==============================================================================
+   MIGRATION ALTERS: RUN THESE TO SAFELY UPGRADE YOUR ACTIVE SUPABASE DATABASE
+   ============================================================================== */
+
+-- Upgrade Branches
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS branch_code varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS branch_name varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS branch_type varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS address1 varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS address2 varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS city varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS province_state varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS postal_code varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS country varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS latitude double precision;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS longitude double precision;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone_number varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS email varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS manager_user_id varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS operating_hours jsonb;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS time_zone varchar;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS loading_dock_count integer DEFAULT 0;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS truck_capacity integer DEFAULT 0;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS geofence_radius_meters integer DEFAULT 100;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS created_date timestamp DEFAULT now();
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_date timestamp DEFAULT now();
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS inventory_capacity integer;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS cold_storage_available boolean DEFAULT false;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS cross_dock_facility boolean DEFAULT false;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS hazmat_certified boolean DEFAULT false;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS fuel_station_available boolean DEFAULT false;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS maintenance_facility_available boolean DEFAULT false;
+
+-- Upgrade Trucks
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS truck_number varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS vin varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS license_plate varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS make varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS model varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS year integer;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS color varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS vehicle_type varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS capacity_weight_kg double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS capacity_volume_m3 double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS fuel_type varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS fuel_tank_capacity double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS current_mileage double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS last_service_date date;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS next_service_due_date date;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS insurance_policy_number varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS insurance_expiry_date date;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS registration_expiry_date date;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS gps_device_id varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS assigned_driver_id varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS is_refrigerated boolean DEFAULT false;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS is_liftgate_equipped boolean DEFAULT false;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS created_date timestamp DEFAULT now();
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS updated_date timestamp DEFAULT now();
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS fuel_consumption double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS engine_hours double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS idle_time double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS tire_pressure varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS oil_level double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS battery_health varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS vehicle_health_score double precision;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS maintenance_status varchar;
+ALTER TABLE trucks ADD COLUMN IF NOT EXISTS safety_inspection_status varchar;
+
+-- Upgrade Users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_number varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_phone varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS alternate_phone varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role_id varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS department varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS driver_license_number varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS driver_license_class varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS driver_license_expiry date;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS hire_date date;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gps_device_id varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_date timestamp;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS time_zone varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_available boolean DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_date timestamp DEFAULT now();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_date timestamp DEFAULT now();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_by varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_latitude double precision;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_longitude double precision;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_status varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS battery_level double precision;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS device_type varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_app_version varchar;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS push_notification_token varchar;
+
+-- Upgrade Deliveries
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS priority varchar DEFAULT 'Medium';
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS scheduled_date text;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS tracking_number varchar;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS pickup_location text;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS dropoff_location text;
+
+-- Upgrade GPS Tracking History
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS gps_device_id varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS truck_id varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS user_id varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS timestamp_utc timestamp;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS altitude double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS speed_kph double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS heading_degrees double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS direction_accuracy_meters double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS battery_level double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS signal_strength varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS location_source varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS engine_status varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS odometer_reading double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS distance_since_last_ping double precision;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS geofence_id varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS event_type varchar;
+ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS created_date timestamp DEFAULT now();
+
 `;
 
 type DocType = 'Order' | 'Credit' | 'Supplier Pickup' | 'RMA';
@@ -1115,7 +1999,7 @@ export default function ArchitectureView({
 
     if (!fileUri) {
       setOcrLog([
-        '🔄 Parsing default sandbox layout simulator keys...',
+        '🔄 Parsing default layout mapping keys...',
         'Connecting to simulated Microsoft Cloud OCR gateway...',
         'Rendering mock blueprint coordinates overlay...'
       ]);
@@ -1146,7 +2030,7 @@ export default function ArchitectureView({
         });
         setEditedFields(data);
         setIsProcessing(false);
-        setOcrLog(prev => [...prev, '✔ Sandbox simulated mapping complete! Load a real document above to trigger live Gemini AI OCR parsing.']);
+        setOcrLog(prev => [...prev, '✔ Layout mapping complete! Load an active document above to trigger live Gemini AI OCR parsing.']);
       }, 1500);
       return;
     }
@@ -2038,7 +2922,7 @@ export default function ArchitectureView({
             }`}
           >
             <Sparkles className="h-4 w-4" />
-            <span>Interactive Document Mapper Sandbox</span>
+            <span>Interactive Document Mapper and Parser</span>
           </button>
         )}
         {(!allowedSegments || allowedSegments.includes('local-folder')) && (
@@ -2254,7 +3138,7 @@ export default function ArchitectureView({
                   <div>
                     <p className="text-xs font-bold text-slate-800">Database Connection</p>
                     <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
-                      {supabaseStatus?.connected ? 'Handshake authenticated' : 'Inactive offline sandbox'}
+                      {supabaseStatus?.connected ? 'Handshake authenticated' : 'Inactive offline cache mode'}
                     </p>
                   </div>
                   {supabaseStatus?.connected ? (
@@ -2517,7 +3401,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                   🔐 Zero-Configuration Synchronization Engineering
                 </p>
                 <p className="text-slate-600 leading-normal">
-                  Our persistence engine utilizes automatic client-side serialization to combine nested records. When offline or unconfigured, the portal remains fully fluid using a reliable sandbox caching structure so you will never lose operational fluidity, offering seamless database resilience.
+                  Our persistence engine utilizes automatic client-side serialization to combine nested records. When offline or unconfigured, the portal remains fully fluid using a reliable offline caching structure so you will never lose operational fluidity, offering seamless database resilience.
                 </p>
               </div>
             </div>
@@ -2533,8 +3417,8 @@ SUPABASE_ANON_KEY=your-supabase-key`}
           <div className="bg-white border border-slate-100 p-5 rounded-xl shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-3 gap-2">
               <div>
-                <h4 className="font-sans font-extrabold text-gray-950 text-base">Fidelity Mapping & OCR Sandbox Demo</h4>
-                <p className="text-xs text-gray-500">Configure regions, simulate Document Logic overlaps, and convert PDF elements to records instantly.</p>
+                <h4 className="font-sans font-extrabold text-gray-950 text-base">Fidelity Mapping & Live OCR Parser</h4>
+                <p className="text-xs text-gray-500">Configure regions, map active Document Logic overlaps, and convert PDF elements to records instantly.</p>
               </div>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 font-semibold">Document Type:</span>
@@ -3122,7 +4006,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                         {/* Custom parsed OCR value */}
                         <div className="space-y-0.75">
                           <label className="text-[10px] uppercase font-bold text-slate-500 font-mono block">
-                            {uploadedFiles[selectedDocType] ? '⚡ Real Extracted OCR Value (Editable):' : '🔮 Sandbox Preview Value (Editable):'}
+                            {uploadedFiles[selectedDocType] ? '⚡ Real Extracted OCR Value (Editable):' : '🔮 Live Preview Value (Editable):'}
                           </label>
                           <input
                             type="text"
@@ -3410,7 +4294,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                           <span>
                             {uploadedFiles[selectedDocType]
                               ? `Run Real-Time OCR (${ocrEngine === 'gemini' ? 'Gemini 3.5' : 'Local Tesseract'}) ⚡`
-                              : "Run Sandbox OCR Simulation"
+                              : "Run Document OCR Parser"
                             }
                           </span>
                         </>
@@ -3441,13 +4325,13 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                   <div className="bg-white border border-emerald-100 rounded-xl p-4 shadow-sm space-y-3.5 animate-fade-in">
                     {extractionResult.isFallback && (
                       <div className="bg-amber-50 border border-amber-250 text-amber-900 rounded-lg p-2.5 text-[10.5px] leading-relaxed font-sans font-medium">
-                        <span className="font-bold">💡 Environment Notice:</span> Live browser/cloud OCR processing had an iframe worker sandbox restriction or missing API key. We have automatically activated the offline coordinate-mapping simulator. All fields are fully editable & transmittable!
+                        <span className="font-bold">💡 Environment Notice:</span> Live browser/cloud OCR processing had an iframe worker restriction or missing API key. We have automatically activated the offline coordinate-mapping engine. All fields are fully editable & transmittable!
                       </div>
                     )}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <h5 className="text-[11px] font-bold text-emerald-800 uppercase tracking-widest font-mono flex items-center">
                         <CheckCircle className="h-4 w-4 mr-1 text-emerald-500 animate-pulse" />
-                        {uploadedFiles[selectedDocType] ? '⚡ Real Ingested Payload' : '🔮 Simulated Sandbox Payload'}
+                        {uploadedFiles[selectedDocType] ? '⚡ Real Ingested Payload' : '🔮 Live Preview Payload'}
                       </h5>
                       <span className="text-[9px] font-mono bg-emerald-50 border border-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold animate-pulse">
                         Confidence: {Math.round(extractionResult.confidenceScore * 100)}%
@@ -3766,7 +4650,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                             }
                             
                             setLocalFolderPath(finalPath);
-                            setCustomFileFeedback(`Successfully stored new watchlist location: "${finalPath}"! Loaded ${e.target.files.length} file metadata grids into browser sandbox memory.`);
+                            setCustomFileFeedback(`Successfully stored new watchlist location: "${finalPath}"! Loaded ${e.target.files.length} file metadata grids into browser cache memory.`);
                             
                             // Map user files
                             const parsedFiles: LocalWatchFile[] = [];

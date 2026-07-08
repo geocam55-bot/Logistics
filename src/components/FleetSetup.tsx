@@ -47,6 +47,22 @@ export default function FleetSetup({
   const [userField1, setUserField1] = useState('');
   const [userField2, setUserField2] = useState('');
 
+  // Commercial Logistics Fields
+  const [truckNumber, setTruckNumber] = useState('');
+  const [licensePlate, setLicensePlate] = useState('');
+  const [make, setMake] = useState('');
+  const [model, setModel] = useState('');
+  const [year, setYear] = useState('');
+  const [color, setColor] = useState('');
+  const [capacityWeightKg, setCapacityWeightKg] = useState('');
+  const [capacityVolumeM3, setCapacityVolumeM3] = useState('');
+  const [fuelType, setFuelType] = useState('Diesel');
+  const [currentMileage, setCurrentMileage] = useState('');
+  const [lastServiceDate, setLastServiceDate] = useState('');
+  const [nextServiceDueDate, setNextServiceDueDate] = useState('');
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
+  const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
+
   // Get trucks assigned to the currently selected branch
   const filteredTrucks = trucks.filter(t => t.branchId === selectedBranchId);
   const selectedBranch = branches.find(b => b.id === selectedBranchId);
@@ -74,6 +90,23 @@ export default function FleetSetup({
     setVin('');
     setUserField1('');
     setUserField2('');
+    
+    // Reset Commercial details
+    setTruckNumber('');
+    setLicensePlate('');
+    setMake('');
+    setModel('');
+    setYear('');
+    setColor('');
+    setCapacityWeightKg('');
+    setCapacityVolumeM3('');
+    setFuelType('Diesel');
+    setCurrentMileage('');
+    setLastServiceDate('');
+    setNextServiceDueDate('');
+    setInsurancePolicyNumber('');
+    setInsuranceExpiryDate('');
+    
     setTargetBranchId(selectedBranchId || (branches[0]?.id || ''));
     setIsAdding(true);
     setEditingTruckId(null);
@@ -89,6 +122,23 @@ export default function FleetSetup({
     setVin(truck.vin || '');
     setUserField1(truck.userField1 || '');
     setUserField2(truck.userField2 || '');
+    
+    // Set Commercial details
+    setTruckNumber(truck.truckNumber || '');
+    setLicensePlate(truck.licensePlate || '');
+    setMake(truck.make || '');
+    setModel(truck.model || '');
+    setYear(truck.year ? String(truck.year) : '');
+    setColor(truck.color || '');
+    setCapacityWeightKg(truck.capacityWeightKg ? String(truck.capacityWeightKg) : '');
+    setCapacityVolumeM3(truck.capacityVolumeM3 ? String(truck.capacityVolumeM3) : '');
+    setFuelType(truck.fuelType || 'Diesel');
+    setCurrentMileage(truck.currentMileage ? String(truck.currentMileage) : '');
+    setLastServiceDate(truck.lastServiceDate || '');
+    setNextServiceDueDate(truck.nextServiceDueDate || '');
+    setInsurancePolicyNumber(truck.insurancePolicyNumber || '');
+    setInsuranceExpiryDate(truck.insuranceExpiryDate || '');
+
     setEditingTruckId(truck.id);
     setIsAdding(false);
   };
@@ -109,7 +159,24 @@ export default function FleetSetup({
       registrationDueDate: registrationDueDate || undefined,
       vin: vin.trim() || undefined,
       userField1: userField1.trim() || undefined,
-      userField2: userField2.trim() || undefined
+      userField2: userField2.trim() || undefined,
+      
+      // Commercial Logistics
+      truckNumber: truckNumber.trim() || undefined,
+      licensePlate: licensePlate.trim() || undefined,
+      make: make.trim() || undefined,
+      model: model.trim() || undefined,
+      year: year ? parseInt(year, 10) : undefined,
+      color: color.trim() || undefined,
+      capacityWeightKg: capacityWeightKg ? parseFloat(capacityWeightKg) : undefined,
+      capacityVolumeM3: capacityVolumeM3 ? parseFloat(capacityVolumeM3) : undefined,
+      fuelType: fuelType,
+      currentMileage: currentMileage ? parseInt(currentMileage, 10) : undefined,
+      lastServiceDate: lastServiceDate || undefined,
+      nextServiceDueDate: nextServiceDueDate || undefined,
+      insurancePolicyNumber: insurancePolicyNumber.trim() || undefined,
+      insuranceExpiryDate: insuranceExpiryDate || undefined,
+      registrationExpiryDate: registrationDueDate || undefined // Keep synced
     };
 
     if (editingTruckId) {
@@ -130,6 +197,21 @@ export default function FleetSetup({
     setVin('');
     setUserField1('');
     setUserField2('');
+    
+    setTruckNumber('');
+    setLicensePlate('');
+    setMake('');
+    setModel('');
+    setYear('');
+    setColor('');
+    setCapacityWeightKg('');
+    setCapacityVolumeM3('');
+    setFuelType('Diesel');
+    setCurrentMileage('');
+    setLastServiceDate('');
+    setNextServiceDueDate('');
+    setInsurancePolicyNumber('');
+    setInsuranceExpiryDate('');
   };
 
   const handleDelete = (id: string) => {
@@ -345,8 +427,7 @@ export default function FleetSetup({
                     />
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-gray-700 block mb-1">VIN #</label>
                     <input 
@@ -376,6 +457,169 @@ export default function FleetSetup({
                       onChange={(e) => setUserField2(e.target.value)}
                       className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
+                  </div>
+                </div>
+
+                {/* Expanded Commercial Specifications */}
+                <div className="pt-3 border-t border-slate-200 space-y-3 bg-slate-100/50 p-3.5 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Commercial Registry & Service Records</span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Truck #</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TR-204"
+                        value={truckNumber}
+                        onChange={(e) => setTruckNumber(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">License Plate</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. GST-871"
+                        value={licensePlate}
+                        onChange={(e) => setLicensePlate(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Make</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Hino"
+                        value={make}
+                        onChange={(e) => setMake(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Model</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 268"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Year</label>
+                      <input
+                        type="number"
+                        placeholder="2022"
+                        value={year}
+                        onChange={(e) => setYear(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Color</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. White"
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Fuel Type</label>
+                      <select
+                        value={fuelType}
+                        onChange={(e) => setFuelType(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      >
+                        <option value="Diesel">Diesel</option>
+                        <option value="Regular Unleaded">Regular Unleaded</option>
+                        <option value="Electric">Electric</option>
+                        <option value="Hybrid">Hybrid</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Mileage (km)</label>
+                      <input
+                        type="number"
+                        placeholder="145200"
+                        value={currentMileage}
+                        onChange={(e) => setCurrentMileage(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Max Payload (Kg)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 5000"
+                        value={capacityWeightKg}
+                        onChange={(e) => setCapacityWeightKg(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Cargo Vol (M³)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 15.4"
+                        value={capacityVolumeM3}
+                        onChange={(e) => setCapacityVolumeM3(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Last Service Date</label>
+                      <input
+                        type="date"
+                        value={lastServiceDate}
+                        onChange={(e) => setLastServiceDate(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Next Service Due</label>
+                      <input
+                        type="date"
+                        value={nextServiceDueDate}
+                        onChange={(e) => setNextServiceDueDate(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 border-t border-slate-200/40 pt-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Insurance Policy #</label>
+                      <input
+                        type="text"
+                        placeholder="Policy number"
+                        value={insurancePolicyNumber}
+                        onChange={(e) => setInsurancePolicyNumber(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Insurance Expiry</label>
+                      <input
+                        type="date"
+                        value={insuranceExpiryDate}
+                        onChange={(e) => setInsuranceExpiryDate(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -467,29 +711,82 @@ export default function FleetSetup({
                             </>
                           )}
                         </div>
-                        
-                        {/* Custom Fields Row */}
-                        {(truck.vin || truck.userField1 || truck.userField2) && (
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 mt-1.5 bg-slate-50 p-1.5 rounded border border-slate-100">
-                            {truck.vin && (
-                              <span className="flex items-center">
-                                <span className="font-semibold text-slate-400 mr-1">VIN:</span>
-                                <span className="font-mono text-slate-700">{truck.vin}</span>
-                              </span>
+                                            {/* Custom Fields Row */}
+                        {(truck.vin || truck.userField1 || truck.userField2 || truck.truckNumber || truck.licensePlate || truck.make || truck.model || truck.year || truck.color || truck.fuelType || truck.currentMileage || truck.lastServiceDate || truck.nextServiceDueDate || truck.insurancePolicyNumber || truck.insuranceExpiryDate) && (
+                          <div className="flex flex-col gap-1 text-[10px] text-gray-500 mt-1.5 bg-slate-50 p-2.5 rounded border border-slate-100">
+                            
+                            {/* Line 1: Commercial details */}
+                            {(truck.truckNumber || truck.licensePlate || truck.make || truck.model || truck.year || truck.color) && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="font-bold text-slate-400 font-mono">SPEC:</span>
+                                {truck.truckNumber && <span className="bg-slate-200 px-1 py-0.25 rounded font-mono text-slate-800">No.{truck.truckNumber}</span>}
+                                {truck.licensePlate && <span className="bg-blue-105 border border-blue-200 text-blue-800 px-1 py-0.25 rounded font-mono font-bold">Plate: {truck.licensePlate}</span>}
+                                {(truck.make || truck.model || truck.year) && (
+                                  <span className="text-slate-700">
+                                    {truck.year} {truck.make} {truck.model} {truck.color ? `(${truck.color})` : ''}
+                                  </span>
+                                )}
+                              </div>
                             )}
-                            {truck.vin && (truck.userField1 || truck.userField2) && <span className="text-gray-300">&bull;</span>}
-                            {truck.userField1 && (
-                              <span className="flex items-center">
-                                <span className="font-semibold text-slate-400 mr-1">F1:</span>
-                                <span className="text-slate-700">{truck.userField1}</span>
-                              </span>
+
+                            {/* Line 2: Mileage & Fuel */}
+                            {(truck.currentMileage || truck.fuelType) && (
+                              <div className="flex flex-wrap items-center gap-1 pt-0.5 border-t border-slate-200/40">
+                                <span className="font-bold text-slate-400 font-mono">FUEL/ODO:</span>
+                                {truck.fuelType && <span className="bg-amber-50 text-amber-800 border border-amber-200 px-1 py-0.25 rounded font-bold">{truck.fuelType}</span>}
+                                {truck.currentMileage !== undefined && <span className="text-slate-700"><strong className="font-mono">{truck.currentMileage.toLocaleString()}</strong> km</span>}
+                              </div>
                             )}
-                            {truck.userField1 && truck.userField2 && <span className="text-gray-300">&bull;</span>}
-                            {truck.userField2 && (
-                              <span className="flex items-center">
-                                <span className="font-semibold text-slate-400 mr-1">F2:</span>
-                                <span className="text-slate-700">{truck.userField2}</span>
-                              </span>
+
+                            {/* Line 3: Servicing & Insurance */}
+                            {(truck.lastServiceDate || truck.nextServiceDueDate || truck.insurancePolicyNumber || truck.insuranceExpiryDate) && (
+                              <div className="flex flex-wrap items-center gap-1 pt-0.5 border-t border-slate-200/40 leading-tight">
+                                <span className="font-bold text-slate-400 font-mono">SERVICE:</span>
+                                {truck.lastServiceDate && <span>Last: <strong className="font-mono text-slate-600">{truck.lastServiceDate}</strong></span>}
+                                {truck.nextServiceDueDate && (
+                                  <span className={`px-1 rounded ${
+                                    new Date(truck.nextServiceDueDate) < new Date() ? 'bg-rose-50 text-rose-700 font-bold' : 'text-slate-600'
+                                  }`}>Next: <strong className="font-mono">{truck.nextServiceDueDate}</strong></span>
+                                )}
+                                {truck.insurancePolicyNumber && (
+                                  <span className="text-slate-600">Ins: <strong className="font-mono text-slate-700">{truck.insurancePolicyNumber}</strong></span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Line 4: Payload capacities */}
+                            {(truck.capacityWeightKg || truck.capacityVolumeM3) && (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5 border-t border-slate-200/40">
+                                <span className="font-bold text-slate-400 font-mono">LOAD:</span>
+                                {truck.capacityWeightKg && <span>Max Weight: <strong className="font-mono text-slate-700">{truck.capacityWeightKg}</strong> kg</span>}
+                                {truck.capacityVolumeM3 && <span>Volume: <strong className="font-mono text-slate-700">{truck.capacityVolumeM3}</strong> m³</span>}
+                              </div>
+                            )}
+
+                            {/* Legacy custom fields */}
+                            {(truck.vin || truck.userField1 || truck.userField2) && (
+                              <div className="flex flex-wrap items-center gap-1 pt-0.5 border-t border-slate-200/40">
+                                {truck.vin && (
+                                  <span className="flex items-center">
+                                    <span className="font-semibold text-slate-400 mr-1">VIN:</span>
+                                    <span className="font-mono text-slate-700">{truck.vin}</span>
+                                  </span>
+                                )}
+                                {truck.vin && (truck.userField1 || truck.userField2) && <span className="text-gray-300">&bull;</span>}
+                                {truck.userField1 && (
+                                  <span className="flex items-center">
+                                    <span className="font-semibold text-slate-400 mr-1">F1:</span>
+                                    <span className="text-slate-700">{truck.userField1}</span>
+                                  </span>
+                                )}
+                                {truck.userField1 && truck.userField2 && <span className="text-gray-300">&bull;</span>}
+                                {truck.userField2 && (
+                                  <span className="flex items-center">
+                                    <span className="font-semibold text-slate-400 mr-1">F2:</span>
+                                    <span className="text-slate-700">{truck.userField2}</span>
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}

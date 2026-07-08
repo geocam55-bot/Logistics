@@ -158,7 +158,7 @@ const getTruckCoords = (truck: any, simProgress: Record<string, number>, branche
   let origLng = -63.5752;
   let destLat = 44.6518;
   let destLng = -63.5722;
-  let isMoving = false;
+  
 
   const homeBranch = branches.find(b => b.id === truck.branchId);
   if (homeBranch) {
@@ -167,16 +167,16 @@ const getTruckCoords = (truck: any, simProgress: Record<string, number>, branche
     origLng = branchCoords.lng;
     destLat = origLat + 0.003;
     destLng = origLng + 0.003;
-    isMoving = true;
+    
   }
 
   const progress = simProgress[truck.id] ?? 0.15;
   const lat = hasRealGps 
     ? (isTruckGps ? truck.gpsLat : truck.lat) 
-    : (isMoving ? (origLat + (destLat - origLat) * progress) : origLat);
+    : origLat;
   const lng = hasRealGps 
     ? (isTruckGps ? truck.gpsLng : truck.lng) 
-    : (isMoving ? (origLng + (destLng - origLng) * progress) : origLng);
+    : origLng;
 
   return { lat, lng, hasRealGps, isTruckGps };
 };
@@ -973,6 +973,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         let destLat: number;
         let destLng: number;
         let isMoving = false;
+        
         const isOnline = isDriverOnline(truck.driver);
 
         const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
@@ -1134,37 +1135,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     };
   });
 
-  // GPS Simulation Loop
-  useEffect(() => {
-    if (!isPlayingSimulation) return;
-    const interval = setInterval(() => {
-      setSimProgress(prev => {
-        const next = { ...prev };
-        displayTrucks.forEach(t => {
-          const current = prev[t.id] || 0.15;
-          const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
-          
-          if (assignedDelivery && assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED) {
-            let increment = 0.035;
-            let nextVal = current + increment;
-            if (nextVal > 1.0) {
-              nextVal = 0.05; // Reset or loop travel path
-              setSysLogs(prevLogs => [
-                `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] Beacon ${t.id} reached milestone. Dispatch verified.`,
-                ...prevLogs.slice(0, 4)
-              ]);
-            }
-            next[t.id] = nextVal;
-          } else {
-            // Unassigned or not loaded yet - stay stationary at start
-            next[t.id] = 0.0;
-          }
-        });
-        return next;
-      });
-    }, 1800);
-    return () => clearInterval(interval);
-  }, [displayTrucks, displayDeliveries, isPlayingSimulation]);
+  
 
   // Render clip progression ticker
   useEffect(() => {
@@ -1233,7 +1204,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
       } else {
         // Position isn't within general Canada Nova Scotia - bridge elements dynamically so they can still see it!
         setHqCoords({ lat: 44.6488, lng: -63.5752 }); // Halifax Center fallback
-        setGpsError("Bridges enabled: Your real location is outside Nova Scotia. Simulated dispatch point locked at Halifax Harbor.");
+        setGpsError("Bridges enabled: Your real location is outside Nova Scotia. Active dispatch point set at Halifax Harbor.");
       }
       setGpsStatus('locked');
       setSysLogs(prev => [
@@ -1244,7 +1215,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
     const errorHandler = (err: GeolocationPositionError) => {
       console.warn("Geolocation permission error:", err);
-      setGpsError("Access restricted. Simulating Dispatch Center at central Halifax City Hall.");
+      setGpsError("Access restricted. Active Dispatch Center set at central Halifax City Hall.");
       setHqCoords({ lat: 44.6488, lng: -63.5752 }); // Fallback
       setGpsStatus('locked');
       setSysLogs(prev => [
@@ -1527,9 +1498,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                             localStorage.setItem('FLEET_TOMTOM_API_KEY', 'Q6ALAtN4vWofc1XpL9RfeT7vAwQJ8fG');
                           }}
                           className="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-705 text-[9.5px] font-mono hover:text-white font-bold cursor-pointer"
-                          title="Click to reset to evaluation demo key"
+                          title="Click to reset to evaluation default key"
                         >
-                          Demo
+                          Default
                         </button>
                       </div>
                       <span className="text-[9px] text-slate-500 block leading-tight">
@@ -1885,6 +1856,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 let destLat: number;
                 let destLng: number;
                 let isMoving = false;
+                
                 const isOnline = isDriverOnline(truck.driver);
 
                 const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
@@ -2323,7 +2295,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                               </div>
                             </div>
 
-                            {/* Simulation settings toggle directly inside card for awesome utility */}
+                            {/* Live telematics directly inside card for awesome utility */}
                             <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2.5 text-[10px] text-slate-500 font-mono">
                               <span className="flex items-center gap-1 leading-none py-0.5">
                                 <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
@@ -2402,7 +2374,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
 
             </div>
 
-            {/* Simulated Live Street view details or Radar Ping Console logs collapsed at the bottom footer */}
+            {/* Live Street view details or Radar Ping Console logs collapsed at the bottom footer */}
             <div className="pt-2.5 border-t border-slate-200 space-y-2 text-slate-505">
               
               <div className="flex items-center justify-between text-[10px] font-mono leading-none">
@@ -2413,10 +2385,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 <span className="text-[9px] uppercase">{cameraFilter === 'normal' ? 'Normal Lens' : cameraFilter.toUpperCase() + ' Active'}</span>
               </div>
 
-              {/* Collapsed view simulated Street View rendering */}
+              {/* Collapsed view Live Street View rendering */}
               <div className="relative h-14 w-full rounded-xl bg-slate-950 overflow-hidden border border-slate-200 flex items-center justify-center">
                 
-                {/* Simulated perspectives */}
+                {/* Active HUD perspectives */}
                 <div className="absolute inset-0 opacity-40 select-none pointer-events-none">
                   <svg className="w-full h-full" viewBox="0 0 100 50" preserveAspectRatio="none">
                     <polygon points="50,15 20,50 80,50" fill="#0f172a" />

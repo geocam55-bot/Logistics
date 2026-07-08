@@ -251,7 +251,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
           setError("No active employee profile matched this address in the Supabase connected live database. Register below to create a direct database record now.");
         }
       } else {
-        // Supabase is unconfigured/inactive. Fallback to Local Sandbox cleanly!
+        // Supabase is unconfigured/inactive. Fallback to offline local cache cleanly!
         console.warn("Supabase database is inactive/unconfigured. Falling back to local offline user session.");
         
         // Define fallback user matching entered email or default to George Campbell
@@ -317,7 +317,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
           };
         }
 
-        // Complete the login successfully in offline demo mode!
+        // Complete the login successfully in offline local cache mode!
         onLoginSuccess(fallbackTenant, fallbackUser);
       }
     } catch (err: any) {

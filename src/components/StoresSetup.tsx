@@ -32,6 +32,19 @@ export default function StoresSetup({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
 
+  // New Branch Properties
+  const [branchCode, setBranchCode] = useState('');
+  const [branchName, setBranchName] = useState('');
+  const [branchType, setBranchType] = useState<'STORE' | 'DC' | 'Depot' | 'Warehouse' | 'Pickup'>('STORE');
+  const [address1, setAddress1] = useState('');
+  const [address2, setAddress2] = useState('');
+  const [city, setCity] = useState('');
+  const [provinceState, setProvinceState] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+
   const cleanAddressText = (address: string | undefined): string => {
     if (!address) return '';
     return address
@@ -48,6 +61,20 @@ export default function StoresSetup({
     setStoreAddress('');
     setStoreLat('');
     setStoreLng('');
+    
+    // Reset properties
+    setBranchCode('');
+    setBranchName('');
+    setBranchType('STORE');
+    setAddress1('');
+    setAddress2('');
+    setCity('');
+    setProvinceState('');
+    setPostalCode('');
+    setCountry('');
+    setPhoneNumber('');
+    setEmail('');
+
     setIsAdding(true);
     setEditingBranchId(null);
   };
@@ -68,6 +95,20 @@ export default function StoresSetup({
     setStoreAddress(cleanAddress);
     setStoreLat(latMatch ? latMatch[1] : '');
     setStoreLng(lngMatch ? lngMatch[1] : '');
+    
+    // Load properties
+    setBranchCode(branch.branchCode || '');
+    setBranchName(branch.branchName || branch.name);
+    setBranchType(branch.branchType || (branch.type as any) || 'STORE');
+    setAddress1(branch.address1 || '');
+    setAddress2(branch.address2 || '');
+    setCity(branch.city || '');
+    setProvinceState(branch.provinceState || '');
+    setPostalCode(branch.postalCode || '');
+    setCountry(branch.country || '');
+    setPhoneNumber(branch.phoneNumber || '');
+    setEmail(branch.email || '');
+
     setEditingBranchId(branch.id);
     setIsAdding(false);
   };
@@ -88,7 +129,22 @@ export default function StoresSetup({
       id: storeId,
       name: storeName.trim(),
       type: storeType,
-      address: finalAddress
+      address: finalAddress,
+      
+      // New properties
+      branchCode: branchCode.trim() || storeId,
+      branchName: branchName.trim() || storeName.trim(),
+      branchType: branchType,
+      address1: address1.trim() || storeAddress.trim(),
+      address2: address2.trim() || undefined,
+      city: city.trim() || undefined,
+      provinceState: provinceState.trim() || undefined,
+      postalCode: postalCode.trim() || undefined,
+      country: country.trim() || undefined,
+      latitude: storeLat ? parseFloat(storeLat) : undefined,
+      longitude: storeLng ? parseFloat(storeLng) : undefined,
+      phoneNumber: phoneNumber.trim() || undefined,
+      email: email.trim() || undefined
     };
 
     if (editingBranchId) {
@@ -110,6 +166,18 @@ export default function StoresSetup({
     setStoreAddress('');
     setStoreLat('');
     setStoreLng('');
+    
+    setBranchCode('');
+    setBranchName('');
+    setBranchType('STORE');
+    setAddress1('');
+    setAddress2('');
+    setCity('');
+    setProvinceState('');
+    setPostalCode('');
+    setCountry('');
+    setPhoneNumber('');
+    setEmail('');
   };
 
   const showFeedback = (msg: string) => {
@@ -290,6 +358,127 @@ export default function StoresSetup({
                     />
                   </div>
                 </div>
+
+                {/* Expanded Branch Specifics */}
+                <div className="pt-3 border-t border-slate-200 space-y-2 bg-slate-50 p-3.5 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Logistics Registry Details</span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Branch Code</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. BR-1080"
+                        value={branchCode}
+                        onChange={(e) => setBranchCode(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Branch Type</label>
+                      <select
+                        value={branchType}
+                        onChange={(e) => setBranchType(e.target.value as any)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none font-medium"
+                      >
+                        <option value="STORE">Store</option>
+                        <option value="DC">DC (Distribution Center)</option>
+                        <option value="Depot">Depot</option>
+                        <option value="Warehouse">Warehouse</option>
+                        <option value="Pickup">Pickup Point</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Alternative Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Lower Sackville Depot"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-2.5 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 border-t border-slate-200/40 pt-1.5">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Formatted Address Components</span>
+                    
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Address Line 1"
+                        value={address1}
+                        onChange={(e) => setAddress1(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Address Line 2 (Optional)"
+                        value={address2}
+                        onChange={(e) => setAddress2(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Province / State"
+                        value={provinceState}
+                        onChange={(e) => setProvinceState(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Postal / ZIP Code"
+                        value={postalCode}
+                        onChange={(e) => setPostalCode(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Country"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 border-t border-slate-200/40 pt-1.5">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Contact Phone</label>
+                      <input
+                        type="text"
+                        placeholder="Branch line"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Contact Email</label>
+                      <input
+                        type="email"
+                        placeholder="Branch inbox"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex space-x-2 pt-2 border-t border-slate-100">
@@ -357,29 +546,49 @@ export default function StoresSetup({
                               ? 'bg-red-100 text-red-800' 
                               : 'bg-blue-100 text-blue-700'
                           }`}>
-                            {isDc ? 'Bulk DC' : 'Retailer'}
+                            {branch.branchType || (isDc ? 'Bulk DC' : 'Retailer')}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 font-medium font-mono text-[10px] bg-slate-50 px-1.5 py-0.5 rounded inline-block">
-                          ID: {branch.id}
-                        </p>
-                        <div className="flex items-center text-xs text-gray-500 space-x-1 pt-1">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-sm sm:max-w-md" title={cleanAddressText(branch.address)}>
-                            {cleanAddressText(branch.address)}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 font-mono">
+                          <span className="bg-slate-50 px-1.5 py-0.5 rounded">ID: {branch.id}</span>
+                          {branch.branchCode && <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold">Code: {branch.branchCode}</span>}
+                        </div>
+                        <div className="flex flex-col text-xs text-gray-500 space-y-0.5 pt-1">
+                          <div className="flex items-center space-x-1">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-sm sm:max-w-md font-medium text-slate-700" title={cleanAddressText(branch.address)}>
+                              {branch.address1 || cleanAddressText(branch.address)}
+                              {branch.address2 && `, ${branch.address2}`}
+                              {(branch.city || branch.provinceState || branch.postalCode) && (
+                                <span className="text-slate-500 ml-1">
+                                  ({[branch.city, branch.provinceState, branch.postalCode, branch.country].filter(Boolean).join(', ')})
+                                </span>
+                              )}
+                            </span>
                             {(() => {
                               const latMatch = (branch.address || '').match(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/i);
                               const lngMatch = (branch.address || '').match(/\|\|lng:\s*(-?\d+(?:\.\d+)?)/i);
                               if (latMatch && lngMatch) {
                                 return (
-                                  <span className="ml-2 font-mono text-[9px] text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
+                                  <span className="ml-1 font-mono text-[9px] text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
                                     📍 {parseFloat(latMatch[1]).toFixed(4)}, {parseFloat(lngMatch[1]).toFixed(4)}
                                   </span>
                                 );
                               }
                               return null;
                             })()}
-                          </span>
+                          </div>
+                          {(branch.phoneNumber || branch.email) && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-500 border-t border-slate-100/60">
+                              {branch.phoneNumber && (
+                                <span>📞 <strong className="text-slate-700 font-mono">{branch.phoneNumber}</strong></span>
+                              )}
+                              {branch.phoneNumber && branch.email && <span className="text-slate-300">&bull;</span>}
+                              {branch.email && (
+                                <span>✉️ <span className="text-blue-600 font-mono">{branch.email}</span></span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

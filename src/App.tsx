@@ -32,6 +32,7 @@ import LandingPage from './components/LandingPage';
 import SuperAdminTenantsView from './components/SuperAdminTenantsView';
 import UserProfileModal, { renderUserAvatarHelper } from './components/UserProfileModal';
 import GpsSetup from './components/GpsSetup';
+import EnterpriseHub from './components/EnterpriseHub';
 import { 
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck, Key,
@@ -612,7 +613,7 @@ export default function App() {
     u: User[]
   ) => {
     lastMutationTimeRef.current = Date.now();
-    // Save to browser cache immediately so that local fallback remains 100% persistent in sandbox
+    // Save to browser cache immediately so that local fallback remains 100% persistent in cache
     localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(d));
     localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(t));
     localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(b));
@@ -639,7 +640,7 @@ export default function App() {
         if (body.supabaseActive) {
           setLastSyncTime(new Date().toLocaleTimeString());
         } else {
-          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Cache Saved)`);
         }
       } else {
         throw new Error(`Server returned ${res.status}`);
@@ -657,7 +658,7 @@ export default function App() {
       } catch (directErr) {
         console.error("Direct Supabase write fallback failed as well:", directErr);
         setSyncStatus('ERROR');
-        setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox Saved)`);
+        setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Cache Saved)`);
       }
     }
   };
@@ -732,7 +733,7 @@ export default function App() {
           return;
         } else {
           // Supabase is unconfigured/inactive. Fallback to Local/Session Storage mode with the backend-provided sample seed data.
-          console.debug("Database dashboard reports unconfigured backend connector. Using local sandbox fallback.");
+          console.debug("Database dashboard reports unconfigured backend connector. Using local cache fallback.");
           if (data.error) {
             setLastFetchError(data.error);
           }
@@ -750,7 +751,7 @@ export default function App() {
           setTrucks(rawTrucks.filter((t: any) => !recentlyDeletedIdsRef.current.has(t.id)));
           setBranches(rawBranches.filter((b: any) => !recentlyDeletedIdsRef.current.has(b.id)));
           setUsers(deduplicateUsers(rawUsers.filter((u: any) => !recentlyDeletedIdsRef.current.has(u.id))));
-          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Sandbox)`);
+          setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Local Cache)`);
           setDbActive(false);
           setSyncStatus('IDLE');
         }
@@ -1725,6 +1726,18 @@ export default function App() {
             <span>Live Dashboard</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('enterprise-hub')}
+            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
+              activeTab === 'enterprise-hub' 
+                ? theme.activeBtn
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+            <span>Enterprise Hub</span>
+          </button>
+
           {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
             <button
               onClick={() => setActiveTab('scanner')}
@@ -1783,17 +1796,7 @@ export default function App() {
             </button>
           )}
 
-          <button
-            onClick={() => setActiveTab('landing-preview')}
-            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-              activeTab === 'landing-preview' 
-                ? theme.activeBtn
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
-            <span>Website Preview</span>
-          </button>
+
 
         </div>
 
@@ -1879,6 +1882,15 @@ export default function App() {
               trucks={trucks} 
               branches={branches}
               users={users}
+            />
+          )}
+          {activeTab === 'enterprise-hub' && (
+            <EnterpriseHub 
+              branches={branches}
+              trucks={trucks}
+              users={users}
+              currentUser={currentUser}
+              onAddOrUpdateDelivery={handleAddOrUpdateDelivery}
             />
           )}
           {activeTab === 'scanner' && (

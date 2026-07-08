@@ -968,9 +968,9 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                   )}
                 </div>
 
-                {/* Epicor Sales Order Ref */}
+                {/* Enterprise Sales Order Ref */}
                 <div>
-                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Epicor Sales Order Ref *</label>
+                  <label className="block text-slate-600 font-bold mb-1 font-mono uppercase text-[10px]">Sales Order Ref *</label>
                   <input 
                     type="text"
                     required

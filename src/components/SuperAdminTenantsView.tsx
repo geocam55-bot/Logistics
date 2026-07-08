@@ -107,7 +107,7 @@ export default function SuperAdminTenantsView({
     }
   }, [tenants, selectedTenantId]);
 
-  // Load users setup from DB or localStorage sandbox
+  // Load users setup from DB or localStorage cache
   const fetchTenantUsers = async (tenantId: string) => {
     if (!tenantId) {
       setTenantUsers([]);
@@ -120,10 +120,10 @@ export default function SuperAdminTenantsView({
       const data = await res.json();
       setTenantUsers(data.users || []);
       
-      // Keep offline/local sandbox synced
+      // Keep offline/local cache synced
       localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(data.users || []));
     } catch (err) {
-      console.warn("Retrying sandbox user credentials from browser cache:", err);
+      console.warn("Retrying offline user credentials from browser cache:", err);
       const cached = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
       if (cached) {
         setTenantUsers(JSON.parse(cached));
@@ -279,7 +279,7 @@ export default function SuperAdminTenantsView({
         const res = await customFetch(`/api/tenant/state?tenantId=${selectedTenantId}`);
         fullState = await res.json();
       } catch (err) {
-        console.warn("Using fallback browser local storage caches in sandbox login mode");
+        console.warn("Using fallback browser local storage caches in offline active mode");
         const ld = localStorage.getItem(`prospaces_deliveries_tenant_${selectedTenantId}`);
         const lt = localStorage.getItem(`prospaces_trucks_tenant_${selectedTenantId}`);
         const lb = localStorage.getItem(`prospaces_branches_tenant_${selectedTenantId}`);
@@ -719,7 +719,7 @@ export default function SuperAdminTenantsView({
                     : 'bg-amber-950/40 border-amber-500/30 text-amber-300'
                 }`}>
                   <Database className="h-3.5 w-3.5 text-current" />
-                  <span>{supabaseStatus?.connected ? 'Live Database Active' : 'Local Sandbox Store'}</span>
+                  <span>{supabaseStatus?.connected ? 'Live Database Active' : 'Local Active Store'}</span>
                 </div>
               </div>
 

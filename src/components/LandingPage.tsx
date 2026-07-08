@@ -188,7 +188,7 @@ export default function LandingPage({
                 onClick={onBookDemo}
                 className="px-5 py-2.5 bg-[#FF5A1F] hover:bg-[#E54B13] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-orange-500/10 cursor-pointer hover:-translate-y-0.5 duration-150"
               >
-                Book a Demo
+                Access Portal
               </button>
             </div>
 
@@ -239,7 +239,7 @@ export default function LandingPage({
                     onClick={onBookDemo}
                     className="w-full py-2.5 bg-[#FF5A1F] text-white font-bold text-sm rounded-xl text-center shadow-sm"
                   >
-                    Book a Demo
+                    Access Portal
                   </button>
                 </div>
               </div>
@@ -905,7 +905,7 @@ export default function LandingPage({
                 <div className="flex items-center space-x-2">
                   <Play className="h-5 w-5 text-orange-500 fill-orange-500" />
                   <h3 className="font-sans font-black text-slate-900 text-base">
-                    Interactive Delivery Tour Simulation
+                    Interactive Delivery & Active Tracking Tour
                   </h3>
                 </div>
                 <button 
@@ -951,11 +951,11 @@ export default function LandingPage({
                   </div>
                 </div>
 
-                {/* Simulated interactive active visualization for each step */}
+                {/* Interactive active visualization for each step */}
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 font-mono text-xs text-slate-600 space-y-2.5">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <span className="font-bold text-slate-800">LIVE CO-PILOT SYSTEM TERMINAL</span>
-                    <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">SIMULATOR STATE: ACTIVE</span>
+                    <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">MONITOR STATE: ACTIVE</span>
                   </div>
 
                   {tourStep === 0 && (

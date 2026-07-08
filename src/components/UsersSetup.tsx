@@ -34,6 +34,19 @@ export default function UsersSetup({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
 
+  // Expanded fields state
+  const [employeeNumber, setEmployeeNumber] = useState('');
+  const [username, setUsername] = useState('');
+  const [mobilePhone, setMobilePhone] = useState('');
+  const [department, setDepartment] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [driverLicenseNumber, setDriverLicenseNumber] = useState('');
+  const [driverLicenseClass, setDriverLicenseClass] = useState('');
+  const [hireDate, setHireDate] = useState('');
+  const [emergencyContactName, setEmergencyContactName] = useState('');
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
+  const [status, setStatus] = useState<'Active' | 'Suspended' | 'Terminated' | 'Inactive'>('Active');
+
   const ROLES: UserRole[] = ['Driver', 'Picker', 'Dispatcher', 'User', 'Admin'];
 
   const getRoleBadgeStyle = (role: UserRole) => {
@@ -61,6 +74,17 @@ export default function UsersSetup({
     setDriverLicenseExpire('');
     setAssociatedStoreId(branches[0]?.id || '');
     setUserPassword('ProSpaces2026!');
+    setEmployeeNumber('');
+    setUsername('');
+    setMobilePhone('');
+    setDepartment('');
+    setJobTitle('');
+    setDriverLicenseNumber('');
+    setDriverLicenseClass('');
+    setHireDate('');
+    setEmergencyContactName('');
+    setEmergencyContactPhone('');
+    setStatus('Active');
     setIsAdding(true);
     setEditingUserId(null);
   };
@@ -74,6 +98,20 @@ export default function UsersSetup({
     setDriverLicenseExpire(user.driverLicenseExpire || '');
     setAssociatedStoreId(user.associatedStoreId || '');
     setUserPassword(user.password || '');
+    
+    // Expanded fields
+    setEmployeeNumber(user.employeeNumber || '');
+    setUsername(user.username || '');
+    setMobilePhone(user.mobilePhone || '');
+    setDepartment(user.department || '');
+    setJobTitle(user.jobTitle || '');
+    setDriverLicenseNumber(user.driverLicenseNumber || '');
+    setDriverLicenseClass(user.driverLicenseClass || '');
+    setHireDate(user.hireDate || '');
+    setEmergencyContactName(user.emergencyContactName || '');
+    setEmergencyContactPhone(user.emergencyContactPhone || '');
+    setStatus(user.status || 'Active');
+    
     setEditingUserId(user.id);
     setIsAdding(false);
   };
@@ -93,7 +131,21 @@ export default function UsersSetup({
       phone: userPhone.trim() || undefined,
       driverLicenseExpire: driverLicenseExpire || undefined,
       associatedStoreId: associatedStoreId || undefined,
-      password: userPassword || 'ProSpaces2026!'
+      password: userPassword || 'ProSpaces2026!',
+      
+      // Expanded fields
+      employeeNumber: employeeNumber.trim() || undefined,
+      username: username.trim() || undefined,
+      mobilePhone: mobilePhone.trim() || undefined,
+      department: department.trim() || undefined,
+      jobTitle: jobTitle.trim() || undefined,
+      driverLicenseNumber: driverLicenseNumber.trim() || undefined,
+      driverLicenseClass: driverLicenseClass.trim() || undefined,
+      driverLicenseExpiry: driverLicenseExpire || undefined, // Syncing with main expire field
+      hireDate: hireDate || undefined,
+      emergencyContactName: emergencyContactName.trim() || undefined,
+      emergencyContactPhone: emergencyContactPhone.trim() || undefined,
+      status: status
     };
 
     if (editingUserId) {
@@ -116,6 +168,17 @@ export default function UsersSetup({
     setUserPhone('');
     setDriverLicenseExpire('');
     setUserPassword('ProSpaces2026!');
+    setEmployeeNumber('');
+    setUsername('');
+    setMobilePhone('');
+    setDepartment('');
+    setJobTitle('');
+    setDriverLicenseNumber('');
+    setDriverLicenseClass('');
+    setHireDate('');
+    setEmergencyContactName('');
+    setEmergencyContactPhone('');
+    setStatus('Active');
   };
 
   const showFeedback = (msg: string) => {
@@ -299,7 +362,151 @@ export default function UsersSetup({
                     onChange={(e) => setUserPassword(e.target.value)}
                     className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                  <span className="text-[9px] text-slate-400 font-serif mt-0.5 block">Use this password to authenticate when logging into this profile.</span>
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">Use this password to authenticate when logging into this profile.</span>
+                </div>
+
+                {/* HR & Logistics Details */}
+                <div className="pt-3 border-t border-slate-100 space-y-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Logistics & Human Resources</span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Employee #</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. EMP-103"
+                        value={employeeNumber}
+                        onChange={(e) => setEmployeeNumber(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Username</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. dmacneil"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Mobile Phone</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. (902) 555-0192"
+                        value={mobilePhone}
+                        onChange={(e) => setMobilePhone(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Status</label>
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as any)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Suspended">Suspended</option>
+                        <option value="Terminated">Terminated</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Department</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Logistics"
+                        value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Job Title</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Lead Delivery Driver"
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {userRole === 'Driver' && (
+                    <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
+                      <span className="text-[9px] font-bold text-slate-400 block uppercase">Commercial Driver Endorsements</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">License #</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. NS-87481-CD"
+                            value={driverLicenseNumber}
+                            onChange={(e) => setDriverLicenseNumber(e.target.value)}
+                            className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">License Class</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. CDL Class 1"
+                            value={driverLicenseClass}
+                            onChange={(e) => setDriverLicenseClass(e.target.value)}
+                            className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5 uppercase">Hire Date</label>
+                      <input
+                        type="date"
+                        value={hireDate}
+                        onChange={(e) => setHireDate(e.target.value)}
+                        className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Emergency Contact</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">Contact Name</label>
+                        <input
+                          type="text"
+                          placeholder="Name"
+                          value={emergencyContactName}
+                          onChange={(e) => setEmergencyContactName(e.target.value)}
+                          className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">Contact Phone</label>
+                        <input
+                          type="text"
+                          placeholder="Phone"
+                          value={emergencyContactPhone}
+                          onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                          className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
@@ -377,7 +584,60 @@ export default function UsersSetup({
                         {user.phone && (
                           <div className="flex items-center space-x-2">
                             <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span>{user.phone}</span>
+                            <span>Main Phone: {user.phone}</span>
+                          </div>
+                        )}
+                        {user.mobilePhone && (
+                          <div className="flex items-center space-x-2">
+                            <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <span>Mobile Phone: {user.mobilePhone}</span>
+                          </div>
+                        )}
+                        {user.employeeNumber && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-bold text-slate-400 w-3.5 text-center font-mono">#</span>
+                            <span>Emp ID: <strong className="font-mono text-slate-700">{user.employeeNumber}</strong></span>
+                          </div>
+                        )}
+                        {(user.department || user.jobTitle) && (
+                          <div className="flex items-center space-x-2">
+                            <Info className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">
+                              {user.jobTitle || 'Crew Member'} {user.department ? `(${user.department})` : ''}
+                            </span>
+                          </div>
+                        )}
+                        {user.status && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-bold text-slate-400 w-3.5 text-center font-mono">S</span>
+                            <span>Status: <strong className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              user.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>{user.status}</strong></span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">
+                            {matchedBranch ? matchedBranch.name.replace(' ProSpaces', '') : 'No Store Association'}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-slate-600">
+                          <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span>Passcode: <strong className="font-mono bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded text-[10px]">{user.password || 'ProSpaces2026!'}</strong></span>
+                        </div>
+                        {user.driverLicenseNumber && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-bold text-slate-400 w-3.5 text-center font-mono">L</span>
+                            <span>Lic #: <strong className="font-mono text-slate-700">{user.driverLicenseNumber}</strong> {user.driverLicenseClass ? `(Class ${user.driverLicenseClass})` : ''}</span>
+                          </div>
+                        )}
+                        {user.emergencyContactName && (
+                          <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded border border-slate-100 mt-1">
+                            <AlertTriangle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
+                            <div className="text-[10px] leading-tight">
+                              <span className="font-bold text-slate-700 block">Emergency Contact</span>
+                              <span>{user.emergencyContactName} {user.emergencyContactPhone ? `(${user.emergencyContactPhone})` : ''}</span>
+                            </div>
                           </div>
                         )}
                         <div className="flex items-center space-x-2">
