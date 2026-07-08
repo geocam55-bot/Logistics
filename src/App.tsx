@@ -1699,105 +1699,139 @@ export default function App() {
       {/* Main Core Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="prospaces-body">
         
-        {/* Navigation Tabs bar */}
-        <div className="bg-white border border-slate-200/60 p-1.5 rounded-xl flex flex-nowrap md:flex-wrap overflow-x-auto md:overflow-x-visible gap-1 shadow-sm w-full scrollbar-none select-none" id="prospaces-nav" style={{ WebkitOverflowScrolling: 'touch' }}>
-          
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-              activeTab === 'dashboard' 
-                ? theme.activeBtn
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <LayoutDashboard className="h-4 w-4" />
-            <span>HQ Dashboard</span>
-          </button>
+        {/* Unified Classified Navigation Panel */}
+        <div className="bg-white border border-slate-200/70 rounded-2xl p-3 shadow-xs w-full select-none" id="prospaces-nav-unified">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:divide-x lg:divide-slate-100">
+            
+            {/* Group 1: Operations */}
+            <div className="lg:col-span-5 flex flex-col space-y-1.5">
+              <div className="flex items-center space-x-1.5 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 font-sans">
+                  Operations Cockpit
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`flex-1 min-w-[120px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === 'dashboard' 
+                      ? theme.activeBtn
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span>HQ Dashboard</span>
+                </button>
 
-          <button
-            onClick={() => setActiveTab('live-dashboard')}
-            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-              activeTab === 'live-dashboard' 
-                ? theme.activeBtn
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
-            <span>Live Dashboard</span>
-          </button>
+                <button
+                  onClick={() => setActiveTab('live-dashboard')}
+                  className={`flex-1 min-w-[120px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === 'live-dashboard' 
+                      ? theme.activeBtn
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                  }`}
+                >
+                  <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
+                  <span>Live Monitor</span>
+                </button>
 
-          <button
-            onClick={() => setActiveTab('enterprise-hub')}
-            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-              activeTab === 'enterprise-hub' 
-                ? theme.activeBtn
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
-            <span>Enterprise Hub</span>
-          </button>
+                <button
+                  onClick={() => setActiveTab('queue')}
+                  className={`flex-1 min-w-[120px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === 'queue' 
+                      ? theme.activeBtn
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                  }`}
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  <span>Freight Board</span>
+                  {deliveries.length > 0 && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'queue' ? 'bg-white text-blue-900 font-mono' : 'bg-slate-100 text-slate-600 font-mono'}`}>
+                      {deliveries.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
 
-          {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
-            <button
-              onClick={() => setActiveTab('scanner')}
-              className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-                activeTab === 'scanner' 
-                  ? theme.activeBtn
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <Scan className="h-4 w-4" />
-              <span>Scanning Station</span>
-            </button>
-          )}
+            {/* Group 2: Enterprise Logistics & Driver Tools */}
+            <div className="lg:col-span-4 lg:pl-4 flex flex-col space-y-1.5">
+              <div className="flex items-center space-x-1.5 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 font-sans">
+                  Enterprise Logistics
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setActiveTab('enterprise-hub')}
+                  className={`flex-1 min-w-[130px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === 'enterprise-hub' 
+                      ? theme.activeBtn
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                  }`}
+                >
+                  <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                  <span>Enterprise Hub</span>
+                </button>
 
-          <button
-            onClick={() => setActiveTab('queue')}
-            className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-              activeTab === 'queue' 
-                ? theme.activeBtn
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <ClipboardList className="h-4 w-4" />
-            <span>Delivery Freight Board</span>
-          </button>
+                {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
+                  <button
+                    onClick={() => setActiveTab('scanner')}
+                    className={`flex-1 min-w-[130px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === 'scanner' 
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                    }`}
+                  >
+                    <Scan className="h-4 w-4" />
+                    <span>Scanning Station</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
-          {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-            <button
-              onClick={() => setActiveTab('document-import')}
-              className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-                activeTab === 'document-import' 
-                  ? theme.activeBtn
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <FileDown className="h-4 w-4" />
-              <span>Document Import</span>
-            </button>
-          )}
+            {/* Group 3: Portal Controls */}
+            <div className="lg:col-span-3 lg:pl-4 flex flex-col space-y-1.5">
+              <div className="flex items-center space-x-1.5 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 font-sans">
+                  Setup & Systems
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                  <button
+                    onClick={() => setActiveTab('document-import')}
+                    className={`flex-1 min-w-[110px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === 'document-import' 
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                    }`}
+                  >
+                    <FileDown className="h-4 w-4" />
+                    <span>Doc Import</span>
+                  </button>
+                )}
 
-          {/* Fleet Setup Switcher Button */}
-          {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-            <button
-              onClick={() => {
-                // Default to stores sub-tab when clicking Fleet Setup
-                setActiveTab('stores');
-              }}
-              className={`shrink-0 py-2.5 px-4 text-xs font-bold rounded-lg flex items-center justify-center space-x-2 transition-all whitespace-nowrap ${
-                ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
-                  ? theme.activeBtn
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <TruckIcon className="h-4 w-4" />
-              <span>Fleet Setup</span>
-            </button>
-          )}
+                {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                  <button
+                    onClick={() => setActiveTab('stores')}
+                    className={`flex-1 min-w-[110px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
+                    }`}
+                  >
+                    <TruckIcon className="h-4 w-4" />
+                    <span>Fleet Setup</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
-
-
+          </div>
         </div>
 
         {/* Secondary Sub-navigation for Fleet Setup */}
