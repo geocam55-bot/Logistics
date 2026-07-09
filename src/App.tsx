@@ -1547,7 +1547,7 @@ export default function App() {
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-8 sm:h-11 w-auto object-contain animate-fade-in"
+                className="h-10 sm:h-18 w-auto object-contain animate-fade-in"
                 referrerPolicy="no-referrer"
               />
             </div>
