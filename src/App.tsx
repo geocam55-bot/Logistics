@@ -1537,9 +1537,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-gray-800 antialiased selection:bg-blue-600 selection:text-white" id="main-app-container">
       
-      {/* Enterprise Brand Header */}
-      <header className="bg-white text-slate-800 shadow-sm border-b border-slate-200/80" id="prospaces-header">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+      {/* Enterprise Sticky Brand Header & Unified Navigation */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all duration-200" id="prospaces-header">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4">
           
           {/* Logo & title context */}
           <div className="flex items-center space-x-3 sm:space-x-4 text-left flex-row w-full sm:w-auto">
@@ -1547,31 +1547,31 @@ export default function App() {
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-10 sm:h-20 w-auto object-contain animate-fade-in"
+                className="h-8 sm:h-11 w-auto object-contain animate-fade-in"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
-              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                <span className="bg-blue-50 text-blue-600 border border-blue-200/50 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded font-mono leading-none">
+              <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                <span className="bg-blue-50 text-blue-600 border border-blue-200/50 text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded font-mono leading-none">
                   Tenant
                 </span>
-                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider font-sans leading-none">Active Workspace:</span>
+                <span className="text-slate-400 text-[9px] uppercase font-bold tracking-wider font-sans leading-none">Active Workspace:</span>
               </div>
-              <h1 className="font-sans font-black text-slate-900 text-sm sm:text-lg tracking-tight leading-tight m-0">
+              <h1 className="font-sans font-black text-slate-900 text-xs sm:text-base tracking-tight leading-tight m-0">
                 {currentTenant.name}
               </h1>
-              <p className="text-slate-500 text-[9px] sm:text-xs font-semibold uppercase tracking-wider mt-1.5 leading-none flex items-center gap-1.5">
+              <p className="text-slate-500 text-[8px] sm:text-[10px] font-semibold uppercase tracking-wider mt-1 leading-none flex items-center gap-1.5">
                 <span>Enterprise Logistics Portal</span>
                 <span className="opacity-40">&bull;</span>
-                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{currentTenant.code}</span>
+                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1 py-0.5 rounded text-[8px] font-mono font-bold">{currentTenant.code}</span>
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Logged-In User Profile context */}
           <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2.5">
-            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200/85 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono text-slate-600">
+            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200/85 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-xs font-mono text-slate-600">
               <Store className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400" />
               <span>{branches.length} Regs &bull; {trucks.length} Vehs</span>
             </div>
@@ -1580,7 +1580,7 @@ export default function App() {
             <div className="relative flex items-center border-l border-slate-200 pl-2.5">
               <button 
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center space-x-2.5 hover:bg-slate-50 p-1.5 rounded-2xl transition-all cursor-pointer select-none text-left"
+                className="flex items-center space-x-2.5 hover:bg-slate-50 p-1 sm:p-1.5 rounded-2xl transition-all cursor-pointer select-none text-left"
                 id="user-menu-trigger"
               >
                 <div className="hidden sm:flex flex-col text-right font-sans">
@@ -1595,7 +1595,7 @@ export default function App() {
                     {currentUser.role}
                   </span>
                 </div>
-                {renderUserAvatarHelper(currentUser.avatarUrl, currentUser.name, "h-8 w-8")}
+                {renderUserAvatarHelper(currentUser.avatarUrl, currentUser.name, "h-7 w-7 sm:h-8 sm:w-8")}
               </button>
 
               {/* User Dropdown Menu */}
@@ -1694,145 +1694,147 @@ export default function App() {
           </div>
 
         </div>
+
+        {/* Unified Classified Navigation Subbar inside Sticky Header */}
+        <div className="border-t border-slate-100 bg-slate-50/70 py-1.5 select-none" id="prospaces-nav-unified-sticky">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:divide-x lg:divide-slate-200/80">
+              
+              {/* Group 1: Operations */}
+              <div className="lg:col-span-5 flex flex-col space-y-1">
+                <div className="flex items-center space-x-1 px-1">
+                  <span className="w-1 h-1 rounded-full bg-blue-600"></span>
+                  <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans">
+                    Operations Cockpit
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`flex-1 min-w-[110px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === 'dashboard' 
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                    }`}
+                  >
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    <span>HQ Dashboard</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('live-dashboard')}
+                    className={`flex-1 min-w-[110px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === 'live-dashboard' 
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                    }`}
+                  >
+                    <Activity className="h-3.5 w-3.5 text-[#FF5A1F] animate-pulse" />
+                    <span>Live Monitor</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('queue')}
+                    className={`flex-1 min-w-[110px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === 'queue' 
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                    }`}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" />
+                    <span>Freight Board</span>
+                    {deliveries.length > 0 && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'queue' ? 'bg-white text-blue-900 font-mono' : 'bg-slate-200 text-slate-600 font-mono'}`}>
+                        {deliveries.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Group 2: Enterprise Logistics & Driver Tools */}
+              <div className="lg:col-span-4 lg:pl-3 flex flex-col space-y-1">
+                <div className="flex items-center space-x-1 px-1">
+                  <span className="w-1 h-1 rounded-full bg-amber-500"></span>
+                  <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans">
+                    Enterprise Logistics
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setActiveTab('enterprise-hub')}
+                    className={`flex-1 min-w-[120px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === 'enterprise-hub' 
+                        ? theme.activeBtn
+                        : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                    }`}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                    <span>Enterprise Hub</span>
+                  </button>
+
+                  {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
+                    <button
+                      onClick={() => setActiveTab('scanner')}
+                      className={`flex-1 min-w-[120px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'scanner' 
+                          ? theme.activeBtn
+                          : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                      }`}
+                    >
+                      <Scan className="h-3.5 w-3.5" />
+                      <span>Scanning Station</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Group 3: Portal Controls */}
+              <div className="lg:col-span-3 lg:pl-3 flex flex-col space-y-1">
+                <div className="flex items-center space-x-1 px-1">
+                  <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                  <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans">
+                    Setup & Systems
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                    <button
+                      onClick={() => setActiveTab('document-import')}
+                      className={`flex-1 min-w-[100px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'document-import' 
+                          ? theme.activeBtn
+                          : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                      }`}
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                      <span>Doc Import</span>
+                    </button>
+                  )}
+
+                  {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                    <button
+                      onClick={() => setActiveTab('stores')}
+                      className={`flex-1 min-w-[100px] py-1.5 px-2.5 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
+                        ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
+                          ? theme.activeBtn
+                          : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/50 hover:shadow-xs'
+                      }`}
+                    >
+                      <TruckIcon className="h-3.5 w-3.5" />
+                      <span>Fleet Setup</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
       </header>
 
       {/* Main Core Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="prospaces-body">
-        
-        {/* Unified Classified Navigation Panel */}
-        <div className="bg-white border border-slate-200/70 rounded-2xl p-3 shadow-xs w-full select-none" id="prospaces-nav-unified">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:divide-x lg:divide-slate-100">
-            
-            {/* Group 1: Operations */}
-            <div className="lg:col-span-5 flex flex-col space-y-1.5">
-              <div className="flex items-center space-x-1.5 px-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 font-sans">
-                  Operations Cockpit
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`flex-1 min-w-[120px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                    activeTab === 'dashboard' 
-                      ? theme.activeBtn
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                  }`}
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span>HQ Dashboard</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('live-dashboard')}
-                  className={`flex-1 min-w-[120px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                    activeTab === 'live-dashboard' 
-                      ? theme.activeBtn
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                  }`}
-                >
-                  <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
-                  <span>Live Monitor</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('queue')}
-                  className={`flex-1 min-w-[120px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                    activeTab === 'queue' 
-                      ? theme.activeBtn
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                  }`}
-                >
-                  <ClipboardList className="h-4 w-4" />
-                  <span>Freight Board</span>
-                  {deliveries.length > 0 && (
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'queue' ? 'bg-white text-blue-900 font-mono' : 'bg-slate-100 text-slate-600 font-mono'}`}>
-                      {deliveries.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Group 2: Enterprise Logistics & Driver Tools */}
-            <div className="lg:col-span-4 lg:pl-4 flex flex-col space-y-1.5">
-              <div className="flex items-center space-x-1.5 px-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 font-sans">
-                  Enterprise Logistics
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <button
-                  onClick={() => setActiveTab('enterprise-hub')}
-                  className={`flex-1 min-w-[130px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                    activeTab === 'enterprise-hub' 
-                      ? theme.activeBtn
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                  }`}
-                >
-                  <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
-                  <span>Enterprise Hub</span>
-                </button>
-
-                {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
-                  <button
-                    onClick={() => setActiveTab('scanner')}
-                    className={`flex-1 min-w-[130px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                      activeTab === 'scanner' 
-                        ? theme.activeBtn
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                    }`}
-                  >
-                    <Scan className="h-4 w-4" />
-                    <span>Scanning Station</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Group 3: Portal Controls */}
-            <div className="lg:col-span-3 lg:pl-4 flex flex-col space-y-1.5">
-              <div className="flex items-center space-x-1.5 px-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
-                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 font-sans">
-                  Setup & Systems
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-                  <button
-                    onClick={() => setActiveTab('document-import')}
-                    className={`flex-1 min-w-[110px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                      activeTab === 'document-import' 
-                        ? theme.activeBtn
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                    }`}
-                  >
-                    <FileDown className="h-4 w-4" />
-                    <span>Doc Import</span>
-                  </button>
-                )}
-
-                {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-                  <button
-                    onClick={() => setActiveTab('stores')}
-                    className={`flex-1 min-w-[110px] py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-all whitespace-nowrap cursor-pointer ${
-                      ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
-                        ? theme.activeBtn
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100'
-                    }`}
-                  >
-                    <TruckIcon className="h-4 w-4" />
-                    <span>Fleet Setup</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
 
         {/* Secondary Sub-navigation for Fleet Setup */}
         {['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab) && (
