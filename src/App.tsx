@@ -2071,6 +2071,7 @@ export default function App() {
           )}
           {activeTab === 'enterprise-hub' && (
             <EnterpriseHub 
+              deliveries={deliveries}
               branches={branches}
               trucks={trucks}
               users={users}

@@ -8,10 +8,11 @@ import {
   Activity, Award, RefreshCw, Trash2, HelpCircle, Navigation, Info, Clock, PlayCircle,
   Camera
 } from 'lucide-react';
-import { Branch, Truck, User } from '../types';
+import { Branch, Truck, User, DeliveryRecord } from '../types';
 import { getFrontendSupabase } from '../lib/supabaseClient';
 
 interface EnterpriseHubProps {
+  deliveries?: DeliveryRecord[];
   branches: Branch[];
   trucks: Truck[];
   users: User[];
@@ -45,9 +46,9 @@ interface Customer {
 }
 
 interface Order {
-  id?: number;
+  id?: number | string;
   orderNumber: string;
-  customerID: number;
+  customerID?: number | string;
   branchID: string;
   orderDate: string;
   requestedDeliveryDate: string;
@@ -58,6 +59,7 @@ interface Order {
   itemCount: number;
   orderValue: number;
   notes: string;
+  customerNameStr?: string; // For mapped deliveries
 }
 
 interface RouteLog {
@@ -169,7 +171,7 @@ interface DocumentRecord {
 
 // Static Seed Data is completely removed. Only Live Supabase tables are used.
 
-export default function EnterpriseHub({ branches, trucks, users, currentUser, onAddOrUpdateDelivery }: EnterpriseHubProps) {
+export default function EnterpriseHub({ deliveries, branches, trucks, users, currentUser, onAddOrUpdateDelivery }: EnterpriseHubProps) {
   const [activeSubTab, setActiveSubTab] = useState<string>('customers');
   
   // Real live states connected to Supabase tables
@@ -271,7 +273,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     try {
       // 1. Customers
       const { data: custData, error: custError } = await supabase.from('Customers').select('*');
-      if (custError) console.error("Error fetching Customers:", custError);
+      
       if (custData) {
         setCustomers(custData.map((c: any) => ({
           id: Number(c.CustomerID),
@@ -302,7 +304,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 2. Orders
       const { data: ordData, error: ordError } = await supabase.from('Orders').select('*');
-      if (ordError) console.error("Error fetching Orders:", ordError);
+      
       if (ordData) {
         setOrders(ordData.map((o: any) => ({
           id: Number(o.OrderID),
@@ -325,7 +327,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 3. Routes
       const { data: routeData, error: routeError } = await supabase.from('Routes').select('*');
-      if (routeError) console.error("Error fetching Routes:", routeError);
+      
       if (routeData) {
         setRoutes(routeData.map((r: any) => ({
           id: Number(r.RouteID),
@@ -350,7 +352,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 4. Stops (RouteStops)
       const { data: stopData, error: stopError } = await supabase.from('RouteStops').select('*');
-      if (stopError) console.error("Error fetching RouteStops:", stopError);
+      
       if (stopData) {
         setStops(stopData.map((s: any) => ({
           id: Number(s.StopID),
@@ -370,7 +372,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 5. Safety Logs
       const { data: safetyData, error: safetyError } = await supabase.from('driver_behaviour').select('*');
-      if (safetyError) console.error("Error fetching driver_behaviour:", safetyError);
+      
       if (safetyData) {
         setSafetyLogs(safetyData.map((db: any) => ({
           id: db.id,
@@ -387,7 +389,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 6. Maintenance (vehicle_maintenance)
       const { data: maintData, error: maintError } = await supabase.from('vehicle_maintenance').select('*');
-      if (maintError) console.error("Error fetching vehicle_maintenance:", maintError);
+      
       if (maintData) {
         setMaintenance(maintData.map((m: any) => ({
           id: m.id,
@@ -406,7 +408,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 7. Inspections (VehicleInspections)
       const { data: inspData, error: inspError } = await supabase.from('VehicleInspections').select('*');
-      if (inspError) console.error("Error fetching VehicleInspections:", inspError);
+      
       if (inspData) {
         setInspections(inspData.map((item: any) => ({
           id: Number(item.InspectionID),
@@ -431,7 +433,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 8. FuelTransactions
       const { data: fuelData, error: fuelError } = await supabase.from('FuelTransactions').select('*');
-      if (fuelError) console.error("Error fetching FuelTransactions:", fuelError);
+      
       if (fuelData) {
         setFuelTransactions(fuelData.map((tx: any) => ({
           id: Number(tx.TransactionID),
@@ -452,7 +454,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 9. Documents
       const { data: docData, error: docError } = await supabase.from('Documents').select('*');
-      if (docError) console.error("Error fetching Documents:", docError);
+      
       if (docData) {
         setDocuments(docData.map((doc: any) => ({
           id: Number(doc.DocumentID),
@@ -470,7 +472,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 10. Proof of Delivery (ProofOfDelivery)
       const { data: podData, error: podError } = await supabase.from('ProofOfDelivery').select('*');
-      if (podError) console.error("Error fetching ProofOfDelivery:", podError);
+      
       if (podData) {
         setPods(podData.map((p: any) => ({
           id: Number(p.PODID),
@@ -488,7 +490,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
       // 11. Notifications
       const { data: notifData, error: notifError } = await supabase.from('Notifications').select('*');
-      if (notifError) console.error("Error fetching Notifications:", notifError);
+      
       if (notifData) {
         setNotifications(notifData.map((n: any) => ({
           id: Number(n.NotificationID),
@@ -1140,10 +1142,31 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     c.city.toLowerCase().includes(custSearch.toLowerCase())
   );
 
+  const combinedOrders = React.useMemo(() => {
+    const deliveryOrders = (deliveries || []).map(d => ({
+      id: d.id,
+      orderNumber: d.invoiceNumber || d.epicorSalesOrder || (d.id || '').substring(0, 8),
+      customerID: 'delivery',
+      customerNameStr: d.customerName,
+      branchID: d.originBranch,
+      orderDate: d.registeredAt,
+      requestedDeliveryDate: d.registeredAt,
+      priority: 'Normal',
+      orderStatus: d.status,
+      totalWeightKg: d.weight ? parseFloat(d.weight) || 0 : 0,
+      totalVolumeM3: 0,
+      itemCount: d.orderTotal ? parseFloat(d.orderTotal) || 1 : 1,
+      orderValue: 0,
+      notes: d.destinationNotes || ''
+    } as Order));
+    return [...deliveryOrders, ...orders];
+  }, [deliveries, orders]);
+
   // Filter orders
-  const filteredOrders = orders.filter(o => 
+  const filteredOrders = combinedOrders.filter(o => 
     o.orderNumber.toLowerCase().includes(orderSearch.toLowerCase()) ||
-    String(o.customerID).includes(orderSearch)
+    String(o.customerID).includes(orderSearch) ||
+    (o.customerNameStr || '').toLowerCase().includes(orderSearch.toLowerCase())
   );
 
   return (
@@ -1194,6 +1217,8 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         {[
           { id: 'customers', label: 'Customers', icon: Users },
           { id: 'orders', label: 'Orders', icon: ShoppingBag },
+          { id: 'routes', label: 'Routes & Stops', icon: RouteIcon },
+          { id: 'maintenance', label: 'Maintenance', icon: Wrench },
           { id: 'pod', label: 'Proof of Delivery', icon: Signature },
           { id: 'safety', label: 'Safety Scorecards', icon: ShieldCheck },
           { id: 'inspections', label: 'DOT Inspections', icon: ClipboardList },
@@ -1547,11 +1572,12 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {filteredOrders.map(o => {
                   const cust = customers.find(c => c.id === o.customerID);
+                  const displayCustomerName = cust ? cust.companyName : (o.customerNameStr || `ID: ${o.customerID}`);
                   return (
                     <tr key={o.id} className="hover:bg-slate-50/50">
                       <td className="px-4 py-3 font-mono font-bold text-slate-900">{o.orderNumber}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">
-                        {cust ? cust.companyName : `ID: ${o.customerID}`}
+                        {displayCustomerName}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1580,18 +1606,26 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
-                        <button
-                          onClick={() => startEditOrder(o)}
-                          className="px-2 py-1 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(Number(o.id))}
-                          className="px-2 py-1 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
-                        >
-                          Delete
-                        </button>
+                        {o.customerID === 'delivery' ? (
+                          <span className="px-2 py-1 bg-slate-100 text-[10px] font-bold rounded text-slate-500">
+                            Freight Board Item
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startEditOrder(o)}
+                              className="px-2 py-1 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteOrder(Number(o.id))}
+                              className="px-2 py-1 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
@@ -2289,6 +2323,110 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-VIEW 9: ROUTES & STOPS */}
+      {activeSubTab === 'routes' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white border border-slate-200/60 rounded-xl shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 font-bold text-slate-800 text-xs flex justify-between items-center border-b border-slate-100">
+              <span>Active Routing Ledger</span>
+            </div>
+            <div className="p-0 overflow-x-auto">
+              <table className="w-full text-left whitespace-nowrap">
+                <thead className="bg-slate-50/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Route #</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Truck / Driver</th>
+                    <th className="px-4 py-3">Distance (KM)</th>
+                    <th className="px-4 py-3">Duration (Min)</th>
+                    <th className="px-4 py-3 text-right">Stops Count</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                  {routes.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400 italic">No routes recorded.</td>
+                    </tr>
+                  ) : (
+                    routes.map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-mono font-bold text-slate-900">{r.routeNumber}</td>
+                        <td className="px-4 py-3 font-mono">{r.routeDate.split('T')[0]}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            r.routeStatus === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {r.routeStatus}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium">
+                          <span className="text-blue-700">{r.truckID}</span> <span className="text-slate-400 mx-1">|</span> {r.driverID}
+                        </td>
+                        <td className="px-4 py-3 font-mono">
+                          {r.actualDistanceKM > 0 ? r.actualDistanceKM : r.plannedDistanceKM}
+                        </td>
+                        <td className="px-4 py-3 font-mono">
+                          {r.actualDurationMinutes > 0 ? r.actualDurationMinutes : r.plannedDurationMinutes}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-right font-bold">
+                          {stops.filter(s => s.routeID === r.id).length}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-VIEW 10: MAINTENANCE */}
+      {activeSubTab === 'maintenance' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white border border-slate-200/60 rounded-xl shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 font-bold text-slate-800 text-xs flex justify-between items-center border-b border-slate-100">
+              <span>Fleet Maintenance Logs</span>
+            </div>
+            <div className="p-0 overflow-x-auto">
+              <table className="w-full text-left whitespace-nowrap">
+                <thead className="bg-slate-50/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Truck ID</th>
+                    <th className="px-4 py-3">Service Type</th>
+                    <th className="px-4 py-3">Service Date</th>
+                    <th className="px-4 py-3">Mileage</th>
+                    <th className="px-4 py-3">Vendor</th>
+                    <th className="px-4 py-3 text-right">Cost</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                  {maintenance.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">No maintenance records found.</td>
+                    </tr>
+                  ) : (
+                    maintenance.map(m => (
+                      <tr key={m.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-mono font-bold text-slate-900">{m.truckID}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{m.maintenanceType}</td>
+                        <td className="px-4 py-3 font-mono">{m.serviceDate.split('T')[0]}</td>
+                        <td className="px-4 py-3 font-mono">{m.mileage.toLocaleString()}</td>
+                        <td className="px-4 py-3">{m.vendor}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-right text-slate-900">
+                          ${m.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
