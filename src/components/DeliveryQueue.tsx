@@ -1,3 +1,4 @@
+import { formatPhoneNumber } from '../lib/formatters';
 import { useState, FormEvent } from 'react';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck, User as AppUser } from '../types';
 import { 
@@ -1048,7 +1049,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                     <input 
                       type="text"
                       value={formPhone}
-                      onChange={(e) => setFormPhone(e.target.value)}
+                      onChange={(e) => setFormPhone(formatPhoneNumber(e.target.value))}
                       className="w-full bg-white border border-slate-200 pl-8 p-2 text-xs rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                       placeholder="360-555-0144"
                     />

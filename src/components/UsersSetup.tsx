@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatPhoneNumber } from '../lib/formatters';
 import { User, UserRole, Branch } from '../types';
 import { Users, UserPlus, Edit2, Trash2, Shield, Info, CheckCircle, Mail, Phone, Building, AlertTriangle, Calendar } from 'lucide-react';
 
@@ -315,7 +316,7 @@ export default function UsersSetup({
                       type="text"
                       placeholder="(902) 555-xxxx"
                       value={userPhone}
-                      onChange={(e) => setUserPhone(e.target.value)}
+                      onChange={(e) => setUserPhone(formatPhoneNumber(e.target.value))}
                       className="w-full border bg-white border-slate-200 px-2.5 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
@@ -399,7 +400,7 @@ export default function UsersSetup({
                         type="text"
                         placeholder="e.g. (902) 555-0192"
                         value={mobilePhone}
-                        onChange={(e) => setMobilePhone(e.target.value)}
+                        onChange={(e) => setMobilePhone(formatPhoneNumber(e.target.value))}
                         className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
@@ -500,7 +501,7 @@ export default function UsersSetup({
                           type="text"
                           placeholder="Phone"
                           value={emergencyContactPhone}
-                          onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                          onChange={(e) => setEmergencyContactPhone(formatPhoneNumber(e.target.value))}
                           className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
                         />
                       </div>

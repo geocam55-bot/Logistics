@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatPhoneNumber } from '../lib/formatters';
 import { Branch } from '../types';
 import { Store, Plus, Edit2, Trash2, Shield, Info, MapPin, Building, CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -463,7 +464,7 @@ export default function StoresSetup({
                         type="text"
                         placeholder="Branch line"
                         value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
                         className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-xs text-slate-800 focus:outline-none"
                       />
                     </div>

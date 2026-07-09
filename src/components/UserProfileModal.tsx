@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatPhoneNumber } from '../lib/formatters';
 import { User, Branch } from '../types';
 import { Camera, Key, Sliders, Check, Phone, User as UserIcon, Building, Mail, FileText, Upload } from 'lucide-react';
 
@@ -426,7 +427,7 @@ export default function UserProfileModal({
                       type="text"
                       value={phone}
                       placeholder="+1 (555) 019-2834"
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600 transition-all font-medium"
                     />
                   </div>

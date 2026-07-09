@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { formatPhoneNumber } from '../lib/formatters';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck, User as AppUser } from '../types';
 import { 
@@ -1278,7 +1279,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     <input
                       type="text"
                       value={searchPhone}
-                      onChange={(e) => setSearchPhone(e.target.value)}
+                      onChange={(e) => setSearchPhone(formatPhoneNumber(e.target.value))}
                       placeholder="E.g., 902..."
                       className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-emerald-500"
                     />
@@ -1508,7 +1509,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-slate-700 block">Contact Phone Number</label>
-                        <input type="text" placeholder="(902) 555-xxxx" value={shippingPhone} onChange={(e) => setShippingPhone(e.target.value)} className="w-full border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono focus:ring-1 focus:ring-emerald-500" />
+                        <input type="text" placeholder="(902) 555-xxxx" value={shippingPhone} onChange={(e) => setShippingPhone(formatPhoneNumber(e.target.value))} className="w-full border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono focus:ring-1 focus:ring-emerald-500" />
                       </div>
                     </div>
                     <div>
@@ -1733,7 +1734,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     <input
                       type="text"
                       value={searchPhone}
-                      onChange={(e) => setSearchPhone(e.target.value)}
+                      onChange={(e) => setSearchPhone(formatPhoneNumber(e.target.value))}
                       placeholder="E.g., 902"
                       className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px]"
                     />
@@ -2027,7 +2028,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-slate-700 block">Phone Site</label>
-                        <input type="text" placeholder="Contact number..." value={shippingPhone} onChange={(e) => setShippingPhone(e.target.value)} className="w-full border border-slate-200 px-3 py-2 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500" />
+                        <input type="text" placeholder="Contact number..." value={shippingPhone} onChange={(e) => setShippingPhone(formatPhoneNumber(e.target.value))} className="w-full border border-slate-200 px-3 py-2 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500" />
                       </div>
                     </div>
 

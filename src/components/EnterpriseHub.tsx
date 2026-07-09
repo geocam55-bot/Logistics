@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { formatPhoneNumber } from '../lib/formatters';
 import { 
   Users, ShoppingBag, MapPin, Route as RouteIcon, ShieldAlert, 
   Wrench, Fuel, Signature, AlertCircle, Sparkles, CheckCircle2,
@@ -1303,7 +1304,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Mobile Phone</label>
-                  <input required type="tel" placeholder="902-555-0101" value={newCust.mobilePhone} onChange={e => setNewCust({...newCust, mobilePhone: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                  <input required type="tel" placeholder="902-555-0101" value={newCust.mobilePhone} onChange={e => setNewCust({...newCust, mobilePhone: formatPhoneNumber(e.target.value)})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
               </div>
               <div>
