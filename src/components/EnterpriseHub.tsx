@@ -242,6 +242,12 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
   const [fuelReceipt, setFuelReceipt] = useState('');
   const [fuelSuccess, setFuelSuccess] = useState('');
 
+  // Editing state hooks for records maintenance
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editingInspection, setEditingInspection] = useState<VehicleInspectionLog | null>(null);
+  const [editingFuel, setEditingFuel] = useState<FuelTransaction | null>(null);
+
   // Expiration Warn Threshold Tracker
   const [expiredCount30, setExpiredCount30] = useState(0);
   const [expiredCountExpired, setExpiredCountExpired] = useState(0);
@@ -551,7 +557,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     }
   };
 
-  // Add customer
+  // Add / Edit customer
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     const supabase = getFrontendSupabase();
@@ -561,7 +567,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     }
 
     try {
-      const { error } = await supabase.from('Customers').insert({
+      const payload = {
         CustomerNumber: newCust.customerNumber,
         CustomerType: newCust.customerType,
         CompanyName: newCust.companyName,
@@ -569,30 +575,46 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         LastName: newCust.lastName,
         Email: newCust.email,
         MobilePhone: newCust.mobilePhone,
-        AlternatePhone: newCust.alternatePhone,
+        AlternatePhone: newCust.alternatePhone || '',
         Address1: newCust.address1,
-        Address2: newCust.address2,
+        Address2: newCust.address2 || '',
         City: newCust.city,
         ProvinceState: newCust.provinceState,
         PostalCode: newCust.postalCode,
         Country: newCust.country,
-        Latitude: newCust.latitude,
-        Longitude: newCust.longitude,
-        SpecialInstructions: newCust.specialInstructions,
-        CreditLimit: newCust.creditLimit,
-        IsActive: newCust.isActive
-      });
+        Latitude: newCust.latitude || 44.6488,
+        Longitude: newCust.longitude || -63.5752,
+        SpecialInstructions: newCust.specialInstructions || '',
+        CreditLimit: newCust.creditLimit || 0,
+        IsActive: newCust.isActive ?? true
+      };
 
-      if (error) throw error;
+      if (editingCustomer) {
+        const { error } = await supabase.from('Customers')
+          .update(payload)
+          .eq('CustomerID', editingCustomer.id);
 
-      await supabase.from('Notifications').insert({
-        Type: 'Customer Profile Created',
-        Message: `Commercial Profile registered: ${newCust.companyName || (newCust.firstName + ' ' + newCust.lastName)} (${newCust.customerNumber})`,
-        IsRead: false
-      });
+        if (error) throw error;
+
+        await supabase.from('Notifications').insert({
+          Type: 'Customer Profile Updated',
+          Message: `Commercial Profile updated: ${newCust.companyName || (newCust.firstName + ' ' + newCust.lastName)} (${newCust.customerNumber})`,
+          IsRead: false
+        });
+      } else {
+        const { error } = await supabase.from('Customers').insert(payload);
+        if (error) throw error;
+
+        await supabase.from('Notifications').insert({
+          Type: 'Customer Profile Created',
+          Message: `Commercial Profile registered: ${newCust.companyName || (newCust.firstName + ' ' + newCust.lastName)} (${newCust.customerNumber})`,
+          IsRead: false
+        });
+      }
 
       await fetchLiveHubData();
       setShowAddCustomer(false);
+      setEditingCustomer(null);
       setNewCust({
         customerNumber: '', customerType: 'Commercial', companyName: '', firstName: '', lastName: '',
         email: '', mobilePhone: '', alternatePhone: '', address1: '', address2: '', city: 'Dartmouth',
@@ -605,7 +627,21 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     }
   };
 
-  // Add Order
+  const handleDeleteCustomer = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this customer profile? This will delete associated history too.")) return;
+    const supabase = getFrontendSupabase();
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('Customers').delete().eq('CustomerID', id);
+      if (error) throw error;
+      await fetchLiveHubData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error deleting customer: ${err.message}`);
+    }
+  };
+
+  // Add / Edit Order
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     const supabase = getFrontendSupabase();
@@ -615,11 +651,13 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     }
 
     try {
-      const { data, error } = await supabase.from('Orders').insert({
+      let data: any = null;
+      let error: any = null;
+
+      const payload = {
         OrderNumber: newOrder.orderNumber,
         CustomerID: newOrder.customerID,
         BranchID: newOrder.branchID,
-        OrderDate: new Date().toISOString(),
         RequestedDeliveryDate: newOrder.requestedDeliveryDate,
         Priority: newOrder.priority,
         OrderStatus: newOrder.orderStatus,
@@ -628,12 +666,25 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         ItemCount: newOrder.itemCount,
         OrderValue: newOrder.orderValue,
         Notes: newOrder.notes
-      }).select();
+      };
+
+      if (editingOrder) {
+        const result = await supabase.from('Orders').update(payload).eq('OrderID', editingOrder.id).select();
+        data = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase.from('Orders').insert({
+          ...payload,
+          OrderDate: new Date().toISOString()
+        }).select();
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
-      const createdOrder = data?.[0];
-      const newId = createdOrder ? Number(createdOrder.OrderID) : 101;
+      const savedOrder = data?.[0];
+      const orderIdVal = savedOrder ? Number(savedOrder.OrderID) : (editingOrder?.id || 101);
 
       if (onAddOrUpdateDelivery) {
         const selectedCust = customers.find(c => c.id === Number(newOrder.customerID));
@@ -643,7 +694,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
           
         onAddOrUpdateDelivery({
           id: `SO-${newOrder.orderNumber}`,
-          invoiceNumber: `INV-${100000 + newId}`,
+          invoiceNumber: `INV-${100000 + orderIdVal}`,
           epicorSalesOrder: newOrder.orderNumber,
           customerName: selectedCust ? selectedCust.companyName : 'Atlantic Builders',
           deliveryAddress,
@@ -651,20 +702,21 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
           originBranch: newOrder.branchID || 'prospaces-dc',
           weight: `${newOrder.totalWeightKg} kg`,
           orderTotal: `$${newOrder.orderValue}`,
-          status: 'REGISTERED',
+          status: newOrder.orderStatus === 'Completed' ? 'DELIVERED' : 'REGISTERED',
           registeredAt: new Date().toISOString(),
           history: [{ status: 'REGISTERED', timestamp: new Date().toISOString(), location: 'Windmill DC', operator: 'System Dispatcher' }]
         });
       }
 
       await supabase.from('Notifications').insert({
-        Type: 'Order Approved',
-        Message: `Order ${newOrder.orderNumber} ($${newOrder.orderValue}) was routed to central dispatch automatically.`,
+        Type: editingOrder ? 'Order Updated' : 'Order Approved',
+        Message: `Order ${newOrder.orderNumber} ($${newOrder.orderValue}) was ${editingOrder ? 'updated' : 'routed to central dispatch'} successfully.`,
         IsRead: false
       });
 
       await fetchLiveHubData();
       setShowAddOrder(false);
+      setEditingOrder(null);
       setNewOrder({
         orderNumber: '', customerID: customers[0]?.id || 0, branchID: 'prospaces-dc', requestedDeliveryDate: '',
         priority: 'Normal', orderStatus: 'Created', totalWeightKg: 100, totalVolumeM3: 0.5,
@@ -672,7 +724,21 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
       });
     } catch (err: any) {
       console.error(err);
-      alert(`Error creating order: ${err.message}`);
+      alert(`Error saving order: ${err.message}`);
+    }
+  };
+
+  const handleDeleteOrder = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this order?")) return;
+    const supabase = getFrontendSupabase();
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('Orders').delete().eq('OrderID', id);
+      if (error) throw error;
+      await fetchLiveHubData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error deleting order: ${err.message}`);
     }
   };
 
@@ -782,10 +848,9 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     const allPassed = Object.values(inspChecks).every(v => v === true);
 
     try {
-      const { error } = await supabase.from('VehicleInspections').insert({
+      const payload = {
         TruckID: inspTruck,
         DriverID: currentUser?.id || 'usr-1',
-        InspectionDate: new Date().toISOString(),
         InspectionType: inspType,
         Passed: allPassed,
         TiresPassed: inspChecks.tires,
@@ -797,20 +862,48 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         WindshieldPassed: inspChecks.windshield,
         SafetyEquipmentPassed: inspChecks.safety,
         Notes: inspNotes
-      });
+      };
 
-      if (error) throw error;
+      if (editingInspection) {
+        const { error } = await supabase.from('VehicleInspections')
+          .update(payload)
+          .eq('InspectionID', editingInspection.id);
+        if (error) throw error;
+        setInspSuccess(`DOT inspection updated successfully.`);
+      } else {
+        const { error } = await supabase.from('VehicleInspections').insert({
+          ...payload,
+          InspectionDate: new Date().toISOString()
+        });
+        if (error) throw error;
+        setInspSuccess(`DOT inspection logged successfully. Vehicle is ${allPassed ? 'APPROVED' : 'FLAGGED FOR MAINTENANCE'}`);
+      }
 
-      setInspSuccess(`DOT inspection logged successfully. Vehicle is ${allPassed ? 'APPROVED' : 'FLAGGED FOR MAINTENANCE'}`);
       await fetchLiveHubData();
+      setEditingInspection(null);
+      setInspTruck('');
+      setInspNotes('');
 
       setTimeout(() => {
         setInspSuccess('');
-        setInspNotes('');
       }, 4000);
     } catch (err: any) {
       console.error(err);
-      alert(`Error logging inspection: ${err.message}`);
+      alert(`Error saving inspection: ${err.message}`);
+    }
+  };
+
+  const handleDeleteInspection = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this DOT inspection record?")) return;
+    const supabase = getFrontendSupabase();
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('VehicleInspections').delete().eq('InspectionID', id);
+      if (error) throw error;
+      await fetchLiveHubData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error deleting inspection: ${err.message}`);
     }
   };
 
@@ -828,10 +921,9 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
     const total = Number((fuelLiters * fuelPrice).toFixed(2));
 
     try {
-      const { error } = await supabase.from('FuelTransactions').insert({
+      const payload = {
         TruckID: fuelTruck,
         DriverID: currentUser?.id || 'usr-1',
-        TransactionDate: new Date().toISOString(),
         FuelStation: fuelStation || 'Irving Dartmouth',
         AmountPurchased: fuelLiters,
         PricePerLiter: fuelPrice,
@@ -839,22 +931,198 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         Mileage: fuelOdometer,
         ReceiptNumber: fuelReceipt || `TX-${Math.floor(100000 + Math.random() * 900000)}`,
         Notes: ''
-      });
+      };
 
-      if (error) throw error;
+      if (editingFuel) {
+        const { error } = await supabase.from('FuelTransactions')
+          .update(payload)
+          .eq('TransactionID', editingFuel.id);
+        if (error) throw error;
+        setFuelSuccess(`Fuel transaction updated successfully.`);
+      } else {
+        const { error } = await supabase.from('FuelTransactions').insert({
+          ...payload,
+          TransactionDate: new Date().toISOString()
+        });
+        if (error) throw error;
+        setFuelSuccess(`Fuel transaction of $${total} logged successfully.`);
+      }
 
-      setFuelSuccess(`Fuel transaction of $${total} logged successfully.`);
       await fetchLiveHubData();
+      setEditingFuel(null);
+      setFuelTruck('');
+      setFuelStation('');
+      setFuelReceipt('');
 
       setTimeout(() => {
         setFuelSuccess('');
-        setFuelStation('');
-        setFuelReceipt('');
       }, 4000);
     } catch (err: any) {
       console.error(err);
-      alert(`Error logging fuel purchase: ${err.message}`);
+      alert(`Error saving fuel purchase: ${err.message}`);
     }
+  };
+
+  const handleDeleteFuel = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this fuel purchase record?")) return;
+    const supabase = getFrontendSupabase();
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('FuelTransactions').delete().eq('TransactionID', id);
+      if (error) throw error;
+      await fetchLiveHubData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error deleting fuel purchase: ${err.message}`);
+    }
+  };
+
+  // Compliance Document states
+  const [showAddDoc, setShowAddDoc] = useState(false);
+  const [newDoc, setNewDoc] = useState<Partial<DocumentRecord>>({
+    documentName: '', documentType: 'Driver License', expiryDate: '', filePath: '', branchID: 'prospaces-dc', truckID: '', driverID: ''
+  });
+  const [editingDoc, setEditingDoc] = useState<DocumentRecord | null>(null);
+
+  const handleCreateDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const supabase = getFrontendSupabase();
+    if (!supabase) {
+      alert("No active Supabase connection.");
+      return;
+    }
+
+    try {
+      const payload = {
+        DocumentName: newDoc.documentName,
+        DocumentType: newDoc.documentType,
+        ExpiryDate: newDoc.expiryDate,
+        FilePath: newDoc.filePath || `/docs/doc_${Date.now() % 10000}.pdf`,
+        BranchID: newDoc.branchID || 'prospaces-dc',
+        TruckID: newDoc.truckID || null,
+        DriverID: newDoc.driverID || null
+      };
+
+      if (editingDoc) {
+        const { error } = await supabase.from('Documents')
+          .update(payload)
+          .eq('DocumentID', editingDoc.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('Documents').insert(payload);
+        if (error) throw error;
+      }
+
+      await fetchLiveHubData();
+      setShowAddDoc(false);
+      setEditingDoc(null);
+      setNewDoc({
+        documentName: '', documentType: 'Driver License', expiryDate: '', filePath: '', branchID: 'prospaces-dc', truckID: '', driverID: ''
+      });
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error saving compliance document: ${err.message}`);
+    }
+  };
+
+  const handleDeleteDocument = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this compliance document?")) return;
+    const supabase = getFrontendSupabase();
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('Documents').delete().eq('DocumentID', id);
+      if (error) throw error;
+      await fetchLiveHubData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error deleting compliance document: ${err.message}`);
+    }
+  };
+
+  // Helper functions to populate forms for editing
+  const startEditCustomer = (c: Customer) => {
+    setEditingCustomer(c);
+    setNewCust({
+      customerNumber: c.customerNumber,
+      customerType: c.customerType,
+      companyName: c.companyName,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      email: c.email,
+      mobilePhone: c.mobilePhone,
+      alternatePhone: c.alternatePhone,
+      address1: c.address1,
+      address2: c.address2,
+      city: c.city,
+      provinceState: c.provinceState,
+      postalCode: c.postalCode,
+      country: c.country,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      specialInstructions: c.specialInstructions,
+      creditLimit: c.creditLimit,
+      isActive: c.isActive
+    });
+    setShowAddCustomer(true);
+  };
+
+  const startEditOrder = (o: Order) => {
+    setEditingOrder(o);
+    setNewOrder({
+      orderNumber: o.orderNumber,
+      customerID: o.customerID,
+      branchID: o.branchID,
+      requestedDeliveryDate: o.requestedDeliveryDate,
+      priority: o.priority,
+      orderStatus: o.orderStatus,
+      totalWeightKg: o.totalWeightKg,
+      totalVolumeM3: o.totalVolumeM3,
+      itemCount: o.itemCount,
+      orderValue: o.orderValue,
+      notes: o.notes
+    });
+    setShowAddOrder(true);
+  };
+
+  const startEditInspection = (item: VehicleInspectionLog) => {
+    setEditingInspection(item);
+    setInspTruck(item.truckID);
+    setInspType(item.inspectionType);
+    setInspChecks({
+      tires: item.tiresPassed,
+      brakes: item.brakesPassed,
+      lights: item.lightsPassed,
+      mirrors: item.mirrorsPassed,
+      horn: item.hornPassed,
+      fluids: item.fluidLevelsPassed,
+      windshield: item.windshieldPassed,
+      safety: item.safetyEquipmentPassed
+    });
+    setInspNotes(item.notes);
+  };
+
+  const startEditFuel = (tx: FuelTransaction) => {
+    setEditingFuel(tx);
+    setFuelTruck(tx.truckID);
+    setFuelStation(tx.fuelStation);
+    setFuelLiters(tx.amountPurchased);
+    setFuelPrice(tx.pricePerLiter);
+    setFuelOdometer(tx.mileage);
+    setFuelReceipt(tx.receiptNumber);
+  };
+
+  const startEditDoc = (doc: DocumentRecord) => {
+    setEditingDoc(doc);
+    setNewDoc({
+      documentName: doc.documentName,
+      documentType: doc.documentType,
+      expiryDate: doc.expiryDate,
+      filePath: doc.filePath,
+      branchID: doc.branchID || 'prospaces-dc',
+      truckID: doc.truckID || '',
+      driverID: doc.driverID || ''
+    });
+    setShowAddDoc(true);
   };
 
   // Helper safety scores calculation (100 minus penalty points based on driver events)
@@ -966,7 +1234,16 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
               />
             </div>
             <button 
-              onClick={() => setShowAddCustomer(!showAddCustomer)}
+              onClick={() => {
+                setEditingCustomer(null);
+                setNewCust({
+                  customerNumber: '', customerType: 'Commercial', companyName: '', firstName: '', lastName: '',
+                  email: '', mobilePhone: '', alternatePhone: '', address1: '', address2: '', city: 'Dartmouth',
+                  provinceState: 'NS', postalCode: '', country: 'Canada', latitude: 44.6488, longitude: -63.5752,
+                  specialInstructions: '', creditLimit: 25000, isActive: true
+                });
+                setShowAddCustomer(!showAddCustomer);
+              }}
               className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -976,7 +1253,9 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
           {showAddCustomer && (
             <form onSubmit={handleCreateCustomer} className="p-4 bg-white border border-slate-200/70 rounded-xl space-y-4 shadow-sm animate-fade-in">
-              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Register New Commercial/Residential Profile</h3>
+              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                {editingCustomer ? 'Edit Commercial/Residential Profile' : 'Register New Commercial/Residential Profile'}
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Customer Number</label>
@@ -1032,8 +1311,25 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                 <textarea rows={2} placeholder="e.g. Enter rear gate..." value={newCust.specialInstructions} onChange={e => setNewCust({...newCust, specialInstructions: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
               </div>
               <div className="flex justify-end space-x-2">
-                <button type="button" onClick={() => setShowAddCustomer(false)} className="px-3.5 py-2 border border-slate-200 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="submit" className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold rounded-lg">Save Profile</button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowAddCustomer(false);
+                    setEditingCustomer(null);
+                    setNewCust({
+                      customerNumber: '', customerType: 'Commercial', companyName: '', firstName: '', lastName: '',
+                      email: '', mobilePhone: '', alternatePhone: '', address1: '', address2: '', city: 'Dartmouth',
+                      provinceState: 'NS', postalCode: '', country: 'Canada', latitude: 44.6488, longitude: -63.5752,
+                      specialInstructions: '', creditLimit: 25000, isActive: true
+                    });
+                  }} 
+                  className="px-3.5 py-2 border border-slate-200 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold rounded-lg">
+                  {editingCustomer ? 'Update Profile' : 'Save Profile'}
+                </button>
               </div>
             </form>
           )}
@@ -1049,6 +1345,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                   <th className="px-4 py-3">Email & Contact</th>
                   <th className="px-4 py-3 text-right">Credit Limit</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -1089,6 +1386,20 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                         <span className="text-[10px] font-bold text-emerald-800 uppercase">Active</span>
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                      <button
+                        onClick={() => startEditCustomer(c)}
+                        className="px-2 py-1 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCustomer(Number(c.id))}
+                        className="px-2 py-1 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1112,7 +1423,15 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
               />
             </div>
             <button 
-              onClick={() => setShowAddOrder(!showAddOrder)}
+              onClick={() => {
+                setEditingOrder(null);
+                setNewOrder({
+                  orderNumber: '', customerID: customers[0]?.id || 0, branchID: 'prospaces-dc', requestedDeliveryDate: '',
+                  priority: 'Normal', orderStatus: 'Created', totalWeightKg: 100, totalVolumeM3: 0.5,
+                  itemCount: 5, orderValue: 1250.00, notes: ''
+                });
+                setShowAddOrder(!showAddOrder);
+              }}
               className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1122,7 +1441,9 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
 
           {showAddOrder && (
             <form onSubmit={handleCreateOrder} className="p-4 bg-white border border-slate-200/70 rounded-xl space-y-4 shadow-sm animate-fade-in">
-              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Create New Logistical Delivery Order</h3>
+              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                {editingOrder ? 'Edit Logistical Delivery Order' : 'Create New Logistical Delivery Order'}
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Order Number</label>
@@ -1172,14 +1493,38 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Items / Packages Count</label>
                   <input type="number" value={newOrder.itemCount} onChange={e => setNewOrder({...newOrder, itemCount: Number(e.target.value)})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Order Status</label>
+                  <select value={newOrder.orderStatus} onChange={e => setNewOrder({...newOrder, orderStatus: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                    <option value="Created">Created</option>
+                    <option value="Dispatched">Dispatched</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Dispatcher Operational Notes</label>
                 <textarea rows={2} value={newOrder.notes} onChange={e => setNewOrder({...newOrder, notes: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
               </div>
               <div className="flex justify-end space-x-2">
-                <button type="button" onClick={() => setShowAddOrder(false)} className="px-3.5 py-2 border border-slate-200 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="submit" className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold rounded-lg">Approve & Dispatch</button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowAddOrder(false);
+                    setEditingOrder(null);
+                    setNewOrder({
+                      orderNumber: '', customerID: customers[0]?.id || 0, branchID: 'prospaces-dc', requestedDeliveryDate: '',
+                      priority: 'Normal', orderStatus: 'Created', totalWeightKg: 100, totalVolumeM3: 0.5,
+                      itemCount: 5, orderValue: 1250.00, notes: ''
+                    });
+                  }} 
+                  className="px-3.5 py-2 border border-slate-200 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold rounded-lg">
+                  {editingOrder ? 'Update Order' : 'Approve & Dispatch'}
+                </button>
               </div>
             </form>
           )}
@@ -1195,6 +1540,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                   <th className="px-4 py-3 text-right">Weight / Vol</th>
                   <th className="px-4 py-3 text-right">Value</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -1231,6 +1577,20 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                         }`}>
                           {o.orderStatus}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          onClick={() => startEditOrder(o)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOrder(Number(o.id))}
+                          className="px-2 py-1 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1496,7 +1856,9 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
           {/* Form */}
           <div className="lg:col-span-1 bg-white p-5 border border-slate-200/50 rounded-xl shadow-xs space-y-4 h-fit">
-            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Perform Digital Pre/Post Trip DOT Inspection</h3>
+            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+              {editingInspection ? 'Edit DOT Inspection Log' : 'Perform Digital Pre/Post Trip DOT Inspection'}
+            </h3>
             
             {inspSuccess && (
               <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-semibold flex items-center space-x-1.5 animate-fade-in">
@@ -1547,9 +1909,27 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                 <textarea rows={2} placeholder="All tire pressure and oil level verified..." value={inspNotes} onChange={e => setInspNotes(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
               </div>
 
-              <button type="submit" className="w-full py-2 bg-blue-800 hover:bg-blue-900 text-white rounded text-xs font-bold transition-all">
-                Certify & File Inspection
-              </button>
+              <div className="flex space-x-2">
+                {editingInspection && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditingInspection(null);
+                      setInspTruck('');
+                      setInspNotes('');
+                      setInspChecks({
+                        tires: true, brakes: true, lights: true, mirrors: true, horn: true, fluids: true, windshield: true, safety: true
+                      });
+                    }} 
+                    className="flex-1 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded text-xs font-bold transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button type="submit" className="flex-1 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded text-xs font-bold transition-all">
+                  {editingInspection ? 'Update Log' : 'Certify & File Inspection'}
+                </button>
+              </div>
             </form>
           </div>
 
@@ -1580,6 +1960,20 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                     </div>
                   </div>
                   {item.notes && <p className="text-[10px] text-slate-500 italic">"{item.notes}"</p>}
+                  <div className="flex justify-end space-x-1.5 pt-2 border-t border-slate-200/50">
+                    <button
+                      onClick={() => startEditInspection(item)}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteInspection(Number(item.id))}
+                      className="px-2 py-0.5 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1592,7 +1986,9 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
           {/* Log fuel transaction */}
           <div className="lg:col-span-1 bg-white p-5 border border-slate-200/50 rounded-xl shadow-xs space-y-4 h-fit">
-            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Log Fuel Transaction</h3>
+            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+              {editingFuel ? 'Edit Fuel Transaction' : 'Log Fuel Transaction'}
+            </h3>
             
             {fuelSuccess && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center space-x-1.5 animate-fade-in">
@@ -1639,15 +2035,34 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                 <input required type="text" placeholder="e.g. Shell Dartmouth" value={fuelStation} onChange={e => setFuelStation(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
               </div>
 
-              <button type="submit" className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-bold transition-all">
-                Log Fuel Transaction
-              </button>
+              <div className="flex space-x-2 pt-1">
+                {editingFuel && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditingFuel(null);
+                      setFuelTruck('');
+                      setFuelStation('');
+                      setFuelLiters(50);
+                      setFuelPrice(1.65);
+                      setFuelOdometer(120000);
+                      setFuelReceipt('');
+                    }} 
+                    className="flex-1 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded text-xs font-bold transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button type="submit" className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-bold transition-all">
+                  {editingFuel ? 'Update Transaction' : 'Log Fuel Transaction'}
+                </button>
+              </div>
             </form>
           </div>
 
           {/* Transactions list */}
           <div className="lg:col-span-2 bg-white p-5 border border-slate-200/50 rounded-xl shadow-xs space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Fleet Fuel Consumption & cost Metrics</h3>
+            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Fleet Fuel Consumption & Cost Metrics</h3>
             
             <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
               <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
@@ -1659,6 +2074,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                   <th className="px-3 py-2.5 text-right">Cost / Liter</th>
                   <th className="px-3 py-2.5 text-right">Total Cost</th>
                   <th className="px-3 py-2.5 text-right">Mileage</th>
+                  <th className="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
@@ -1671,6 +2087,20 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                     <td className="px-3 py-2.5 text-right font-mono">${tx.pricePerLiter.toFixed(3)}</td>
                     <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-800">${tx.totalCost.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-right font-mono text-[11px] text-slate-500">{tx.mileage.toLocaleString()} km</td>
+                    <td className="px-3 py-2.5 text-right space-x-1.5 whitespace-nowrap">
+                      <button
+                        onClick={() => startEditFuel(tx)}
+                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFuel(Number(tx.id))}
+                        className="px-1.5 py-0.5 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1717,6 +2147,91 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
             </div>
           )}
 
+          <div className="flex justify-between items-center bg-white p-3 border border-slate-200/50 rounded-xl shadow-xs">
+            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Compliance Documents</h3>
+            <button 
+              onClick={() => {
+                setEditingDoc(null);
+                setNewDoc({
+                  documentName: '', documentType: 'Driver License', expiryDate: '', filePath: '', branchID: 'prospaces-dc', truckID: '', driverID: ''
+                });
+                setShowAddDoc(!showAddDoc);
+              }}
+              className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Register Document</span>
+            </button>
+          </div>
+
+          {showAddDoc && (
+            <form onSubmit={handleCreateDocument} className="p-4 bg-white border border-slate-200/70 rounded-xl space-y-4 shadow-sm animate-fade-in">
+              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                {editingDoc ? 'Edit Compliance Document' : 'Register New Compliance Document'}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Document Name / Title</label>
+                  <input required type="text" placeholder="e.g. Class 1 Driver License" value={newDoc.documentName} onChange={e => setNewDoc({...newDoc, documentName: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Document Type</label>
+                  <select value={newDoc.documentType} onChange={e => setNewDoc({...newDoc, documentType: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                    <option value="Driver License">Driver License</option>
+                    <option value="Vehicle Registration">Vehicle Registration</option>
+                    <option value="Cargo Insurance">Cargo Insurance</option>
+                    <option value="Training Certificate">Training Certificate</option>
+                    <option value="Permit">Special Transport Permit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Expiry Date</label>
+                  <input required type="date" value={newDoc.expiryDate} onChange={e => setNewDoc({...newDoc, expiryDate: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Link to Driver (Optional)</label>
+                  <select value={newDoc.driverID || ''} onChange={e => setNewDoc({...newDoc, driverID: e.target.value || undefined})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                    <option value="">-- None --</option>
+                    {users.filter(u => u.role === 'Driver').map(d => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.id})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Link to Truck (Optional)</label>
+                  <select value={newDoc.truckID || ''} onChange={e => setNewDoc({...newDoc, truckID: e.target.value || undefined})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                    <option value="">-- None --</option>
+                    {trucks.map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">File Path / Location</label>
+                  <input type="text" placeholder="/docs/lic_driver.pdf" value={newDoc.filePath} onChange={e => setNewDoc({...newDoc, filePath: e.target.value})} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowAddDoc(false);
+                    setEditingDoc(null);
+                    setNewDoc({
+                      documentName: '', documentType: 'Driver License', expiryDate: '', filePath: '', branchID: 'prospaces-dc', truckID: '', driverID: ''
+                    });
+                  }} 
+                  className="px-3.5 py-2 border border-slate-200 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold rounded-lg">
+                  {editingDoc ? 'Update Document' : 'Register Document'}
+                </button>
+              </div>
+            </form>
+          )}
+
           <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-xs">
             <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
               <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
@@ -1727,6 +2242,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                   <th className="px-4 py-3">Expiry Date</th>
                   <th className="px-4 py-3">File Asset Location</th>
                   <th className="px-4 py-3">Compliance Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1750,6 +2266,20 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                         }`}>
                           {isExpired ? 'NON-COMPLIANT' : 'VERIFIED'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          onClick={() => startEditDoc(doc)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-[10px] font-bold rounded text-slate-700 transition-all"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDocument(Number(doc.id))}
+                          className="px-2 py-1 bg-red-50 hover:bg-red-100 hover:text-red-800 text-[10px] font-bold rounded text-red-700 transition-all"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   );
