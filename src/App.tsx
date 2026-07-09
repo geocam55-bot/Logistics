@@ -37,7 +37,7 @@ import {
   LayoutDashboard, Scan, ClipboardList, Layers3, Store, Shield, Users, 
   ChevronDown, Trash2, Truck as TruckIcon, LogOut, Landmark, UserCheck, Key,
   Database, RefreshCw, FileDown, AlertTriangle, ShieldAlert, Camera, Sliders, User as UserIcon,
-  Compass, Sparkles, Activity
+  Compass, Sparkles, Activity, Menu, X
 } from 'lucide-react';
 import prospacesLogo from './assets/images/logo_no_border_tight_1783077241511.jpg';
 
@@ -107,6 +107,7 @@ function deduplicateUsers(usersList: User[]): User[] {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [allTenants, setAllTenants] = useState<Tenant[]>(() => {
     const cached = localStorage.getItem('prospaces_all_tenants');
@@ -1539,48 +1540,48 @@ export default function App() {
       
       {/* Enterprise Sticky Brand Header & Unified Navigation */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all duration-200" id="prospaces-header">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-3">
           
           {/* Logo & title context */}
-          <div className="flex items-center space-x-3 sm:space-x-4 text-left flex-row w-full sm:w-auto">
+          <div className="flex items-center space-x-2.5 sm:space-x-4 text-left">
             <div className="shrink-0 flex items-center justify-center">
               <img 
                 src={prospacesLogo} 
                 alt="ProSpaces Logo" 
-                className="h-10 sm:h-18 w-auto object-contain animate-fade-in"
+                className="h-10 sm:h-16 w-auto object-contain animate-fade-in"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
-              <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 mb-0.5">
                 <span className="bg-blue-50 text-blue-600 border border-blue-200/50 text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded font-mono leading-none">
                   Tenant
                 </span>
-                <span className="text-slate-400 text-[9px] uppercase font-bold tracking-wider font-sans leading-none">Active Workspace:</span>
+                <span className="text-slate-400 text-[9px] uppercase font-bold tracking-wider font-sans leading-none hidden xs:inline">Active Workspace:</span>
               </div>
-              <h1 className="font-sans font-black text-slate-900 text-xs sm:text-base tracking-tight leading-tight m-0">
+              <h1 className="font-sans font-black text-slate-900 text-xs sm:text-base tracking-tight leading-tight m-0 truncate max-w-[150px] sm:max-w-none">
                 {currentTenant.name}
               </h1>
-              <p className="text-slate-500 text-[8px] sm:text-[10px] font-semibold uppercase tracking-wider mt-1 leading-none flex items-center gap-1.5">
+              <p className="text-slate-500 text-[8px] sm:text-[10px] font-semibold uppercase tracking-wider mt-0.5 leading-none flex items-center gap-1 sm:gap-1.5">
                 <span>Enterprise Logistics Portal</span>
                 <span className="opacity-40">&bull;</span>
-                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1 py-0.5 rounded text-[8px] font-mono font-bold">{currentTenant.code}</span>
+                <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1 py-0.5 rounded text-[8px] font-mono font-bold leading-none">{currentTenant.code}</span>
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Logged-In User Profile context */}
-          <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2.5">
-            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200/85 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-xs font-mono text-slate-600">
-              <Store className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400" />
+          <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+            <div className="hidden md:flex items-center space-x-1.5 bg-slate-50 border border-slate-200/85 px-2.5 py-1 rounded-lg text-xs font-mono text-slate-600">
+              <Store className="h-3.5 w-3.5 text-slate-400" />
               <span>{branches.length} Regs &bull; {trucks.length} Vehs</span>
             </div>
 
             {/* Authenticated User Badge & Logout Switcher */}
-            <div className="relative flex items-center border-l border-slate-200 pl-2.5">
+            <div className="relative flex items-center">
               <button 
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center space-x-2.5 hover:bg-slate-50 p-1 sm:p-1.5 rounded-2xl transition-all cursor-pointer select-none text-left"
+                className="flex items-center space-x-1 sm:space-x-2 hover:bg-slate-50 p-1 sm:p-1.5 rounded-2xl transition-all cursor-pointer select-none text-left"
                 id="user-menu-trigger"
               >
                 <div className="hidden sm:flex flex-col text-right font-sans">
@@ -1691,12 +1692,160 @@ export default function App() {
                 </>
               )}
             </div>
-          </div>
 
+            {/* Righthand Navigation Dropdown on Mobile */}
+            <div className="relative lg:hidden">
+              <button
+                onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+                className="p-2 text-slate-600 hover:bg-slate-100 active:bg-slate-200 rounded-xl transition-all cursor-pointer flex items-center justify-center border border-slate-200/80 bg-white"
+                id="mobile-nav-trigger"
+                aria-label="Toggle Navigation Menu"
+              >
+                {isMobileNavOpen ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
+              </button>
+
+              {isMobileNavOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMobileNavOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 p-3.5 z-50 animate-fade-in text-left">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-1 font-sans">Navigation Menu</p>
+                    
+                    <div className="space-y-1">
+                      {/* HQ Dashboard */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('dashboard');
+                          setIsMobileNavOpen(false);
+                        }}
+                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'dashboard'
+                            ? 'bg-blue-800 text-white shadow-sm'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>HQ Dashboard</span>
+                      </button>
+
+                      {/* Live Monitor */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('live-dashboard');
+                          setIsMobileNavOpen(false);
+                        }}
+                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'live-dashboard'
+                            ? 'bg-blue-800 text-white shadow-sm'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
+                        <span>Live Monitor</span>
+                      </button>
+
+                      {/* Freight Board */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('queue');
+                          setIsMobileNavOpen(false);
+                        }}
+                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                          activeTab === 'queue'
+                            ? 'bg-blue-800 text-white shadow-sm'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2.5">
+                          <ClipboardList className="h-4 w-4" />
+                          <span>Freight Board</span>
+                        </div>
+                        {deliveries.length > 0 && (
+                          <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${activeTab === 'queue' ? 'bg-white text-blue-900 font-mono' : 'bg-slate-100 text-slate-600 font-mono'}`}>
+                            {deliveries.length}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Enterprise Hub */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('enterprise-hub');
+                          setIsMobileNavOpen(false);
+                        }}
+                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'enterprise-hub'
+                            ? 'bg-blue-800 text-white shadow-sm'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                        <span>Enterprise Hub</span>
+                      </button>
+
+                      {/* Scanning Station */}
+                      {['Admin', 'Dispatcher', 'Driver', 'Picker'].includes(currentUser?.role || '') && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('scanner');
+                            setIsMobileNavOpen(false);
+                          }}
+                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                            activeTab === 'scanner'
+                              ? 'bg-blue-800 text-white shadow-sm'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Scan className="h-4 w-4" />
+                          <span>Scanning Station</span>
+                        </button>
+                      )}
+
+                      {/* Doc Import */}
+                      {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('document-import');
+                            setIsMobileNavOpen(false);
+                          }}
+                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                            activeTab === 'document-import'
+                              ? 'bg-blue-800 text-white shadow-sm'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <FileDown className="h-4 w-4" />
+                          <span>Doc Import</span>
+                        </button>
+                      )}
+
+                      {/* Fleet Setup */}
+                      {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('stores');
+                            setIsMobileNavOpen(false);
+                          }}
+                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                            ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
+                              ? 'bg-blue-800 text-white shadow-sm'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <TruckIcon className="h-4 w-4" />
+                          <span>Fleet Setup</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+          </div>
         </div>
 
         {/* Unified Classified Navigation Subbar inside Sticky Header */}
-        <div className="border-t border-slate-100 bg-slate-50/70 py-1.5 select-none" id="prospaces-nav-unified-sticky">
+        <div className="hidden lg:block border-t border-slate-100 bg-slate-50/70 py-1.5 select-none" id="prospaces-nav-unified-sticky">
           <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:divide-x lg:divide-slate-200/80">
               

@@ -2064,7 +2064,8 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
           <div className="lg:col-span-2 bg-white p-5 border border-slate-200/50 rounded-xl shadow-xs space-y-4">
             <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Fleet Fuel Consumption & Cost Metrics</h3>
             
-            <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
               <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5">Date</th>
@@ -2105,6 +2106,7 @@ export default function EnterpriseHub({ branches, trucks, users, currentUser, on
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
