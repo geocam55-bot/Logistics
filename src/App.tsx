@@ -1315,7 +1315,7 @@ export default function App() {
         
         {/* Super Admin Top Header */}
         <header className="bg-slate-950 text-white border-b border-amber-500/25 shadow-xl animate-slide-down" id="super-admin-header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             
             {/* Branded Logo representation */}
             <div className="flex items-center space-x-3 text-center sm:text-left">
@@ -1507,7 +1507,7 @@ export default function App() {
         </header>
 
         {/* Core Screen */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col space-y-6">
+        <main className="flex-1 max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 flex flex-col space-y-6">
           <div className="bg-slate-800/40 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md" id="super-admin-content-card">
             <SuperAdminTenantsView 
               tenants={allTenants} 
@@ -1521,7 +1521,7 @@ export default function App() {
         </main>
 
         <footer className="bg-slate-950 text-slate-500 py-6 border-t border-slate-900 text-center text-xs" id="super-admin-footer">
-          <div className="max-w-7xl mx-auto px-4 space-y-1">
+          <div className="max-w-[1920px] mx-auto px-4 space-y-1">
             <p className="font-bold text-slate-400">ProSpaces Global Administration Node</p>
             <p className="text-[10px] text-slate-600 font-mono">
               Secured under master corporate administrative rules &bull; Full structural control over physical tenants.
@@ -1540,7 +1540,7 @@ export default function App() {
       
       {/* Enterprise Sticky Brand Header & Unified Navigation */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all duration-200" id="prospaces-header">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-3">
+        <div className="max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-3">
           
           {/* Logo & title context */}
           <div className="flex items-center space-x-2.5 sm:space-x-4 text-left">
@@ -1846,7 +1846,7 @@ export default function App() {
 
         {/* Unified Classified Navigation Subbar inside Sticky Header */}
         <div className="hidden lg:block border-t border-slate-100 bg-slate-50/70 py-1.5 select-none" id="prospaces-nav-unified-sticky">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:divide-x lg:divide-slate-200/80">
               
               {/* Group 1: Operations */}
@@ -1983,7 +1983,7 @@ export default function App() {
       </header>
 
       {/* Main Core Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col space-y-6" id="prospaces-body">
+      <main className="flex-1 max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 flex flex-col space-y-6" id="prospaces-body">
 
         {/* Secondary Sub-navigation for Fleet Setup */}
         {['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab) && (
@@ -2182,7 +2182,7 @@ export default function App() {
 
       {/* Corporate Footer */}
       <footer className="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-12" id="prospaces-footer">
-        <div className="max-w-7xl mx-auto px-4 space-y-2">
+        <div className="max-w-[1920px] mx-auto px-4 space-y-2">
           <p className="font-medium text-slate-300">{currentTenant.name} &bull; ProSpaces Portal</p>
           <p className="text-[10px] text-slate-500 font-mono">
             Drafted for presentation regarding independent mobile routing platforms &bull; Part of ProSpaces Delivery and Logistics &bull; Workspace tenant: {currentTenant.code}
