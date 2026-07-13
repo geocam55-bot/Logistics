@@ -1724,7 +1724,7 @@ app.use((req, res, next) => {
       try {
         await supabase.from("Notifications").insert([{
           Type: "System Alert",
-          Message: `Password reset request completed for ${user.name} (${user.email}). Temporary password issued.`,
+          Message: `Password reset request completed for ${user.name} (${user.email}). New temporary password is: ${tempPassword}`,
           IsRead: false,
           CreatedAt: new Date().toISOString()
         }]);

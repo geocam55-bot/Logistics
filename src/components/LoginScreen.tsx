@@ -470,7 +470,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
 
       if (data.simulated) {
         setResetSuccessMessage(
-          `[DEVELOPMENT PREVIEW SIMULATION] A temporary password has been successfully generated: "${data.tempPassword}". (SMTP environment variables are unconfigured, so the email delivery is simulated and displayed here). Please sign in using this password and immediately update it in your Profile.`
+          `Your temporary password has been successfully generated: "${data.tempPassword}". Please sign in using this password and immediately update it in your user profile.`
         );
       } else {
         setResetSuccessMessage(
