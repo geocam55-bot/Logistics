@@ -457,61 +457,30 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
     setResetSuccessMessage(null);
     
     try {
-      const supabase = getFrontendSupabase();
-      if (!supabase) {
-        setError("Database is currently offline. Please contact your local administrator.");
-        setLoading(false);
-        return;
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail.trim() })
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit reset request.");
       }
-      
-      const emailQuery = resetEmail.trim().toLowerCase();
-      // Look up user
-      const { data, error: dbErr } = await supabase
-        .from("users")
-        .select("*")
-        .ilike("email", emailQuery);
-        
-      if (dbErr) {
-        throw dbErr;
+
+      if (data.simulated) {
+        setResetSuccessMessage(
+          `[DEVELOPMENT PREVIEW SIMULATION] A temporary password has been successfully generated: "${data.tempPassword}". (SMTP environment variables are unconfigured, so the email delivery is simulated and displayed here). Please sign in using this password and immediately update it in your Profile.`
+        );
+      } else {
+        setResetSuccessMessage(
+          `Success! A temporary password has been successfully generated and sent to ${resetEmail.trim()}. Please check your email inbox and spam folder for instructions.`
+        );
       }
-      
-      if (!data || data.length === 0) {
-        setError(`We couldn't find an account associated with '${resetEmail}'. Please check the email spelling.`);
-        setLoading(false);
-        return;
-      }
-      
-      const userRecord = data[0];
-      const deserializedUser = deserializeFromPhone(userRecord);
-      
-      // Mark as password reset requested
-      deserializedUser.resetRequest = "Requested";
-      
-      // Reserialize to phone
-      const phonePayload = serializeToPhone(
-        deserializedUser.phone, 
-        deserializedUser.password, 
-        deserializedUser.status, 
-        deserializedUser.driverLicenseExpire, 
-        deserializedUser.lastActive,
-        deserializedUser.resetRequest
-      );
-      
-      // Update in Supabase
-      const { error: updateErr } = await supabase
-        .from("users")
-        .update({ phone: phonePayload })
-        .eq("id", userRecord.id);
-        
-      if (updateErr) {
-        throw updateErr;
-      }
-      
-      setResetSuccessMessage(`Your password reset request has been sent to the Admin! Please notify George Campbell or your local branch administrator to approve and set your new password.`);
       setResetEmail('');
     } catch (err: any) {
       console.error("Password reset request error:", err);
-      setError("An error occurred while submitting your password reset request. Please try again.");
+      setError(err.message || "An error occurred while submitting your password reset request. Please try again.");
     } finally {
       setLoading(false);
     }

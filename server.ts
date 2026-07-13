@@ -1646,6 +1646,161 @@ app.use((req, res, next) => {
     }
   });
 
+  // Forgot Password / Recovery Endpoint
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email parameter is required." });
+      }
+
+      const supabase = getSupabase(req);
+      if (!supabase) {
+        return res.status(503).json({
+          error: "Database connection inactive. Cannot reset password in local sandbox offline mode."
+        });
+      }
+
+      const normEmail = email.trim().toLowerCase();
+
+      // Find user in users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("*")
+        .ilike("email", normEmail);
+
+      if (userError) {
+        throw new Error(userError.message);
+      }
+
+      if (!userData || userData.length === 0) {
+        return res.status(404).json({
+          error: "No registered profile found matching this email address."
+        });
+      }
+
+      const user = deserializeFromPhone(userData[0]);
+
+      // Generate a new temporary password
+      const characters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+      let tempPassword = "PS-";
+      for (let i = 0; i < 6; i++) {
+        tempPassword += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+
+      // Update password in Supabase
+      const updatedUser = {
+        ...user,
+        password: tempPassword,
+        phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest)
+      };
+
+      try {
+        const { error } = await supabase
+          .from("users")
+          .update(updatedUser)
+          .eq("id", user.id);
+        if (error) throw error;
+      } catch (err: any) {
+        const errMsg = err.message || String(err);
+        if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("42703"))) {
+          const { password, status, ...strippedUser } = updatedUser;
+          const { error: retryErr } = await supabase
+            .from("users")
+            .update(strippedUser)
+            .eq("id", user.id);
+          if (retryErr) throw retryErr;
+        } else {
+          throw err;
+        }
+      }
+
+      // Try inserting an alert notification to Notifications table for dispatch dashboard stream
+      try {
+        await supabase.from("Notifications").insert([{
+          Type: "System Alert",
+          Message: `Password reset request completed for ${user.name} (${user.email}). Temporary password issued.`,
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        }]);
+      } catch (notifErr) {
+        // Safe fallback - non-blocking
+        console.warn("Could not insert password reset notification:", notifErr);
+      }
+
+      // Send password email
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+      const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+      const smtpFrom = process.env.SMTP_FROM || "ProSpaces Logistics <noreply@prospaces.com>";
+
+      let emailSent = false;
+      let emailError = "";
+
+      if (smtpHost && smtpUser && smtpPass) {
+        try {
+          const nodemailer = await import("nodemailer");
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: {
+              user: smtpUser,
+              pass: smtpPass
+            }
+          });
+
+          const mailOptions = {
+            from: smtpFrom,
+            to: user.email,
+            subject: "Your ProSpaces Password Reset",
+            text: `Hi ${user.name},\n\nYou requested a password reset for your ProSpaces account.\n\nYour new temporary password is: ${tempPassword}\n\nPlease sign in with this password and update it in your user profile immediately.\n\nBest regards,\nProSpaces Fleet Support`,
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <h2 style="color: #1e3a8a; margin-bottom: 20px;">ProSpaces Logistics</h2>
+                <p>Hi <strong>${user.name}</strong>,</p>
+                <p>We received a request to reset your password. A temporary password has been successfully generated for you:</p>
+                <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 12px 24px; font-size: 18px; font-weight: bold; font-family: monospace; letter-spacing: 1px; display: inline-block; margin: 15px 0; color: #0f172a; border-radius: 6px;">
+                  ${tempPassword}
+                </div>
+                <p>Please use this temporary password to sign in to ProSpaces, and immediately update your password under your User Profile settings.</p>
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+                <p style="font-size: 12px; color: #64748b; line-height: 1.5;">
+                  If you did not make this request, please contact a dispatcher or system administrator. This is an automated notification.
+                </p>
+              </div>
+            `
+          };
+
+          await transporter.sendMail(mailOptions);
+          emailSent = true;
+          console.log(`[EMAIL] Password reset email sent to ${user.email}`);
+        } catch (mailErr: any) {
+          console.error("Failed to send real SMTP reset email:", mailErr);
+          emailError = mailErr.message || String(mailErr);
+        }
+      } else {
+        console.log(`[SIMULATION] Password reset request for ${user.email}. New temporary password is: ${tempPassword}`);
+      }
+
+      return res.json({
+        success: true,
+        emailSent,
+        emailError: emailError || null,
+        simulated: !emailSent,
+        tempPassword: !emailSent ? tempPassword : null, // expose temp password only if real SMTP is unconfigured for developer review
+        message: emailSent 
+          ? `A temporary password has been sent to ${user.email}.`
+          : `Password reset successfully simulated. Real-time SMTP is unconfigured.`
+      });
+
+    } catch (err: any) {
+      console.error("Forgot password operation error:", err);
+      return res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
   // Helper to construct the premium default mock and seed state for a given tenant ID
   function getDefaultTenantState(tid: string) {
     return {
