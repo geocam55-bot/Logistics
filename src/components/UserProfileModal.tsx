@@ -162,7 +162,7 @@ export default function UserProfileModal({
         email: email.trim(),
         phone: phone.trim(),
         associatedStoreId,
-        driverLicenseExpire: currentUser.role === 'Driver' ? driverLicenseExpire : undefined
+        driverLicenseExpire: driverLicenseExpire || undefined
       };
       await onUpdateProfile(updated);
       setSuccessMsg("Personal information updated successfully!");
@@ -448,19 +448,17 @@ export default function UserProfileModal({
                     </select>
                   </div>
 
-                  {currentUser.role === 'Driver' && (
-                    <div className="space-y-1 sm:col-span-2">
-                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <FileText className="h-3 w-3 text-slate-400" /> CDL / Driver's License Expiration
-                      </label>
-                      <input
-                        type="date"
-                        value={driverLicenseExpire}
-                        onChange={(e) => setDriverLicenseExpire(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600 transition-all font-medium"
-                      />
-                    </div>
-                  )}
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <FileText className="h-3 w-3 text-slate-400" /> CDL / Driver's License Expiration
+                    </label>
+                    <input
+                      type="date"
+                      value={driverLicenseExpire}
+                      onChange={(e) => setDriverLicenseExpire(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600 transition-all font-medium"
+                    />
+                  </div>
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex justify-end">

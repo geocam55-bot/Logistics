@@ -1688,26 +1688,31 @@ app.use((req, res, next) => {
         tempPassword += characters.charAt(Math.floor(Math.random() * characters.length));
       }
 
-      // Update password in Supabase
-      const updatedUser = {
-        ...user,
-        password: tempPassword,
-        phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest)
+      // Update password in Supabase using ONLY database-backed columns to prevent schema errors
+      const updatedUserDb = {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest),
+        associatedStoreId: user.associatedStoreId || null,
+        tenantId: user.tenantId
       };
 
       try {
         const { error } = await supabase
           .from("users")
-          .update(updatedUser)
+          .update(updatedUserDb)
           .eq("id", user.id);
         if (error) throw error;
       } catch (err: any) {
+        // Fallback for column errors if any database schema differs
         const errMsg = err.message || String(err);
-        if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("42703"))) {
-          const { password, status, ...strippedUser } = updatedUser;
+        if (errMsg.includes("column") || err.code === "42703") {
           const { error: retryErr } = await supabase
             .from("users")
-            .update(strippedUser)
+            .update({
+              phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest)
+            })
             .eq("id", user.id);
           if (retryErr) throw retryErr;
         } else {

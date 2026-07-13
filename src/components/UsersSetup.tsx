@@ -336,22 +336,20 @@ export default function UsersSetup({
                   </select>
                 </div>
 
-                {userRole === 'Driver' && (
-                  <div>
-                    <label className="text-xs font-semibold text-gray-700 block mb-1">
-                      Driver License Expiration
-                    </label>
-                    <input
-                      type="date"
-                      value={driverLicenseExpire}
-                      onChange={(e) => setDriverLicenseExpire(e.target.value)}
-                      className="w-full border bg-gray-50 border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                    />
-                    <span className="text-[10px] text-gray-400 mt-1 flex items-center">
-                      <Calendar className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" /> Real-time active status check will analyze this date
-                    </span>
-                  </div>
-                )}
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">
+                    Driver License Expiration
+                  </label>
+                  <input
+                    type="date"
+                    value={driverLicenseExpire}
+                    onChange={(e) => setDriverLicenseExpire(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                  />
+                  <span className="text-[10px] text-gray-400 mt-1 flex items-center">
+                    <Calendar className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" /> Real-time active status check will analyze this date
+                  </span>
+                </div>
 
                 <div>
                   <label className="text-xs font-semibold text-gray-700 block mb-1">Account Login Password</label>
@@ -442,33 +440,31 @@ export default function UsersSetup({
                     </div>
                   </div>
 
-                  {userRole === 'Driver' && (
-                    <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
-                      <span className="text-[9px] font-bold text-slate-400 block uppercase">Commercial Driver Endorsements</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">License #</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. NS-87481-CD"
-                            value={driverLicenseNumber}
-                            onChange={(e) => setDriverLicenseNumber(e.target.value)}
-                            className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">License Class</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. CDL Class 1"
-                            value={driverLicenseClass}
-                            onChange={(e) => setDriverLicenseClass(e.target.value)}
-                            className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
-                          />
-                        </div>
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Commercial Driver Endorsements</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">License #</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. NS-87481-CD"
+                          value={driverLicenseNumber}
+                          onChange={(e) => setDriverLicenseNumber(e.target.value)}
+                          className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5 uppercase">License Class</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. CDL Class 1"
+                          value={driverLicenseClass}
+                          onChange={(e) => setDriverLicenseClass(e.target.value)}
+                          className="w-full border bg-white border-slate-200 px-2 py-1 rounded text-[11px] text-slate-800 focus:outline-none"
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   <div className="grid grid-cols-1 gap-2">
                     <div>
