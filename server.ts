@@ -1907,7 +1907,7 @@ app.use((req, res, next) => {
             console.warn("[SEED] Supabase users table is missing columns. Retrying user seeding with column stripping and phone serialization...");
             const strippedUsers = defaults.users.map((u: any) => {
               const { password, status, driverLicenseExpire, ...stripped } = u;
-              stripped.phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire);
+              stripped.phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, undefined, undefined, u.avatarUrl);
               return stripped;
             });
             const { error: retryErr } = await supabase.from("users").upsert(strippedUsers);
