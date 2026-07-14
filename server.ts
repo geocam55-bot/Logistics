@@ -1742,7 +1742,7 @@ app.use((req, res, next) => {
 
       // Auto-correct common misconfigured hostnames for IONOS
       if (smtpHost.toLowerCase() === "smtp.ionos.ca") {
-        console.warn("[SMTP] Mapping smtp.ionos.ca to smtp.ionos.com to resolve DNS getaddrinfo error.");
+        console.log("[SMTP] Mapping smtp.ionos.ca to smtp.ionos.com to resolve DNS getaddrinfo error.");
         smtpHost = "smtp.ionos.com";
       }
 
