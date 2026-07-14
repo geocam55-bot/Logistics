@@ -1734,11 +1734,17 @@ app.use((req, res, next) => {
       }
 
       // Send password email
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
+      let smtpHost = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim() : "";
+      const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : "";
+      const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim() : "";
       const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
       const smtpFrom = process.env.SMTP_FROM || "ProSpaces Logistics <noreply@prospaces.com>";
+
+      // Auto-correct common misconfigured hostnames for IONOS
+      if (smtpHost.toLowerCase() === "smtp.ionos.ca") {
+        console.warn("[SMTP] Mapping smtp.ionos.ca to smtp.ionos.com to resolve DNS getaddrinfo error.");
+        smtpHost = "smtp.ionos.com";
+      }
 
       let emailSent = false;
       let emailError = "";
