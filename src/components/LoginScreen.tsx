@@ -488,7 +488,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
         setResetSuccessMessage(message);
       } else {
         setResetSuccessMessage(
-          `Success! A temporary password has been successfully generated and sent to ${resetEmail.trim()}. Please check your email inbox and spam folder for instructions.`
+          `Success! A password reset email has been sent to ${resetEmail.trim()}. Please check your email inbox and spam folder for instructions.`
         );
       }
       setResetEmail('');
