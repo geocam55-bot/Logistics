@@ -3,6 +3,7 @@ import { Tenant, User } from '../types';
 import { TENANTS } from '../data';
 import { getFrontendSupabase, deserializeFromPhone, serializeToPhone } from '../lib/supabaseClient';
 import { Shield, Key, CheckCircle2, ArrowRight, Mail, Lock, Building2, UserCheck, HelpCircle, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import prospacesLogo from '../assets/images/logo_no_border_tight_1783077241511.jpg';
 
 // Custom fetch utility to automatically inject custom Supabase headers for stateless backend resilience
@@ -676,6 +677,29 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                       className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
                     />
                   </div>
+
+                  {/* Dynamic Detected Space Card */}
+                  <AnimatePresence>
+                    {email.trim() && detectedTenant && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0, y: -4 }}
+                        animate={{ opacity: 1, height: 'auto', y: 0 }}
+                        exit={{ opacity: 0, height: 0, y: -4 }}
+                        className="mt-2.5 px-3 py-2.5 bg-slate-50 border border-slate-100/90 rounded-xl flex items-center justify-between text-xs transition-all duration-300"
+                      >
+                        <div className="flex items-center space-x-2.5">
+                          <span className="text-base shrink-0 select-none">{detectedTenant.logoBadge || '🏢'}</span>
+                          <div className="flex flex-col text-left">
+                            <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider leading-none">SYSTEM WORKSPACE DETECTED</span>
+                            <span className="font-extrabold text-slate-800 leading-tight mt-0.5">{detectedTenant.name}</span>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-mono font-black bg-blue-50 border border-blue-100 text-blue-600 px-2 py-0.5 rounded-md leading-none uppercase shrink-0">
+                          {detectedTenant.code}
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Password Passcode */}

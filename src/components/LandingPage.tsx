@@ -496,26 +496,26 @@ export default function LandingPage({
             
             {/* Card 1: Optimized Delivery Routes */}
             <div 
-              className={`bg-white rounded-2xl border p-8 shadow-sm transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTab === 'routes' ? 'border-[#FF5A1F] ring-2 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200'
+              className={`bg-white rounded-3xl border p-8 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.05)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group cursor-pointer ${
+                activeTab === 'routes' ? 'border-[#FF5A1F] ring-4 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200/80'
               }`}
               onClick={() => setActiveTab('routes')}
             >
               <div className="h-12 w-12 rounded-xl bg-orange-50 border border-orange-100 text-[#FF5A1F] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <MapPin className="h-6 w-6" />
               </div>
-              <h3 className="text-slate-900 font-sans font-black text-lg mb-2">
+              <h3 className="text-slate-900 font-sans font-extrabold text-lg mb-2">
                 Optimized Delivery Routes
               </h3>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4">
+              <p className="text-slate-500 text-sm leading-relaxed mb-4 font-normal">
                 Get drivers on the fastest path. Auto-sequence multiple jobsite deliveries respecting payload restrictions, gate access times, and truck dimensional clearances.
               </p>
               
               {/* Simple illustrative SVG widget inside the card */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100/50 flex items-center justify-between">
+              <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100/50 flex items-center justify-between">
                 <div className="space-y-1">
                   <span className="text-[9px] text-slate-400 font-mono uppercase font-bold block leading-none">ROUTE SEQUENCER</span>
-                  <span className="text-xs font-bold text-slate-800 block">Conshohocken Yard &rarr; Stop 1 &rarr; Stop 2</span>
+                  <span className="text-xs font-bold text-slate-850 block">Conshohocken Yard &rarr; Stop 1 &rarr; Stop 2</span>
                 </div>
                 <span className="bg-emerald-100 border border-emerald-200 text-emerald-800 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-none">
                   -24 min saved
@@ -525,26 +525,26 @@ export default function LandingPage({
 
             {/* Card 2: Real-Time Load & Fleet Tracking */}
             <div 
-              className={`bg-white rounded-2xl border p-8 shadow-sm transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTab === 'tracking' ? 'border-[#FF5A1F] ring-2 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200'
+              className={`bg-white rounded-3xl border p-8 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.05)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group cursor-pointer ${
+                activeTab === 'tracking' ? 'border-[#FF5A1F] ring-4 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200/80'
               }`}
               onClick={() => setActiveTab('tracking')}
             >
               <div className="h-12 w-12 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Truck className="h-6 w-6" />
               </div>
-              <h3 className="text-slate-900 font-sans font-black text-lg mb-2">
+              <h3 className="text-slate-900 font-sans font-extrabold text-lg mb-2">
                 Real-Time Load & Fleet Tracking
               </h3>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4">
+              <p className="text-slate-500 text-sm leading-relaxed mb-4 font-normal">
                 Know where every load is. Drivers pin live cargo loading confirmations (with picker identification) so you can track lumberyard inventory transit second-by-second.
               </p>
 
               {/* Simple illustrative SVG widget inside the card */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100/50 flex items-center justify-between">
+              <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100/50 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
-                  <span className="text-xs text-slate-700 font-medium">GPS: Flatbed Truck #104</span>
+                  <span className="text-xs text-slate-750 font-semibold">GPS: Flatbed Truck #104</span>
                 </div>
                 <span className="text-slate-400 font-mono text-[9px]">Speed: 45 MPH</span>
               </div>
@@ -552,23 +552,23 @@ export default function LandingPage({
 
             {/* Card 3: Digital Proof of Delivery */}
             <div 
-              className={`bg-white rounded-2xl border p-8 shadow-sm transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTab === 'pod' ? 'border-[#FF5A1F] ring-2 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200'
+              className={`bg-white rounded-3xl border p-8 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.05)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group cursor-pointer ${
+                activeTab === 'pod' ? 'border-[#FF5A1F] ring-4 ring-orange-500/5' : 'border-slate-100 hover:border-slate-200/80'
               }`}
               onClick={() => setActiveTab('pod')}
             >
               <div className="h-12 w-12 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <FileText className="h-6 w-6" />
               </div>
-              <h3 className="text-slate-900 font-sans font-black text-lg mb-2">
+              <h3 className="text-slate-900 font-sans font-extrabold text-lg mb-2">
                 Digital Proof of Delivery
               </h3>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4">
+              <p className="text-slate-500 text-sm leading-relaxed mb-4 font-normal">
                 Instant delivery verification. Capture dropoff photography, precise GPS drop coordinates, and electronic customer signatures directly from the driver app.
               </p>
               
               {/* Simple illustrative SVG widget inside the card */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100/50 flex items-center justify-between">
+              <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100/50 flex items-center justify-between">
                 <div className="space-y-1">
                   <span className="text-[9px] text-slate-400 font-mono uppercase font-bold block leading-none">POD STATUS</span>
                   <span className="text-xs font-bold text-emerald-700 block">Photo & Signature Uploaded</span>
