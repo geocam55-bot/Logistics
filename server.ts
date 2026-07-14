@@ -2122,6 +2122,7 @@ app.use((req, res, next) => {
             deliveryAddress: "SHIP TO: 547 KING ST 547 KING ST BRIDGEWATER   NS B3Z 1H3",
             phone: "902-555-0199",
             originBranch: "01075",
+            pdfUrl: "/uploads/263890_source.pdf",
             destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
             status: "REGISTERED",
             registeredAt: "6/16/2026, 11:15:48 AM",

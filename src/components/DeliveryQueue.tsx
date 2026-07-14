@@ -16,6 +16,16 @@ interface DeliveryQueueProps {
   users: AppUser[];
 }
 
+// Helper to retrieve the actual PDF path from the delivery record or parse it from destinationNotes as a fallback
+const getEffectivePdfUrl = (delivery: DeliveryRecord): string | undefined => {
+  if (delivery.pdfUrl) return delivery.pdfUrl;
+  if (delivery.destinationNotes) {
+    const match = delivery.destinationNotes.match(/Physical Document stored:\s*([^\s|]+)/);
+    if (match) return match[1].trim();
+  }
+  return undefined;
+};
+
 export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches, users }: DeliveryQueueProps) {
   const BRANCHES = branches || [];
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,7 +111,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     setFormReturnReason(record.returnReason || '');
     setFormSignature(record.customerSignature || '');
     setFormPhoto(record.deliveryPhoto || '');
-    setFormPdfUrl(record.pdfUrl || '');
+    setFormPdfUrl(record.pdfUrl || getEffectivePdfUrl(record) || '');
     setFormPicker(record.assignedPicker || '');
     setFormRegisteredAt(record.registeredAt ? record.registeredAt.substring(0, 10) : new Date().toISOString().substring(0, 10));
     setFormDeliveredAt(record.deliveredAt ? record.deliveredAt.substring(0, 10) : '');
@@ -526,11 +536,11 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         <span className="font-mono font-extrabold text-blue-600 text-sm tracking-tight">{delivery.id}</span>
                         <span className="text-xs text-gray-400">|</span>
                         <span className="text-[10px] font-mono text-slate-500 font-semibold uppercase">Inv: {delivery.invoiceNumber}</span>
-                        {delivery.pdfUrl && (
+                        {getEffectivePdfUrl(delivery) && (
                           <>
                             <span className="text-xs text-slate-300">|</span>
                             <a
-                              href={delivery.pdfUrl}
+                              href={getEffectivePdfUrl(delivery)}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
@@ -720,7 +730,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                       
                       {/* Shipping detail cards */}
                       <div className="grid grid-cols-1 gap-4">
-                        {delivery.pdfUrl && (
+                        {getEffectivePdfUrl(delivery) && (
                           <div>
                             <h5 className="font-bold text-gray-900 mb-1 uppercase tracking-wider font-mono text-[10px]">Physical Document Archive</h5>
                             <div className="bg-gradient-to-br from-indigo-50/50 to-blue-50/50 border border-indigo-100 rounded-xl p-3.5 shadow-xs flex items-center justify-between">
@@ -734,7 +744,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                                 </div>
                               </div>
                               <a
-                                href={delivery.pdfUrl}
+                                href={getEffectivePdfUrl(delivery)}
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
