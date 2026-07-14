@@ -1741,8 +1741,22 @@ app.use((req, res, next) => {
       const smtpPort = parseInt((process.env.SMTP_PORT || "587").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, ''), 10);
       const smtpFrom = (process.env.SMTP_FROM || "ProSpaces Logistics <noreply@prospaces.com>").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
 
+      // Server-side Diagnostics
+      const maskString = (str: string) => {
+        if (!str) return "NOT_SET";
+        if (str.length <= 4) return "****";
+        return str.substring(0, 2) + "****" + str.substring(str.length - 2);
+      };
+      console.log("[SMTP Diagnostics] Environment variables parsed:", {
+        SMTP_HOST: smtpHost ? `${smtpHost} (length: ${smtpHost.length})` : "MISSING/EMPTY",
+        SMTP_USER: maskString(smtpUser),
+        SMTP_PASS: smtpPass ? `SET (length: ${smtpPass.length})` : "MISSING/EMPTY",
+        SMTP_PORT: smtpPort,
+        SMTP_FROM: smtpFrom
+      });
+
       // Auto-correct common misconfigured hostnames for IONOS
-      if (smtpHost.toLowerCase() === "smtp.ionos.ca") {
+      if (smtpHost && smtpHost.toLowerCase() === "smtp.ionos.ca") {
         console.log("[SMTP] Mapping smtp.ionos.ca to smtp.ionos.com to resolve DNS getaddrinfo error.");
         smtpHost = "smtp.ionos.com";
       }
@@ -1750,9 +1764,14 @@ app.use((req, res, next) => {
       let emailSent = false;
       let emailError = "";
 
-      if (smtpHost && smtpUser && smtpPass) {
+      const hasAllSMTP = !!(smtpHost && smtpUser && smtpPass);
+      console.log(`[SMTP Diagnostics] Checking if required SMTP vars are present: ${hasAllSMTP}`);
+
+      if (hasAllSMTP) {
         try {
+          console.log("[SMTP Diagnostics] Importing nodemailer...");
           const nodemailer = await import("nodemailer");
+          console.log("[SMTP Diagnostics] Creating transporter...");
           const transporter = nodemailer.createTransport({
             host: smtpHost,
             port: smtpPort,
@@ -1788,11 +1807,12 @@ app.use((req, res, next) => {
             `
           };
 
+          console.log(`[SMTP Diagnostics] Sending email via transporter to: ${user.email}...`);
           await transporter.sendMail(mailOptions);
           emailSent = true;
-          console.log(`[EMAIL] Password reset email sent to ${user.email}`);
+          console.log(`[SMTP Diagnostics] Email sent successfully to ${user.email}`);
         } catch (mailErr: any) {
-          console.error("Failed to send real SMTP reset email:", mailErr);
+          console.error("[SMTP Diagnostics] Error occurred during SMTP setup/delivery:", mailErr);
           emailError = mailErr.message || String(mailErr);
         }
       } else {

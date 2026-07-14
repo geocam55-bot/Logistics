@@ -464,14 +464,28 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
       });
       const data = await response.json();
       
+      console.log("[forgot-password API response diagnostics]", data);
+
       if (!response.ok) {
         throw new Error(data.error || "Failed to submit reset request.");
       }
 
       if (data.simulated) {
-        setResetSuccessMessage(
-          `Your temporary password has been successfully generated: "${data.tempPassword}". Please sign in using this password and immediately update it in your user profile.`
-        );
+        let message = `Your temporary password has been successfully generated: "${data.tempPassword}". Please sign in using this password and immediately update it in your user profile.`;
+        
+        if (data.emailError) {
+          message += `\n\n⚠️ SMTP Error details: ${data.emailError}`;
+        } else if (data.smtpDiagnostics) {
+          const missing = [];
+          if (!data.smtpDiagnostics.hasHost) missing.push("SMTP_HOST");
+          if (!data.smtpDiagnostics.hasUser) missing.push("SMTP_USER");
+          if (!data.smtpDiagnostics.hasPass) missing.push("SMTP_PASS");
+          
+          if (missing.length > 0) {
+            message += `\n\n⚠️ Missing production SMTP variables: ${missing.join(", ")}. Please verify they are configured in your Vercel Project Environment Variables.`;
+          }
+        }
+        setResetSuccessMessage(message);
       } else {
         setResetSuccessMessage(
           `Success! A temporary password has been successfully generated and sent to ${resetEmail.trim()}. Please check your email inbox and spam folder for instructions.`
