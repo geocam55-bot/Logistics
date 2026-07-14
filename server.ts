@@ -1738,8 +1738,21 @@ app.use((req, res, next) => {
       let smtpHost = (process.env.SMTP_HOST || "").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
       const smtpUser = (process.env.SMTP_USER || "").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
       const smtpPass = (process.env.SMTP_PASS || "").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
-      const smtpPort = parseInt((process.env.SMTP_PORT || "587").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, ''), 10);
+      let smtpPort = parseInt((process.env.SMTP_PORT || "587").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, ''), 10);
       const smtpFrom = (process.env.SMTP_FROM || "ProSpaces Logistics <noreply@prospaces.com>").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+
+      // Auto-correct port typos
+      let portWasCorrected = false;
+      const originalPort = smtpPort;
+      if (smtpPort === 485) {
+        console.warn("[SMTP Diagnostics] Detected SMTP_PORT set to 485. This is highly likely a typo for port 465 (secure SSL). Auto-correcting to 465.");
+        smtpPort = 465;
+        portWasCorrected = true;
+      } else if (smtpPort === 585) {
+        console.warn("[SMTP Diagnostics] Detected SMTP_PORT set to 585. This is highly likely a typo for port 587 (STARTTLS). Auto-correcting to 587.");
+        smtpPort = 587;
+        portWasCorrected = true;
+      }
 
       // Server-side Diagnostics
       const maskString = (str: string) => {
@@ -1752,6 +1765,8 @@ app.use((req, res, next) => {
         SMTP_USER: maskString(smtpUser),
         SMTP_PASS: smtpPass ? `SET (length: ${smtpPass.length})` : "MISSING/EMPTY",
         SMTP_PORT: smtpPort,
+        SMTP_PORT_ORIGINAL: originalPort,
+        SMTP_PORT_WAS_CORRECTED: portWasCorrected,
         SMTP_FROM: smtpFrom
       });
 
