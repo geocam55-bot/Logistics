@@ -1810,9 +1810,16 @@ app.use((req, res, next) => {
         emailError: emailError || null,
         simulated: !emailSent,
         tempPassword: !emailSent ? tempPassword : null, // expose temp password only if real SMTP is unconfigured for developer review
+        smtpDiagnostics: {
+          hasHost: !!smtpHost,
+          hasUser: !!smtpUser,
+          hasPass: !!smtpPass,
+          port: smtpPort,
+          from: smtpFrom
+        },
         message: emailSent 
           ? `A temporary password has been sent to ${user.email}.`
-          : `Password reset successfully simulated. Real-time SMTP is unconfigured.`
+          : `Password reset successfully simulated. Real-time SMTP is unconfigured. (Missing: ${[!smtpHost && 'SMTP_HOST', !smtpUser && 'SMTP_USER', !smtpPass && 'SMTP_PASS'].filter(Boolean).join(', ')})`
       });
 
     } catch (err: any) {
