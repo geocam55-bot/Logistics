@@ -172,7 +172,7 @@ function formatDatabaseError(err: any): string {
   return msg;
 }
 
-function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined): string {
+function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined, avatarUrl?: string | undefined): string {
   const basePhone = (phone || "").trim();
   let res = basePhone;
   if (password) {
@@ -190,6 +190,9 @@ function serializeToPhone(phone: string | undefined, password: string | undefine
   if (resetRequest) {
     res += ` ||resetreq:${resetRequest}`;
   }
+  if (avatarUrl) {
+    res += ` ||avatar:${avatarUrl}`;
+  }
   return res;
 }
 
@@ -202,6 +205,7 @@ function deserializeFromPhone(user: any): any {
   let driverLicenseExpire = user.driverLicenseExpire || "";
   let lastActive = "";
   let resetRequest = "";
+  let avatarUrl = "";
 
   const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
   if (pwMatch) {
@@ -228,6 +232,11 @@ function deserializeFromPhone(user: any): any {
     resetRequest = resetreqMatch[1];
     cleanPhone = cleanPhone.replace(/\|\|resetreq:[^\s|]+/, "");
   }
+  const avatarMatch = phone.match(/\|\|avatar:([^\s|]+)/);
+  if (avatarMatch) {
+    avatarUrl = avatarMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|avatar:[^\s|]+/, "");
+  }
 
   return {
     ...user,
@@ -236,7 +245,8 @@ function deserializeFromPhone(user: any): any {
     status,
     driverLicenseExpire,
     lastActive,
-    resetRequest
+    resetRequest,
+    avatarUrl
   };
 }
 
@@ -1693,7 +1703,7 @@ app.use((req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest),
+        phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest, user.avatarUrl),
         associatedStoreId: user.associatedStoreId || null,
         tenantId: user.tenantId
       };
@@ -1711,7 +1721,7 @@ app.use((req, res, next) => {
           const { error: retryErr } = await supabase
             .from("users")
             .update({
-              phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest)
+              phone: serializeToPhone(user.phone, tempPassword, user.status, user.driverLicenseExpire, user.lastActive, user.resetRequest, user.avatarUrl)
             })
             .eq("id", user.id);
           if (retryErr) throw retryErr;
@@ -2335,7 +2345,7 @@ app.use((req, res, next) => {
               name: u.name,
               email: u.email,
               role: u.role,
-              phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive, u.resetRequest),
+              phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive, u.resetRequest, u.avatarUrl),
               associatedStoreId: u.associatedStoreId || null
             };
           });

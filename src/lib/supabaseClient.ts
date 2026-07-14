@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 // Serialization and Deserialization helpers matching the backend implementation
-export function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined): string {
+export function serializeToPhone(phone: string | undefined, password: string | undefined, status: string | undefined, driverLicenseExpire?: string | undefined, lastActive?: string | undefined, resetRequest?: string | undefined, avatarUrl?: string | undefined): string {
   const basePhone = (phone || "").trim();
   let res = basePhone;
   if (password) {
@@ -19,6 +19,9 @@ export function serializeToPhone(phone: string | undefined, password: string | u
   if (resetRequest) {
     res += ` ||resetreq:${resetRequest}`;
   }
+  if (avatarUrl) {
+    res += ` ||avatar:${avatarUrl}`;
+  }
   return res;
 }
 
@@ -31,6 +34,7 @@ export function deserializeFromPhone(user: any): any {
   let driverLicenseExpire = user.driverLicenseExpire || "";
   let lastActive = "";
   let resetRequest = "";
+  let avatarUrl = "";
 
   const pwMatch = phone.match(/\|\|pw:([^\s|]+)/);
   if (pwMatch) {
@@ -57,6 +61,11 @@ export function deserializeFromPhone(user: any): any {
     resetRequest = resetreqMatch[1];
     cleanPhone = cleanPhone.replace(/\|\|resetreq:[^\s|]+/, "");
   }
+  const avatarMatch = phone.match(/\|\|avatar:([^\s|]+)/);
+  if (avatarMatch) {
+    avatarUrl = avatarMatch[1];
+    cleanPhone = cleanPhone.replace(/\|\|avatar:[^\s|]+/, "");
+  }
 
   return {
     ...user,
@@ -65,7 +74,8 @@ export function deserializeFromPhone(user: any): any {
     status,
     driverLicenseExpire,
     lastActive,
-    resetRequest
+    resetRequest,
+    avatarUrl
   };
 }
 
@@ -450,7 +460,7 @@ export async function saveTenantStateDirect(
     name: u.name,
     email: u.email,
     role: u.role,
-    phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive, u.resetRequest),
+    phone: serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, u.lastActive, u.resetRequest, u.avatarUrl),
     associatedStoreId: u.associatedStoreId
   }));
 
