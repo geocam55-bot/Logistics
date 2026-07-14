@@ -1759,6 +1759,9 @@ app.use((req, res, next) => {
             auth: {
               user: smtpUser,
               pass: smtpPass
+            },
+            tls: {
+              rejectUnauthorized: false
             }
           });
 
@@ -1792,6 +1795,11 @@ app.use((req, res, next) => {
           emailError = mailErr.message || String(mailErr);
         }
       } else {
+        const missingVars = [];
+        if (!smtpHost) missingVars.push("SMTP_HOST");
+        if (!smtpUser) missingVars.push("SMTP_USER");
+        if (!smtpPass) missingVars.push("SMTP_PASS");
+        console.warn(`[SMTP Warning] Real email delivery is disabled because of missing env variables in production: ${missingVars.join(", ")}`);
         console.log(`[SIMULATION] Password reset request for ${user.email}. New temporary password is: ${tempPassword}`);
       }
 
