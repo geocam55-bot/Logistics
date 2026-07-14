@@ -1734,11 +1734,11 @@ app.use((req, res, next) => {
       }
 
       // Send password email
-      let smtpHost = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim() : "";
-      const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : "";
-      const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim() : "";
-      const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
-      const smtpFrom = process.env.SMTP_FROM || "ProSpaces Logistics <noreply@prospaces.com>";
+      let smtpHost = (process.env.SMTP_HOST || "").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+      const smtpUser = (process.env.SMTP_USER || "").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+      const smtpPass = (process.env.SMTP_PASS || "").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
+      const smtpPort = parseInt((process.env.SMTP_PORT || "587").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, ''), 10);
+      const smtpFrom = (process.env.SMTP_FROM || "ProSpaces Logistics <noreply@prospaces.com>").trim().replace(/^['"\\\'\\\"]+|['"\\\'\\\"]+$/g, '');
 
       // Auto-correct common misconfigured hostnames for IONOS
       if (smtpHost.toLowerCase() === "smtp.ionos.ca") {
