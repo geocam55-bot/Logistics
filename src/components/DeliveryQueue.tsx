@@ -203,7 +203,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         assignedPicker: formStatus === DeliveryStatus.PICKED_AND_LOADED ? pickerName : (editingRecord?.assignedPicker || undefined),
         returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
         customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || editingRecord.customerSignature || 'Physical Signoff Done') : undefined,
-        deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || editingRecord.deliveryPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
+        deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || editingRecord.deliveryPhoto || undefined) : undefined,
         pdfUrl: formPdfUrl || undefined,
         history: newHistory
       };
@@ -252,7 +252,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         assignedPicker: formStatus === DeliveryStatus.PICKED_AND_LOADED ? pickerName : undefined,
         returnReason: formStatus === DeliveryStatus.RETURNED ? (formReturnReason || undefined) : undefined,
         customerSignature: formStatus === DeliveryStatus.DELIVERED ? (formSignature || 'Physical Handoff Validated') : undefined,
-        deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80') : undefined,
+        deliveryPhoto: formStatus === DeliveryStatus.DELIVERED ? (formPhoto || undefined) : undefined,
         pdfUrl: formPdfUrl || undefined,
         history: newHistory
       };

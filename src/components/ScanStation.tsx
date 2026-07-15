@@ -85,6 +85,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
   // Outcome
   const [deliveryOutcome, setDeliveryOutcome] = useState<'SUCCESS' | 'RETURN'>('SUCCESS');
   const [customerSignature, setCustomerSignature] = useState('');
+  const [deliveryPhoto, setDeliveryPhoto] = useState('');
   const [returnReason, setReturnReason] = useState('');
   const [returnDestination, setReturnDestination] = useState('WINDMILL_DC');
 
@@ -876,7 +877,7 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
         status: DeliveryStatus.DELIVERED,
         deliveredAt: now,
         customerSignature: customerSignature || 'Verified at Site',
-        deliveryPhoto: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=60',
+        deliveryPhoto: deliveryPhoto || undefined,
         history: [
           ...scannedRecord.history,
           {
@@ -911,12 +912,18 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
     setScannedRecord(updated);
     setActiveFormType('IDLE');
     setBarcodeInput('');
+    setDeliveryPhoto('');
+    setCustomerSignature('');
+    setReturnReason('');
   };
 
   const cancelActiveForm = () => {
     setActiveFormType('IDLE');
     setScannedRecord(null);
     setManualSalesOrder(null);
+    setDeliveryPhoto('');
+    setCustomerSignature('');
+    setReturnReason('');
   };
 
   // Simulate picking a registered barcode or generating a dummy one in the system
@@ -2143,6 +2150,32 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                     <div>
                       <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Customer Representative Name / Signature</label>
                       <input type="text" required placeholder="E.g., John Smith - Received on-site..." value={customerSignature} onChange={(e) => setCustomerSignature(e.target.value)} className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500" />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Attach Delivery Photo</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setDeliveryPhoto(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }} 
+                        className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-xs bg-slate-50 focus:ring-1 focus:ring-emerald-500" 
+                      />
+                      {deliveryPhoto && (
+                        <div className="mt-2 text-[10px] text-green-700 font-bold flex items-center space-x-1">
+                          <CheckSquare className="h-3 w-3" />
+                          <span>Photo captured & attached.</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="p-3 bg-green-50 border border-green-100 rounded-xl text-[10.5px] text-green-800">
