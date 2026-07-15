@@ -20,8 +20,13 @@ interface DeliveryQueueProps {
 const getEffectivePdfUrl = (delivery: DeliveryRecord): string | undefined => {
   if (delivery.pdfUrl) return delivery.pdfUrl;
   if (delivery.destinationNotes) {
-    const match = delivery.destinationNotes.match(/Physical Document stored:\s*([^\s|]+)/);
-    if (match) return match[1].trim();
+    const match = delivery.destinationNotes.match(/Physical Document stored:\s*([^\s|"]+)/);
+    if (match) {
+      let url = match[1].trim();
+      // Remove trailing punctuation just in case
+      if (url.endsWith('.')) url = url.slice(0, -1);
+      return url;
+    }
   }
   return undefined;
 };
