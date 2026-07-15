@@ -60,6 +60,8 @@ interface Order {
   orderValue: number;
   notes: string;
   customerNameStr?: string; // For mapped deliveries
+  hasSignature?: boolean;
+  hasPhoto?: boolean;
 }
 
 interface RouteLog {
@@ -1157,7 +1159,9 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
       totalVolumeM3: 0,
       itemCount: d.orderTotal ? parseFloat(d.orderTotal) || 1 : 1,
       orderValue: 0,
-      notes: d.destinationNotes || ''
+      notes: d.destinationNotes || '',
+      hasSignature: !!d.customerSignature,
+      hasPhoto: !!d.deliveryPhoto
     } as Order));
     return [...deliveryOrders, ...orders];
   }, [deliveries, orders]);
@@ -1607,8 +1611,12 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
                       </td>
                       <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
                         {o.customerID === 'delivery' ? (
-                          <span className="px-2 py-1 bg-slate-100 text-[10px] font-bold rounded text-slate-500">
-                            Freight Board Item
+                          <span className="px-2 py-1 bg-slate-100 text-[10px] font-bold rounded text-slate-500 flex flex-col items-end gap-1">
+                            <span>Freight Board Item</span>
+                            <span className="flex items-center gap-1.5 mt-0.5">
+                              {o.hasSignature && <span className="text-blue-600 flex items-center bg-blue-50 px-1 rounded"><Signature className="h-3 w-3 mr-0.5" /> Signed</span>}
+                              {o.hasPhoto && <span className="text-emerald-600 flex items-center bg-emerald-50 px-1 rounded"><Camera className="h-3 w-3 mr-0.5" /> Photo</span>}
+                            </span>
                           </span>
                         ) : (
                           <>

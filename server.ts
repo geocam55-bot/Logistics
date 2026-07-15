@@ -2014,6 +2014,27 @@ app.use((req, res, next) => {
               }
             }
           }
+          if (d.history && Array.isArray(d.history)) {
+            // Scan backwards to find the most recent valid values
+            for (let i = d.history.length - 1; i >= 0; i--) {
+                const entry = d.history[i];
+                if (!d.customerSignature && entry.customerSignature) {
+                    d.customerSignature = entry.customerSignature;
+                }
+                if (!d.deliveryPhoto && entry.deliveryPhoto) {
+                    d.deliveryPhoto = entry.deliveryPhoto;
+                }
+                if (!d.destinationNotes && entry.destinationNotes) {
+                    d.destinationNotes = entry.destinationNotes;
+                }
+                if (!d.weight && entry.weight) {
+                    d.weight = entry.weight;
+                }
+                if (!d.orderTotal && entry.orderTotal) {
+                    d.orderTotal = entry.orderTotal;
+                }
+            }
+          }
           return d;
         });
 
@@ -2276,7 +2297,29 @@ app.use((req, res, next) => {
       const sanitizedBranches = uniqueBranches.map((b: any) => ({ ...b, tenantId }));
       const sanitizedTrucks = uniqueTrucks.map((t: any) => ({ ...t, tenantId }));
       const sanitizedUsers = uniqueUsers.map((u: any) => ({ ...u, tenantId }));
-      const sanitizedDeliveries = uniqueDeliveries.map((d: any) => ({ ...d, tenantId }));
+      const sanitizedDeliveries = uniqueDeliveries.map((d: any) => {
+        const copy = { ...d, tenantId };
+        // Preserve new fields inside history just in case they get stripped due to missing DB columns
+        if (copy.history && Array.isArray(copy.history) && copy.history.length > 0) {
+           const lastHistory = copy.history[copy.history.length - 1];
+           if (copy.customerSignature) {
+               lastHistory.customerSignature = copy.customerSignature;
+           }
+           if (copy.deliveryPhoto) {
+               lastHistory.deliveryPhoto = copy.deliveryPhoto;
+           }
+           if (copy.destinationNotes) {
+               lastHistory.destinationNotes = copy.destinationNotes;
+           }
+           if (copy.weight) {
+               lastHistory.weight = copy.weight;
+           }
+           if (copy.orderTotal) {
+               lastHistory.orderTotal = copy.orderTotal;
+           }
+        }
+        return copy;
+      });
 
       // Execute upserts series to maintain reference integrity
       // 1. Branches first (parent of trucks and deliveries)
@@ -2421,7 +2464,7 @@ app.use((req, res, next) => {
         let deliveriesToUpsert = [...sanitizedDeliveries];
         let success = false;
         let attempts = 0;
-        while (!success && attempts < 5) {
+        while (!success && attempts < 15) {
           try {
             const { error } = await supabase.from("deliveries").upsert(deliveriesToUpsert);
             if (error) throw error;
@@ -2442,6 +2485,9 @@ app.use((req, res, next) => {
                 else if (errMsg.includes("weight")) colToStrip = "weight";
                 else if (errMsg.includes("orderTotal")) colToStrip = "orderTotal";
                 else if (errMsg.includes("assignedPicker")) colToStrip = "assignedPicker";
+                else if (errMsg.includes("destinationNotes")) colToStrip = "destinationNotes";
+                else if (errMsg.includes("customerSignature")) colToStrip = "customerSignature";
+                else if (errMsg.includes("deliveryPhoto")) colToStrip = "deliveryPhoto";
               }
               
               if (colToStrip) {
@@ -2452,9 +2498,9 @@ app.use((req, res, next) => {
                   return copy;
                 });
               } else {
-                console.log("Stripping all potential new columns (pdfUrl, weight, orderTotal) due to unidentified column error.");
+                console.log("Stripping all potential new columns (pdfUrl, weight, orderTotal, etc) due to unidentified column error.");
                 deliveriesToUpsert = deliveriesToUpsert.map(d => {
-                  const { pdfUrl, weight, orderTotal, ...rest } = d;
+                  const { pdfUrl, weight, orderTotal, assignedPicker, destinationNotes, customerSignature, deliveryPhoto, ...rest } = d;
                   return rest;
                 });
               }
