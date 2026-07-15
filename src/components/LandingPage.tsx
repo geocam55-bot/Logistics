@@ -267,7 +267,7 @@ export default function LandingPage({
               </h1>
               
               <p className="text-slate-500 text-base sm:text-lg lg:text-lg leading-relaxed max-w-xl">
-                The only logistics system built exclusively for home improvement centers and commercial supply yards. Seamlessly integrated into your ProSpaces CRM.
+                The only logistics system built exclusively for home improvement centers and commercial supply yards.
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
