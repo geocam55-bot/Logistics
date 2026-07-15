@@ -2002,12 +2002,27 @@ app.use((req, res, next) => {
       supabaseTemporarilyDisabled = false;
       supabaseDisabledUntil = 0;
 
+        const rawDeliveries = rDeliveries.data || [];
+        const enrichedDeliveries = rawDeliveries.map((d: any) => {
+          if (!d.assignedPicker && d.history && Array.isArray(d.history)) {
+            // Find the most recent history entry with a picker assigned
+            const pickerEntry = [...d.history].reverse().find((h: any) => h.notes && h.notes.includes("Picker assigned: "));
+            if (pickerEntry) {
+              const match = pickerEntry.notes.match(/Picker assigned: ([^.]+)/);
+              if (match) {
+                d.assignedPicker = match[1].trim();
+              }
+            }
+          }
+          return d;
+        });
+
       res.json({
         supabaseActive: true,
         branches: rBranches.data || [],
         trucks: deserializedTrucks,
         users: deserializedUsers,
-        deliveries: rDeliveries.data || []
+        deliveries: enrichedDeliveries
       });
     } catch (err: any) {
       // Trigger circuit breaker for timeout or network unreachable errors
@@ -2417,15 +2432,16 @@ app.use((req, res, next) => {
             console.warn(`Deliveries sync failed (attempt ${attempts}):`, errMsg);
             
             // Check for missing column error, e.g., 'column "pdfUrl" of relation "deliveries" does not exist' or error code "42703"
-            if (errMsg.includes("column") || errMsg.includes("42703") || dbErr.code === "42703") {
-              const match = errMsg.match(/column "([^"]+)"|column ([^\s]+) of relation/);
-              let colToStrip = match ? (match[1] || match[2]) : null;
+            if (errMsg.includes("column") || errMsg.includes("42703") || dbErr.code === "42703" || dbErr.code === "PGRST204") {
+              const match = errMsg.match(/column "([^"]+)"|column ([^\s]+) of relation|'([^']+)' column/);
+              let colToStrip = match ? (match[1] || match[2] || match[3]) : null;
               
               if (!colToStrip) {
                 // If we couldn't match the column name, look for known new columns in errMsg
                 if (errMsg.includes("pdfUrl")) colToStrip = "pdfUrl";
                 else if (errMsg.includes("weight")) colToStrip = "weight";
                 else if (errMsg.includes("orderTotal")) colToStrip = "orderTotal";
+                else if (errMsg.includes("assignedPicker")) colToStrip = "assignedPicker";
               }
               
               if (colToStrip) {

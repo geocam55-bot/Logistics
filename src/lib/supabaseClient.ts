@@ -481,31 +481,35 @@ export async function saveTenantStateDirect(
     address: b.address
   }));
 
-  const mappedDeliveries = uniqueDeliveries.map(d => ({
-    id: d.id,
-    tenantId,
-    invoiceNumber: d.invoiceNumber,
-    epicorSalesOrder: d.epicorSalesOrder,
-    customerName: d.customerName,
-    deliveryAddress: d.deliveryAddress,
-    phone: d.phone,
-    originBranch: d.originBranch,
-    weight: d.weight,
-    orderTotal: d.orderTotal,
-    pdfUrl: d.pdfUrl,
-    destinationNotes: d.destinationNotes,
-    status: d.status,
-    registeredAt: d.registeredAt,
-    pickedAt: d.pickedAt,
-    deliveredAt: d.deliveredAt,
-    returnedAt: d.returnedAt,
-    returnReason: d.returnReason,
-    assignedTruck: d.assignedTruck,
-    assignedDriver: d.assignedDriver,
-    customerSignature: d.customerSignature,
-    deliveryPhoto: d.deliveryPhoto,
-    history: d.history ? (typeof d.history === 'string' ? JSON.parse(d.history) : d.history) : []
-  }));
+  const mappedDeliveries = uniqueDeliveries.map(d => {
+    const obj: any = {
+      id: d.id,
+      tenantId,
+      invoiceNumber: d.invoiceNumber,
+      epicorSalesOrder: d.epicorSalesOrder,
+      customerName: d.customerName,
+      deliveryAddress: d.deliveryAddress,
+      phone: d.phone,
+      originBranch: d.originBranch,
+      destinationNotes: d.destinationNotes,
+      status: d.status,
+      registeredAt: d.registeredAt,
+      pickedAt: d.pickedAt,
+      deliveredAt: d.deliveredAt,
+      returnedAt: d.returnedAt,
+      returnReason: d.returnReason,
+      assignedTruck: d.assignedTruck,
+      assignedDriver: d.assignedDriver,
+      customerSignature: d.customerSignature,
+      deliveryPhoto: d.deliveryPhoto,
+      history: d.history ? (typeof d.history === 'string' ? JSON.parse(d.history) : d.history) : []
+    };
+    
+    // Explicitly add potentially missing columns if they have values to avoid undefined breaking upserts
+    // BUT since we know these columns might be missing in Supabase, we omit them entirely in the direct client
+    // fallback so that the save doesn't crash. The backend /save-state endpoint has proper regex stripping.
+    return obj;
+  });
 
   // Perform parallel upserts
   await Promise.all([
