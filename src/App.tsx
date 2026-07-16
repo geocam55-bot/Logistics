@@ -208,9 +208,13 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     const role = currentUser.role;
-    if (role === 'Driver' || role === 'Picker') {
-      if (!['dashboard', 'queue', 'scanner'].includes(activeTab)) {
-        setActiveTab('dashboard');
+    if (role === 'Driver') {
+      if (!['epod', 'inspections', 'fuel'].includes(activeTab)) {
+        setActiveTab('epod');
+      }
+    } else if (role === 'Picker') {
+      if (activeTab !== 'scanner') {
+        setActiveTab('scanner');
       }
     } else if (role === 'User') {
       if (!['dashboard', 'queue'].includes(activeTab)) {
@@ -1711,80 +1715,88 @@ export default function App() {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-1 font-sans">Navigation Menu</p>
                     
                     <div className="space-y-1">
-                      <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Dispatcher Space</div>
-                      <button
-                        onClick={() => {
-                          setActiveTab('dashboard');
-                          setIsMobileNavOpen(false);
-                        }}
-                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                          activeTab === 'dashboard'
-                            ? 'bg-blue-800 text-white shadow-sm'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        <span>HQ Dashboard</span>
-                      </button>
+                      {['Admin', 'Dispatcher', 'User'].includes(currentUser?.role || '') && (
+                        <>
+                          <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Dispatcher Space</div>
+                          <button
+                            onClick={() => {
+                              setActiveTab('dashboard');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                              activeTab === 'dashboard'
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            <span>HQ Dashboard</span>
+                          </button>
 
-                      <button
-                        onClick={() => {
-                          setActiveTab('live-dashboard');
-                          setIsMobileNavOpen(false);
-                        }}
-                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                          activeTab === 'live-dashboard'
-                            ? 'bg-blue-800 text-white shadow-sm'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
-                        <span>Live Monitor</span>
-                      </button>
+                          {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                            <button
+                              onClick={() => {
+                                setActiveTab('live-dashboard');
+                                setIsMobileNavOpen(false);
+                              }}
+                              className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                                activeTab === 'live-dashboard'
+                                  ? 'bg-blue-800 text-white shadow-sm'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <Activity className="h-4 w-4 text-[#FF5A1F] animate-pulse" />
+                              <span>Live Monitor</span>
+                            </button>
+                          )}
 
-                      <button
-                        onClick={() => {
-                          setActiveTab('queue');
-                          setIsMobileNavOpen(false);
-                        }}
-                        className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer ${
-                          activeTab === 'queue'
-                            ? 'bg-blue-800 text-white shadow-sm'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2.5">
-                          <ClipboardList className="h-4 w-4" />
-                          <span>Freight Board</span>
-                        </div>
-                        {deliveries.length > 0 && (
-                          <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${activeTab === 'queue' ? 'bg-white text-blue-900 font-mono' : 'bg-slate-100 text-slate-600 font-mono'}`}>
-                            {deliveries.length}
-                          </span>
-                        )}
-                      </button>
-
-                      <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Picker Space</div>
-                      {['Admin', 'Dispatcher', 'Picker'].includes(currentUser?.role || '') && (
-                        <button
-                          onClick={() => {
-                            setActiveTab('scanner');
-                            setIsMobileNavOpen(false);
-                          }}
-                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                            activeTab === 'scanner'
-                              ? 'bg-blue-800 text-white shadow-sm'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <Scan className="h-4 w-4 text-amber-600" />
-                          <span>Loading Scanner</span>
-                        </button>
+                          <button
+                            onClick={() => {
+                              setActiveTab('queue');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                              activeTab === 'queue'
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2.5">
+                              <ClipboardList className="h-4 w-4" />
+                              <span>Freight Board</span>
+                            </div>
+                            {deliveries.length > 0 && (
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${activeTab === 'queue' ? 'bg-white text-blue-900 font-mono' : 'bg-slate-100 text-slate-600 font-mono'}`}>
+                                {deliveries.length}
+                              </span>
+                            )}
+                          </button>
+                        </>
                       )}
 
-                      <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Driver Space</div>
+                      {['Admin', 'Dispatcher', 'Picker'].includes(currentUser?.role || '') && (
+                        <>
+                          <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Picker Space</div>
+                          <button
+                            onClick={() => {
+                              setActiveTab('scanner');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                              activeTab === 'scanner'
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <Scan className="h-4 w-4 text-amber-600" />
+                            <span>Loading Scanner</span>
+                          </button>
+                        </>
+                      )}
+
                       {['Admin', 'Dispatcher', 'Driver'].includes(currentUser?.role || '') && (
                         <>
+                          <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Driver Space</div>
                           <button
                             onClick={() => {
                               setActiveTab('epod');
@@ -1832,56 +1844,54 @@ export default function App() {
                         </>
                       )}
 
-                      <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Admin Space</div>
                       {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-                        <button
-                          onClick={() => {
-                            setActiveTab('enterprise-hub');
-                            setIsMobileNavOpen(false);
-                          }}
-                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                            activeTab === 'enterprise-hub'
-                              ? 'bg-blue-800 text-white shadow-sm'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <Sparkles className="h-4 w-4 text-purple-500 animate-pulse" />
-                          <span>Enterprise Hub</span>
-                        </button>
-                      )}
+                        <>
+                          <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Admin Space</div>
+                          <button
+                            onClick={() => {
+                              setActiveTab('enterprise-hub');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                              activeTab === 'enterprise-hub'
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <Sparkles className="h-4 w-4 text-purple-500 animate-pulse" />
+                            <span>Enterprise Hub</span>
+                          </button>
 
-                      {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-                        <button
-                          onClick={() => {
-                            setActiveTab('document-import');
-                            setIsMobileNavOpen(false);
-                          }}
-                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                            activeTab === 'document-import'
-                              ? 'bg-blue-800 text-white shadow-sm'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <FileDown className="h-4 w-4" />
-                          <span>Doc Import</span>
-                        </button>
-                      )}
+                          <button
+                            onClick={() => {
+                              setActiveTab('document-import');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                              activeTab === 'document-import'
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <FileDown className="h-4 w-4" />
+                            <span>Doc Import</span>
+                          </button>
 
-                      {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
-                        <button
-                          onClick={() => {
-                            setActiveTab('stores');
-                            setIsMobileNavOpen(false);
-                          }}
-                          className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                            ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
-                              ? 'bg-blue-800 text-white shadow-sm'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <Settings className="h-4 w-4" />
-                          <span>System Config</span>
-                        </button>
+                          <button
+                            onClick={() => {
+                              setActiveTab('stores');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                              ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab)
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <Settings className="h-4 w-4" />
+                            <span>System Config</span>
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -1898,44 +1908,48 @@ export default function App() {
             <div className="flex items-center space-x-2 lg:space-x-4">
               
               {/* Group 1: Dispatcher Space */}
-              <div className="group relative">
-                <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  <span>Dispatcher Space</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform" />
-                </button>
-                <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5 min-w-[200px] z-[100] animate-in fade-in zoom-in-95 duration-100">
-                  <button
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                      activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    <span>HQ Dashboard</span>
+              {['Admin', 'Dispatcher', 'User'].includes(currentUser?.role || '') && (
+                <div className="group relative">
+                  <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                    <span>Dispatcher Space</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform" />
                   </button>
+                  <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5 min-w-[200px] z-[100] animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                      onClick={() => setActiveTab('dashboard')}
+                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                        activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span>HQ Dashboard</span>
+                    </button>
 
-                  <button
-                    onClick={() => setActiveTab('live-dashboard')}
-                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                      activeTab === 'live-dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <Activity className="h-4 w-4 text-[#FF5A1F]" />
-                    <span>Live Monitor</span>
-                  </button>
+                    {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                      <button
+                        onClick={() => setActiveTab('live-dashboard')}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'live-dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <Activity className="h-4 w-4 text-[#FF5A1F]" />
+                        <span>Live Monitor</span>
+                      </button>
+                    )}
 
-                  <button
-                    onClick={() => setActiveTab('queue')}
-                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                      activeTab === 'queue' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <ClipboardList className="h-4 w-4" />
-                    <span>Freight Board</span>
-                  </button>
+                    <button
+                      onClick={() => setActiveTab('queue')}
+                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                        activeTab === 'queue' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                      <span>Freight Board</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Group 2: Picker Space */}
               {['Admin', 'Dispatcher', 'Picker'].includes(currentUser?.role || '') && (
