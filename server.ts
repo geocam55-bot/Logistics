@@ -1633,7 +1633,7 @@ app.use((req, res, next) => {
       } catch (dbErr: any) {
         const errMsg = dbErr.message || String(dbErr);
         if (errMsg.includes("column") && (errMsg.includes("password") || errMsg.includes("status") || errMsg.includes("42703"))) {
-          console.warn("Supabase users table is missing 'password' or 'status' columns. Retrying registration insert without these columns...");
+          console.log("[Users Sync] Supabase users table is missing 'password' or 'status' columns. Retrying registration insert without these columns...");
           const { password, status, ...strippedRecord } = newUserRecord;
           (strippedRecord as any).phone = serializeToPhone(newUserRecord.phone, newUserRecord.password, newUserRecord.status);
           const { error: retryErr } = await supabase
@@ -1916,7 +1916,7 @@ app.use((req, res, next) => {
         if (error) {
           const errMsg = error.message || String(error);
           if (errMsg.includes("column") || errMsg.includes("password") || errMsg.includes("status") || error.code === "42703") {
-            console.warn("[SEED] Supabase users table is missing columns. Retrying user seeding with column stripping and phone serialization...");
+            console.log("[SEED] Supabase users table is missing columns. Retrying user seeding with column stripping and phone serialization...");
             const strippedUsers = defaults.users.map((u: any) => {
               const { password, status, driverLicenseExpire, ...stripped } = u;
               stripped.phone = serializeToPhone(u.phone, u.password, u.status, u.driverLicenseExpire, undefined, undefined, u.avatarUrl);
@@ -2383,7 +2383,7 @@ app.use((req, res, next) => {
           } catch (dbErr: any) {
             const errMsg = dbErr.message || String(dbErr);
             if (errMsg.includes("column") && (errMsg.includes("registrationDueDate") || errMsg.includes("42703") || dbErr.code === "42703")) {
-              console.warn("Supabase trucks table is missing 'registrationDueDate' column. Retrying upsert with serialized fallback...");
+              console.log("[Trucks Sync] Supabase trucks table is missing 'registrationDueDate' column. Retrying upsert with serialized fallback...");
               const strippedTrucks = trucksToUpsert.map((t: any) => {
                 const { registrationDueDate, ...rest } = t;
                 return rest;
@@ -2478,7 +2478,6 @@ app.use((req, res, next) => {
           } catch (dbErr: any) {
             attempts++;
             const errMsg = dbErr.message || String(dbErr);
-            console.warn(`Deliveries sync failed (attempt ${attempts}):`, errMsg);
             
             // Check for missing column error, e.g., 'column "pdfUrl" of relation "deliveries" does not exist' or error code "42703"
             if (errMsg.includes("column") || errMsg.includes("42703") || dbErr.code === "42703" || dbErr.code === "PGRST204") {
@@ -2497,20 +2496,21 @@ app.use((req, res, next) => {
               }
               
               if (colToStrip) {
-                console.log(`Stripping missing column '${colToStrip}' from deliveries payload to bypass schema mismatch and retrying...`);
+                console.log(`[Deliveries Sync] Stripping missing column '${colToStrip}' from deliveries payload to bypass schema mismatch and retrying...`);
                 deliveriesToUpsert = deliveriesToUpsert.map(d => {
                   const copy = { ...d };
                   delete copy[colToStrip];
                   return copy;
                 });
               } else {
-                console.log("Stripping all potential new columns (pdfUrl, weight, orderTotal, etc) due to unidentified column error.");
+                console.log(`[Deliveries Sync] Stripping all potential new columns due to unidentified column error: ${errMsg}`);
                 deliveriesToUpsert = deliveriesToUpsert.map(d => {
                   const { pdfUrl, weight, orderTotal, assignedPicker, destinationNotes, customerSignature, deliveryPhoto, ...rest } = d;
                   return rest;
                 });
               }
             } else {
+              console.warn(`Deliveries sync failed (attempt ${attempts}):`, errMsg);
               throw new Error(`Deliveries Sync Error: ${errMsg}`);
             }
           }

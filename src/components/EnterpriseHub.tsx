@@ -18,6 +18,7 @@ interface EnterpriseHubProps {
   users: User[];
   currentUser: User | null;
   onAddOrUpdateDelivery?: (record: any) => void;
+  defaultView?: string;
 }
 
 // Interfaces matching database schema
@@ -173,8 +174,9 @@ interface DocumentRecord {
 
 // Static Seed Data is completely removed. Only Live Supabase tables are used.
 
-export default function EnterpriseHub({ deliveries, branches, trucks, users, currentUser, onAddOrUpdateDelivery }: EnterpriseHubProps) {
-  const [activeSubTab, setActiveSubTab] = useState<string>('customers');
+export default function EnterpriseHub({ deliveries, branches, trucks, users, currentUser, onAddOrUpdateDelivery, defaultView = 'customers' }: EnterpriseHubProps) {
+  const [activeSubTab, setActiveSubTab] = useState<string>(defaultView);
+  useEffect(() => { setActiveSubTab(defaultView); }, [defaultView]);
   
   // Real live states connected to Supabase tables
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -240,6 +242,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
   const [uploadedPhotoPath, setUploadedPhotoPath] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [podSuccessMsg, setPodSuccessMsg] = useState('');
 
   // Fleet Inspection States
@@ -788,6 +791,17 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
     setSignatureData(base64);
   };
 
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedPhotoPath(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Log Proof of Delivery (POD)
   const handleLogPOD = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -814,8 +828,8 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
             ...targetDelivery,
             status: 'DELIVERED',
             deliveredAt: new Date().toISOString(),
-            customerSignature: signatureData || 'LIVE_MOBILE_DRAWN_INK',
-            deliveryPhoto: uploadedPhotoPath || 'Package left by the front entry pillar.',
+            customerSignature: signatureData || undefined,
+            deliveryPhoto: uploadedPhotoPath || undefined,
             history: newHistory
           });
         }
@@ -828,6 +842,10 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
         setPodReceiver('');
         setPodNotes('');
         setSignatureData(null);
+        setUploadedPhotoPath(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         clearSignature();
       }, 4000);
     } catch (err: any) {
@@ -1733,19 +1751,26 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
                     <option value="Pickup Condition">Warehouse Loading state</option>
                     <option value="Return">Returned Freight Verification</option>
                   </select>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment" 
+                    ref={fileInputRef} 
+                    onChange={handlePhotoCapture} 
+                    className="hidden" 
+                  />
                   <button 
                     type="button" 
-                    onClick={() => setUploadedPhotoPath(`/signatures/pod_photo_${Date.now() % 10000}.png`)}
+                    onClick={() => fileInputRef.current?.click()}
                     className="px-3 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-bold flex items-center space-x-1"
                   >
                     <Camera className="h-3.5 w-3.5" />
-                    <span>Simulate Photo</span>
+                    <span>Take Photo</span>
                   </button>
                 </div>
                 {uploadedPhotoPath && (
-                  <div className="mt-1 text-[10px] text-blue-800 font-medium flex items-center space-x-1 bg-blue-50 p-1.5 rounded border border-blue-100">
-                    <Info className="h-3 w-3" />
-                    <span>Generated high-res simulated photo asset: <strong className="font-mono">{uploadedPhotoPath}</strong></span>
+                  <div className="mt-2 text-[10px] flex items-center justify-center bg-slate-50 p-2 rounded border border-slate-200">
+                    <img src={uploadedPhotoPath} alt="Captured delivery proof" className="max-h-32 object-contain rounded" />
                   </div>
                 )}
               </div>
@@ -1795,6 +1820,28 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
                         "{p.notes}"
                       </p>
                     )}
+                    <div className="grid grid-cols-2 gap-2">
+                      {p.signature && (
+                        <div className="bg-white p-1 border border-slate-200 rounded">
+                          <div className="text-[9px] font-bold text-slate-400 mb-1">Customer Signature</div>
+                          {p.signature.startsWith('data:image') ? (
+                            <img src={p.signature} alt="Signature" className="h-10 object-contain mx-auto" />
+                          ) : (
+                            <div className="h-10 flex items-center justify-center font-mono text-[9px] text-slate-500 bg-slate-50 rounded">
+                              {p.signature}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {p.photo && (
+                         <div className="bg-white p-1 border border-slate-200 rounded flex items-center space-x-2">
+                           <Camera className="h-4 w-4 text-slate-400 shrink-0" />
+                           <div className="text-[9px] font-mono text-slate-600 truncate" title={p.photo}>
+                             {p.photo}
+                           </div>
+                         </div>
+                      )}
+                    </div>
                     <div className="flex items-center space-x-2 text-[9px] text-slate-400">
                       <span className="px-1 bg-emerald-100 text-emerald-800 rounded font-bold font-mono">DELIVERED</span>
                       <span>Signature and telemetry stored on Cloud block.</span>
