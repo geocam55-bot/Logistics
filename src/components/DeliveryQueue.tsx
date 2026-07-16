@@ -35,7 +35,11 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
   const BRANCHES = branches || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
-  const [selectedDateFilter, setSelectedDateFilter] = useState('');
+  const [selectedDateFilter, setSelectedDateFilter] = useState(() => {
+    const today = new Date();
+    const tzOffset = today.getTimezoneOffset() * 60000;
+    return new Date(Date.now() - tzOffset).toISOString().substring(0, 10);
+  });
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | DeliveryStatus>('ALL');
 
@@ -391,6 +395,14 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
       const recordDate = record.deliveredAt 
         ? record.deliveredAt.substring(0, 10) 
         : record.registeredAt?.substring(0, 10);
+        
+      const isCompleted = record.status === DeliveryStatus.DELIVERED || record.status === DeliveryStatus.RETURNED;
+      
+      // Roll over incomplete tickets from previous days to the currently filtered date
+      if (!isCompleted && recordDate && recordDate < selectedDateFilter) {
+        return true;
+      }
+
       if (recordDate !== selectedDateFilter) {
         return false;
       }

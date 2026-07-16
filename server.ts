@@ -2033,6 +2033,9 @@ app.use((req, res, next) => {
                 if (!d.orderTotal && entry.orderTotal) {
                     d.orderTotal = entry.orderTotal;
                 }
+                if (!d.assignedPicker && entry.assignedPicker) {
+                    d.assignedPicker = entry.assignedPicker;
+                }
             }
           }
           return d;
@@ -2316,6 +2319,9 @@ app.use((req, res, next) => {
            }
            if (copy.orderTotal) {
                lastHistory.orderTotal = copy.orderTotal;
+           }
+           if (copy.assignedPicker) {
+               lastHistory.assignedPicker = copy.assignedPicker;
            }
         }
         return copy;

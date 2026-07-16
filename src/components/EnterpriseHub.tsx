@@ -186,7 +186,21 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
   const [inspections, setInspections] = useState<VehicleInspectionLog[]>([]);
   const [fuelTransactions, setFuelTransactions] = useState<FuelTransaction[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [pods, setPods] = useState<ProofOfDeliveryLog[]>([]);
+  const pods = React.useMemo(() => {
+    return (deliveries || []).filter(d => d.status === 'DELIVERED').map(d => ({
+      id: d.id,
+      deliveryID: d.id,
+      receiverName: d.customerName,
+      relationshipToCustomer: 'Customer',
+      gpsLatitude: 44.6488,
+      gpsLongitude: -63.5752,
+      timestamp: d.deliveredAt || d.registeredAt,
+      notes: d.destinationNotes || '',
+      signature: d.customerSignature,
+      photo: d.deliveryPhoto
+    }));
+  }, [deliveries]);
+
   const [notifications, setNotifications] = useState<any[]>([]);
 
   // Search queries
@@ -473,23 +487,8 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
       }
 
       // 10. Proof of Delivery (ProofOfDelivery)
-      const { data: podData, error: podError } = await supabase.from('ProofOfDelivery').select('*');
+      // Removed - now derived from live deliveries array
       
-      if (podData) {
-        setPods(podData.map((p: any) => ({
-          id: Number(p.PODID),
-          deliveryID: p.DeliveryID || '',
-          receiverName: p.ReceiverName || '',
-          relationshipToCustomer: p.RelationshipToCustomer || '',
-          gpsLatitude: Number(p.GPSLatitude || 44.6488),
-          gpsLongitude: Number(p.GPSLongitude || -63.5752),
-          timestamp: p.Timestamp || '',
-          notes: p.Notes || ''
-        })));
-      } else {
-        setPods([]);
-      }
-
       // 11. Notifications
       const { data: notifData, error: notifError } = await supabase.from('Notifications').select('*');
       
@@ -794,37 +793,35 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
     e.preventDefault();
     if (!selectedPODOrder) return;
 
-    const supabase = getFrontendSupabase();
-    if (!supabase) {
-      alert("No active Supabase connection.");
-      return;
-    }
-
     try {
-      const { error } = await supabase.from('ProofOfDelivery').insert({
-        DeliveryID: selectedPODOrder,
-        ReceiverName: podReceiver || 'John Smith',
-        RelationshipToCustomer: podRelationship,
-        GPSLatitude: 44.6488,
-        GPSLongitude: -63.5752,
-        Timestamp: new Date().toISOString(),
-        Notes: podNotes
-      });
-
-      if (error) throw error;
-
       if (onAddOrUpdateDelivery) {
-        onAddOrUpdateDelivery({
-          id: selectedPODOrder,
-          status: 'DELIVERED',
-          deliveredAt: new Date().toISOString(),
-          customerSignature: signatureData || 'LIVE_MOBILE_DRAWN_INK',
-          deliveryPhoto: uploadedPhotoPath || 'Package left by the front entry pillar.'
-        });
+        const targetDelivery = (deliveries || []).find(d => d.id === selectedPODOrder);
+        if (targetDelivery) {
+          const newHistory = [
+            ...(targetDelivery.history || []),
+            {
+              status: 'DELIVERED',
+              timestamp: new Date().toISOString(),
+              location: 'Delivery Site',
+              operator: currentUser?.name || 'Driver',
+              notes: podNotes || 'Delivered to recipient',
+              customerSignature: signatureData || undefined,
+              deliveryPhoto: uploadedPhotoPath || undefined
+            }
+          ];
+
+          onAddOrUpdateDelivery({
+            ...targetDelivery,
+            status: 'DELIVERED',
+            deliveredAt: new Date().toISOString(),
+            customerSignature: signatureData || 'LIVE_MOBILE_DRAWN_INK',
+            deliveryPhoto: uploadedPhotoPath || 'Package left by the front entry pillar.',
+            history: newHistory
+          });
+        }
       }
 
       setPodSuccessMsg(`Electronic POD successfully logged for ${selectedPODOrder}!`);
-      await fetchLiveHubData();
 
       setTimeout(() => {
         setPodSuccessMsg('');
@@ -1671,8 +1668,8 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
                   className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500"
                 >
                   <option value="">-- Choose Dispatched Active Delivery --</option>
-                  {orders.map(o => (
-                    <option key={o.id} value={o.orderNumber}>{o.orderNumber} - {customers.find(c => c.id === o.customerID)?.companyName}</option>
+                  {(deliveries || []).filter(d => d.status === 'PICKED_AND_LOADED' || d.status === 'REGISTERED').map(d => (
+                    <option key={d.id} value={d.id}>{d.id} - {d.customerName}</option>
                   ))}
                 </select>
               </div>
