@@ -846,7 +846,42 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setUploadedPhotoPath(reader.result as string);
+        const originalBase64 = reader.result as string;
+        // Compress and downscale the image client-side to ensure the base64 payload is compact and syncs reliably to Supabase
+        const img = new Image();
+        img.src = originalBase64;
+        img.onload = () => {
+          const max_size = 1024; // max dimension (width or height)
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > max_size) {
+              height = Math.round((height * max_size) / width);
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width = Math.round((width * max_size) / height);
+              height = max_size;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            setUploadedPhotoPath(compressedBase64);
+          } else {
+            setUploadedPhotoPath(originalBase64);
+          }
+        };
+        img.onerror = () => {
+          setUploadedPhotoPath(originalBase64);
+        };
       };
       reader.readAsDataURL(file);
     }
