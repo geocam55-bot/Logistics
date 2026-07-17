@@ -841,9 +841,22 @@ export default function App() {
     }
 
     lastHeartbeatRef.current = now;
-    const updatedUsers = currentUsers.map(u => u.id === currentUser.id ? { ...u, lastActive: new Date().toISOString() } : u);
+    const timestamp = new Date().toISOString();
+    const updatedUsers = currentUsers.map(u => u.id === currentUser.id ? { ...u, lastActive: timestamp } : u);
     setUsers(updatedUsers);
-    syncStateToSupabase(currentTenant.id, currentDeliveries, currentTrucks, currentBranches, updatedUsers);
+
+    // Call lightweight user heartbeat endpoint instead of full syncStateToSupabase to prevent overwriting shared states like deliveries
+    customFetch("/api/tenant/user-heartbeat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenantId: currentTenant.id,
+        userId: currentUser.id,
+        lastActive: timestamp
+      })
+    }).catch(err => {
+      console.warn("User heartbeat lightweight sync failed:", err);
+    });
   }, [currentUser, currentTenant, loadTrigger]);
 
   // Auto-heal/reconcile state to ensure logged-in user and driver vehicles are always present and properly linked

@@ -2207,6 +2207,64 @@ app.use((req, res, next) => {
     }
   });
 
+  // Lightweight user heartbeat update to avoid overwriting shared states like deliveries
+  app.post("/api/tenant/user-heartbeat", async (req, res) => {
+    try {
+      const { tenantId, userId, lastActive } = req.body;
+      if (!tenantId || !userId) {
+        return res.status(400).json({ error: "tenantId and userId parameters are required." });
+      }
+
+      const supabase = getSupabase(req);
+      const timestamp = lastActive || new Date().toISOString();
+
+      if (!supabase) {
+        // Fallback for in-memory store
+        const tid = String(tenantId);
+        const state = inMemoryTenantStates[tid];
+        if (state && state.users) {
+          state.users = state.users.map((u: any) => u.id === userId ? { ...u, lastActive: timestamp } : u);
+        }
+        return res.json({ success: true, supabaseActive: false });
+      }
+
+      // Update user directly on Supabase
+      const { data: userData, error: fetchErr } = await supabase
+        .from("users")
+        .select("*")
+        .eq("tenantId", tenantId)
+        .eq("id", userId);
+
+      if (fetchErr || !userData || userData.length === 0) {
+        return res.status(404).json({ error: "User not found on database." });
+      }
+
+      const user = deserializeFromPhone(userData[0]);
+      const updatedPhone = serializeToPhone(
+        user.phone,
+        user.password,
+        user.status,
+        user.driverLicenseExpire,
+        timestamp,
+        user.resetRequest,
+        user.avatarUrl
+      );
+
+      const { error: updateErr } = await supabase
+        .from("users")
+        .update({ phone: updatedPhone })
+        .eq("tenantId", tenantId)
+        .eq("id", userId);
+
+      if (updateErr) throw updateErr;
+
+      return res.json({ success: true, supabaseActive: true });
+    } catch (err: any) {
+      console.error("Failed to update user heartbeat:", err);
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
   // Save/Upsert fully updated collection states for a specific tenant
   app.post("/api/tenant/save-state", async (req, res) => {
     try {
