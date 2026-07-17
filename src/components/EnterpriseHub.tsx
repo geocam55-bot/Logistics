@@ -6,7 +6,7 @@ import {
   XCircle, FileText, Bell, Search, Plus, Calendar, ShieldCheck, 
   Gauge, DollarSign, ArrowRight, ClipboardList, PenTool, CheckSquare,
   Activity, Award, RefreshCw, Trash2, HelpCircle, Navigation, Info, Clock, PlayCircle,
-  Camera
+  Camera, Truck as TruckIcon
 } from 'lucide-react';
 import { Branch, Truck, User, DeliveryRecord } from '../types';
 import { getFrontendSupabase } from '../lib/supabaseClient';
@@ -1188,40 +1188,54 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
     (o.customerNameStr || '').toLowerCase().includes(orderSearch.toLowerCase())
   );
 
+  const isDriver = currentUser?.role === 'Driver';
+
   return (
     <div className="bg-slate-50 border border-slate-200/70 rounded-2xl shadow-xs overflow-hidden w-full p-4 md:p-6" id="enterprise-logistics-hub">
       {/* Upper header action bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200/80 pb-5 mb-6 gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="p-2 bg-blue-100 rounded-lg text-blue-800">
-              <Sparkles className="h-5 w-5 text-blue-600" />
+            <span className={`p-2 rounded-lg ${isDriver ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+              {isDriver ? (
+                <TruckIcon className="h-5 w-5 text-emerald-600" />
+              ) : (
+                <Sparkles className="h-5 w-5 text-blue-600" />
+              )}
             </span>
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Enterprise Logistics Hub</h1>
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+              {isDriver ? 'Driver Mobile Portal' : 'Enterprise Logistics Hub'}
+            </h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Multi-phase central hub for Customers, Orders, Compliance, Maintenance, Fuel Management and Signatures.</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {isDriver 
+              ? 'Complete electronic proofs of delivery, submit vehicle pre-trips, and log fuel transactions.'
+              : 'Multi-phase central hub for Customers, Orders, Compliance, Maintenance, Fuel Management and Signatures.'}
+          </p>
         </div>
 
-        {/* Sync buttons & stats */}
-        <div className="flex items-center gap-2">
-          {expiredCount30 > 0 && (
-            <div className="px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center space-x-1.5 text-amber-800 text-xs font-semibold">
-              <AlertCircle className="h-3.5 w-3.5 text-amber-600 animate-bounce" />
-              <span>{expiredCount30} Expirations Due (30d)</span>
-            </div>
-          )}
+        {/* Sync buttons & stats - only shown for dispatchers/admins */}
+        {!isDriver && (
+          <div className="flex items-center gap-2">
+            {expiredCount30 > 0 && (
+              <div className="px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center space-x-1.5 text-amber-800 text-xs font-semibold">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-600 animate-bounce" />
+                <span>{expiredCount30} Expirations Due (30d)</span>
+              </div>
+            )}
 
-          <button
-            onClick={triggerDatabaseSync}
-            disabled={isSyncingWithDb}
-            className={`px-4 py-2 text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-all text-white ${
-              isSyncingWithDb ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-800 hover:bg-blue-900'
-            }`}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isSyncingWithDb ? 'animate-spin' : ''}`} />
-            <span>{isSyncingWithDb ? 'Syncing...' : 'Sync to Supabase'}</span>
-          </button>
-        </div>
+            <button
+              onClick={triggerDatabaseSync}
+              disabled={isSyncingWithDb}
+              className={`px-4 py-2 text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-all text-white ${
+                isSyncingWithDb ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-800 hover:bg-blue-900'
+              }`}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isSyncingWithDb ? 'animate-spin' : ''}`} />
+              <span>{isSyncingWithDb ? 'Syncing...' : 'Sync to Supabase'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {dbSyncMsg && (
@@ -1244,7 +1258,12 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
           { id: 'fuel', label: 'Fuel Tracking', icon: Fuel },
           { id: 'compliance', label: 'Compliance Vault', icon: FileText },
           { id: 'notifications', label: 'Alerts', icon: Bell }
-        ].map(tab => {
+        ].filter(tab => {
+          if (isDriver) {
+            return ['pod', 'inspections', 'fuel'].includes(tab.id);
+          }
+          return true;
+        }).map(tab => {
           const IconComp = tab.icon;
           const isActive = activeSubTab === tab.id;
           return (
