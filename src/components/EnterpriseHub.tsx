@@ -1399,10 +1399,11 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
           )}
 
           <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-xs">
-            <table className="min-w-full divide-y divide-slate-100 text-left">
-              <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Number</th>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100 text-left">
+                <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Number</th>
                   <th className="px-4 py-3">Company / Client</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">HQ / Location</th>
@@ -1469,6 +1470,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 
@@ -1594,10 +1596,11 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
           )}
 
           <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-xs">
-            <table className="min-w-full divide-y divide-slate-100 text-left">
-              <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Order #</th>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100 text-left">
+                <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Order #</th>
                   <th className="px-4 py-3">Customer Profile</th>
                   <th className="px-4 py-3">Priority</th>
                   <th className="px-4 py-3">Req. Delivery</th>
@@ -1675,6 +1678,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 
@@ -1915,7 +1919,8 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Telemetric Safety Violations Event Log</h3>
               <span className="text-[10px] text-slate-400 font-mono">Sensors sync: 300ms intervals</span>
             </div>
-            <table className="min-w-full divide-y divide-slate-100 text-left">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100 text-left">
               <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                 <tr>
                   <th className="px-4 py-3">Recorded At</th>
@@ -1954,6 +1959,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 
@@ -2341,7 +2347,8 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
           )}
 
           <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-xs">
-            <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
               <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Document Title</th>
@@ -2395,6 +2402,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 

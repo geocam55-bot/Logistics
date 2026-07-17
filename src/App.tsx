@@ -1539,8 +1539,21 @@ export default function App() {
 
   const theme = getThemeClasses(currentTenant.primaryColor);
 
+  const userRoleNormalized = (currentUser?.role || '').trim().toLowerCase();
+  const isNavAdmin = ['admin', 'super_admin'].includes(userRoleNormalized);
+  const isNavDispatcher = userRoleNormalized === 'dispatcher';
+  const isNavDriver = userRoleNormalized === 'driver';
+  const isNavPicker = userRoleNormalized === 'picker';
+  const isNavUser = userRoleNormalized === 'user';
+
+  // Combined checks for view space accessibility
+  const showDispatcherSpace = isNavAdmin || isNavDispatcher || isNavUser;
+  const showPickerSpace = isNavAdmin || isNavDispatcher || isNavPicker;
+  const showDriverSpace = isNavAdmin || isNavDispatcher || isNavDriver;
+  const showAdminSpace = isNavAdmin || isNavDispatcher;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-gray-800 antialiased selection:bg-blue-600 selection:text-white" id="main-app-container">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-gray-800 antialiased selection:bg-blue-600 selection:text-white w-full max-w-full overflow-x-hidden" id="main-app-container">
       
       {/* Enterprise Sticky Brand Header & Unified Navigation */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all duration-200" id="prospaces-header">
@@ -1715,7 +1728,7 @@ export default function App() {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-1 font-sans">Navigation Menu</p>
                     
                     <div className="space-y-1">
-                      {['Admin', 'Dispatcher', 'User'].includes(currentUser?.role || '') && (
+                      {showDispatcherSpace && (
                         <>
                           <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Dispatcher Space</div>
                           <button
@@ -1733,7 +1746,7 @@ export default function App() {
                             <span>HQ Dashboard</span>
                           </button>
 
-                          {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                          {showAdminSpace && (
                             <button
                               onClick={() => {
                                 setActiveTab('live-dashboard');
@@ -1774,7 +1787,7 @@ export default function App() {
                         </>
                       )}
 
-                      {['Admin', 'Dispatcher', 'Picker'].includes(currentUser?.role || '') && (
+                      {showPickerSpace && (
                         <>
                           <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Picker Space</div>
                           <button
@@ -1794,7 +1807,7 @@ export default function App() {
                         </>
                       )}
 
-                      {['Admin', 'Dispatcher', 'Driver'].includes(currentUser?.role || '') && (
+                      {showDriverSpace && (
                         <>
                           <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Driver Space</div>
                           <button
@@ -1844,7 +1857,7 @@ export default function App() {
                         </>
                       )}
 
-                      {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                      {showAdminSpace && (
                         <>
                           <div className="text-[9px] font-black tracking-wider uppercase text-slate-400 font-sans mt-3 mb-1 px-2 border-b border-slate-100 pb-1">Admin Space</div>
                           <button
@@ -1908,7 +1921,7 @@ export default function App() {
             <div className="flex items-center space-x-2 lg:space-x-4">
               
               {/* Group 1: Dispatcher Space */}
-              {['Admin', 'Dispatcher', 'User'].includes(currentUser?.role || '') && (
+              {showDispatcherSpace && (
                 <div className="group relative">
                   <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
@@ -1926,7 +1939,7 @@ export default function App() {
                       <span>HQ Dashboard</span>
                     </button>
 
-                    {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+                    {showAdminSpace && (
                       <button
                         onClick={() => setActiveTab('live-dashboard')}
                         className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
@@ -1952,7 +1965,7 @@ export default function App() {
               )}
 
               {/* Group 2: Picker Space */}
-              {['Admin', 'Dispatcher', 'Picker'].includes(currentUser?.role || '') && (
+              {showPickerSpace && (
                 <div className="group relative">
                   <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
@@ -1974,7 +1987,7 @@ export default function App() {
               )}
 
               {/* Group 3: Driver Space */}
-              {['Admin', 'Dispatcher', 'Driver'].includes(currentUser?.role || '') && (
+              {showDriverSpace && (
                 <div className="group relative">
                   <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -2014,7 +2027,7 @@ export default function App() {
               )}
 
               {/* Group 4: Admin Space */}
-              {['Admin', 'Dispatcher'].includes(currentUser?.role || '') && (
+              {showAdminSpace && (
                 <div className="group relative">
                   <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
@@ -2059,7 +2072,7 @@ export default function App() {
       </header>
 
       {/* Main Core Body */}
-      <main className="flex-1 max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 flex flex-col space-y-6" id="prospaces-body">
+      <main className="flex-1 max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 flex flex-col space-y-6 overflow-x-hidden" id="prospaces-body">
 
         {/* Secondary Sub-navigation for Fleet Setup */}
         {['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab) && (
