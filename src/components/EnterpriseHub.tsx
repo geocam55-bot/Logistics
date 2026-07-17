@@ -749,7 +749,17 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
     }
   };
 
-  // Canvas Drawing for Signatures
+  // Canvas Drawing for Signatures (Support mouse & mobile touch)
+  const getTouchPos = (canvas: HTMLCanvasElement, touchEvent: React.TouchEvent<HTMLCanvasElement>) => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = touchEvent.touches[0] || touchEvent.changedTouches[0];
+    if (!touch) return { x: 0, y: 0 };
+    return {
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top
+    };
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -773,6 +783,46 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.stroke();
+  };
+
+  const startDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const pos = getTouchPos(canvas, e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    setIsDrawing(true);
+  };
+
+  const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const pos = getTouchPos(canvas, e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = '#1e3a8a';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  };
+
+  const endDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    setIsDrawing(false);
   };
 
   const clearSignature = () => {
@@ -1748,7 +1798,11 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={() => setIsDrawing(false)}
-                    className="w-full bg-slate-50 cursor-crosshair h-[120px]"
+                    onMouseLeave={() => setIsDrawing(false)}
+                    onTouchStart={startDrawingTouch}
+                    onTouchMove={drawTouch}
+                    onTouchEnd={endDrawingTouch}
+                    className="w-full bg-slate-50 cursor-crosshair h-[120px] touch-none"
                   />
                   {!signatureData && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-[10px] text-slate-400 font-mono">
