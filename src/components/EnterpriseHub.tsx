@@ -928,6 +928,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
         setPodNotes('');
         setSignatureData(null);
         setUploadedPhotoPath(null);
+        setSelectedPODOrder('');
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -1791,7 +1792,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
                   required
                   value={selectedPODOrder} 
                   onChange={e => setSelectedPODOrder(e.target.value)} 
-                  className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500"
+                  className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500"
                 >
                   <option value="">-- Choose Dispatched Active Delivery --</option>
                   {(deliveries || []).filter(d => d.status === 'PICKED_AND_LOADED' || d.status === 'REGISTERED').map(d => (
@@ -1803,11 +1804,11 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Receiver Person Name</label>
-                  <input required type="text" placeholder="e.g. John Smith" value={podReceiver} onChange={e => setPodReceiver(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                  <input required type="text" placeholder="e.g. John Smith" value={podReceiver} onChange={e => setPodReceiver(e.target.value)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Relationship to Customer</label>
-                  <select value={podRelationship} onChange={e => setPodRelationship(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                  <select value={podRelationship} onChange={e => setPodRelationship(e.target.value)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500">
                     <option value="Customer">Primary Customer</option>
                     <option value="Employee">Site Foreman / Employee</option>
                     <option value="Neighbor">Neighboring tenant</option>
@@ -1857,7 +1858,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Proof of Delivery Photo Category</label>
                 <div className="flex gap-2">
-                  <select value={uploadedPhotoType} onChange={e => setUploadedPhotoType(e.target.value)} className="p-2 text-xs rounded border border-slate-200 focus:outline-blue-500 flex-1">
+                  <select value={uploadedPhotoType} onChange={e => setUploadedPhotoType(e.target.value)} className="p-2 text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500 flex-1">
                     <option value="Delivered Package">Delivered Package in Front Lobby</option>
                     <option value="Damage">Damage Pre-existing Check</option>
                     <option value="Pickup Condition">Warehouse Loading state</option>
@@ -1889,7 +1890,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Recipient delivery notes / exceptions</label>
-                <textarea rows={2} placeholder="e.g. Forklift operator unloaded safely to backyard..." value={podNotes} onChange={e => setPodNotes(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                <textarea rows={2} placeholder="e.g. Forklift operator unloaded safely to backyard..." value={podNotes} onChange={e => setPodNotes(e.target.value)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500" />
               </div>
 
               <button 
@@ -2071,7 +2072,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
             <form onSubmit={handleLogInspection} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Select Truck / Vehicle</label>
-                <select required value={inspTruck} onChange={e => setInspTruck(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                <select required value={inspTruck} onChange={e => setInspTruck(e.target.value)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500">
                   <option value="">-- Choose Truck --</option>
                   {trucks.map(t => (
                     <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
@@ -2081,7 +2082,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Inspection Window</label>
-                <select value={inspType} onChange={e => setInspType(e.target.value as any)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                <select value={inspType} onChange={e => setInspType(e.target.value as any)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500">
                   <option value="Pre-Trip">Pre-Trip (Safety Walkaround)</option>
                   <option value="Post-Trip">Post-Trip (End of shift)</option>
                 </select>
@@ -2201,7 +2202,7 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
             <form onSubmit={handleLogFuel} className="space-y-3 text-xs">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Truck ID</label>
-                <select required value={fuelTruck} onChange={e => setFuelTruck(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500">
+                <select required value={fuelTruck} onChange={e => setFuelTruck(e.target.value)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500">
                   <option value="">-- Choose Truck --</option>
                   {trucks.map(t => (
                     <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
@@ -2212,22 +2213,22 @@ export default function EnterpriseHub({ deliveries, branches, trucks, users, cur
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Liters Purchased</label>
-                  <input required type="number" step="0.01" value={fuelLiters} onChange={e => setFuelLiters(Number(e.target.value))} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                  <input required type="number" step="0.01" value={fuelLiters} onChange={e => setFuelLiters(Number(e.target.value))} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Price Per Liter ($)</label>
-                  <input required type="number" step="0.001" value={fuelPrice} onChange={e => setFuelPrice(Number(e.target.value))} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                  <input required type="number" step="0.001" value={fuelPrice} onChange={e => setFuelPrice(Number(e.target.value))} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Odometer Mileage (km)</label>
-                  <input required type="number" value={fuelOdometer} onChange={e => setFuelOdometer(Number(e.target.value))} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                  <input required type="number" value={fuelOdometer} onChange={e => setFuelOdometer(Number(e.target.value))} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Receipt Number</label>
-                  <input type="text" placeholder="SH-92831" value={fuelReceipt} onChange={e => setFuelReceipt(e.target.value)} className="p-2 w-full text-xs rounded border border-slate-200 focus:outline-blue-500" />
+                  <input type="text" placeholder="SH-92831" value={fuelReceipt} onChange={e => setFuelReceipt(e.target.value)} className="p-2 w-full text-base md:text-xs rounded border border-slate-200 focus:outline-blue-500" />
                 </div>
               </div>
 

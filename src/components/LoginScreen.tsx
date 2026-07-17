@@ -626,7 +626,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                       placeholder="you@company.com"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
+                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
                     />
                   </div>
                 </div>
@@ -674,7 +674,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                       placeholder="you@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
+                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
                     />
                   </div>
 
@@ -729,7 +729,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
+                      className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all font-normal shadow-sm"
                     />
                   </div>
                 </div>
@@ -783,7 +783,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                   placeholder="e.g. Robert Cormier"
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-105"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-base md:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-105"
                 />
               </div>
 
@@ -824,7 +824,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                     placeholder="(902) 555-0199"
                     value={customPhone}
                     onChange={(e) => setCustomPhone(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-404 focus:outline-none focus:border-blue-600"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-base md:text-sm text-slate-900 placeholder-slate-404 focus:outline-none focus:border-blue-600"
                   />
                 </div>
 
@@ -837,7 +837,7 @@ export default function LoginScreen({ onLoginSuccess, tenantsList, onBackToLandi
                     placeholder="WINDMILL_DC"
                     value={customStoreId}
                     onChange={(e) => setCustomStoreId(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-404 focus:outline-none focus:border-blue-600"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-base md:text-sm text-slate-900 placeholder-slate-404 focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
