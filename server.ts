@@ -2054,6 +2054,28 @@ app.use((req, res, next) => {
         return res.status(400).json({ error: "tenantId parameter is required." });
       }
 
+      // Proactive Fleet Complete Token Refresh & Sync on App Open/State Load
+      const hasConfig = !!(process.env.FLEET_COMPLETE_API_KEY || (process.env.FLEET_COMPLETE_USERNAME && process.env.FLEET_COMPLETE_PASSWORD) || inMemoryFcApiKey || (inMemoryFcUsername && inMemoryFcPassword));
+      if (hasConfig) {
+        const tokenAgeMs = Date.now() - fcTokenFetchedAt;
+        const shouldRefresh = !cachedFcToken || (tokenAgeMs > 5 * 60 * 1000); // 5 minutes threshold
+        if (shouldRefresh) {
+          console.log(`[Fleet Complete] App state loaded. Proactively refreshing token (Age: ${Math.round(tokenAgeMs / 1000)}s, Cached: ${!!cachedFcToken}) to avoid mid-cycle expiration.`);
+          // Force refresh by clearing cache first
+          cachedFcToken = null;
+          fcTokenExpiresAt = 0;
+          
+          // Trigger in background to avoid blocking the main state request
+          getFleetCompleteToken().then((tok) => {
+            if (tok) {
+              return syncFleetCompleteTelemetry();
+            }
+          }).catch(err => {
+            console.warn("[Fleet Complete] Failed proactive token/telemetry sync on app open:", err);
+          });
+        }
+      }
+
       const supabase = getSupabase(req);
       if (!supabase) {
         const tid = String(tenantId);
@@ -3109,6 +3131,7 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
   let inMemoryFcPassword: string | null = null;
   let cachedFcToken: string | null = null;
   let fcTokenExpiresAt: number = 0;
+  let fcTokenFetchedAt: number = 0;
   let cachedFleetId: string | null = null;
 
   async function testFleetCompleteConnection(apiKey: string | null, username?: string, password?: string): Promise<{ success: boolean; message: string; fleetId?: string; vehiclesCount?: number }> {
@@ -3485,6 +3508,7 @@ async function getFleetCompleteToken(): Promise<string | null> {
       const data = await response.json();
       if (data.access_token) {
         cachedFcToken = data.access_token;
+        fcTokenFetchedAt = Date.now();
         // The API returns expires_in in seconds (usually 3600). Set expiry to 5 minutes before it actually expires.
         const expiresInMs = (data.expires_in || 3600) * 1000;
         fcTokenExpiresAt = Date.now() + expiresInMs - (5 * 60 * 1000); 
