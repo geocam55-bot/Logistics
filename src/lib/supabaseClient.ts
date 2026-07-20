@@ -252,7 +252,7 @@ export function deserializeType(truck: any): any {
     registrationDueDate,
     ...(lat !== undefined && !isNaN(lat) ? { lat } : {}),
     ...(lng !== undefined && !isNaN(lng) ? { lng } : {}),
-    gpsSource: gpsSource || 'mobile',
+    gpsSource: gpsSource || (gpsDeviceId ? 'truck' : 'mobile'),
     gpsDeviceId: gpsDeviceId || '',
     gpsSerialNumber: gpsSerialNumber || '',
     gpsDeviceName: gpsDeviceName || '',
