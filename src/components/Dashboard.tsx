@@ -40,7 +40,13 @@ import {
   Maximize2,
   Minimize2,
   Warehouse,
-  Store
+  Store,
+  MoreVertical,
+  Wrench,
+  X,
+  Pin,
+  Target,
+  Crosshair
 } from 'lucide-react';
 
 // Regional Coordinate Dictionary for high-accuracy live geolocating
@@ -438,7 +444,44 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const [selectedMonth, setSelectedMonth] = useState<string>('April');
   const [selectedDay, setSelectedDay] = useState<number>(12);
   const [selectedYear, setSelectedYear] = useState<number>(2024);
-  const [expandedTruckId, setExpandedTruckId] = useState<string | null>(null);
+  const [activeActionMenuTruckId, setActiveActionMenuTruckId] = useState<string | null>(null);
+  const [viewingTripsTruckId, setViewingTripsTruckId] = useState<string | null>(null);
+  const [viewingDetailsTruckId, setViewingDetailsTruckId] = useState<string | null>(null);
+  const [viewingCoordinatesTruckId, setViewingCoordinatesTruckId] = useState<string | null>(null);
+  const [detailsAccordionOpen, setDetailsAccordionOpen] = useState<{
+    general: boolean;
+    pinned: boolean;
+    events: boolean;
+    maintenance: boolean;
+    sensors: boolean;
+  }>({
+    general: false,
+    pinned: true,
+    events: false,
+    maintenance: false,
+    sensors: false,
+  });
+  const [filterByLocationQuery, setFilterByLocationQuery] = useState<string>('');
+  const [isTripsAccordionOpen, setIsTripsAccordionOpen] = useState<boolean>(true);
+  
+  // Custom states for the interactive Reminder Modal
+  const [showReminderModal, setShowReminderModal] = useState<boolean>(false);
+  const [reminderTruckId, setReminderTruckId] = useState<string | null>(null);
+  const [reminderText, setReminderText] = useState<string>('');
+  const [reminderType, setReminderType] = useState<string>('Oil Change');
+  const [reminderDueDate, setReminderDueDate] = useState<string>('');
+  
+  // Custom State for Toast notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
   
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
@@ -1090,13 +1133,9 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           </div>
         `);
 
-        // Update selected truck and expanded sidebar truck in state when clicking on marker
+        // Update selected truck when clicking on marker
         markerInstance.on('click', () => {
-          setSelectedTrackTruckId(prev => {
-            const next = prev === truck.id ? null : truck.id;
-            setExpandedTruckId(next);
-            return next;
-          });
+          setSelectedTrackTruckId(prev => prev === truck.id ? null : truck.id);
         });
       });
     }
@@ -1528,6 +1567,89 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   </div>
                 </div>
               )}
+
+              {/* Location Coordinates Popup Overlay */}
+              {viewingCoordinatesTruckId && (() => {
+                const selectedCoordinatesTruck = displayTrucks.find(t => t.id === viewingCoordinatesTruckId);
+                if (!selectedCoordinatesTruck) return null;
+
+                const lat = selectedCoordinatesTruck.gpsLat || selectedCoordinatesTruck.lat || 44.690383;
+                const lng = selectedCoordinatesTruck.gpsLng || selectedCoordinatesTruck.lng || -63.599217;
+                
+                const getTruckAddress = (truck: any) => {
+                  if (!truck) return '500 Windmill Rd, Dartmouth, NS B3B 1B3, Canada';
+                  const branch = activeBranches.find(b => b.id === truck.branchId);
+                  if (branch && branch.address) return branch.address;
+                  const delivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
+                  if (delivery && delivery.deliveryAddress) return delivery.deliveryAddress;
+                  return '500 Windmill Rd, Dartmouth, NS B3B 1B3, Canada';
+                };
+
+                const address = getTruckAddress(selectedCoordinatesTruck);
+
+                return (
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl border border-slate-100 p-6 shadow-2xl z-20 animate-fade-in font-sans space-y-4 w-[350px] max-w-[90%] select-none">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-800">
+                        Location coordinates
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setViewingCoordinatesTruckId(null)}
+                        className="p-1 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors cursor-pointer flex items-center justify-center"
+                        title="Close"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3.5 pt-1">
+                      <div className="flex items-start gap-3">
+                        <MapPin className="h-4 w-4 text-slate-700 shrink-0 mt-0.5 fill-slate-700" />
+                        <span className="text-slate-600 font-medium text-xs leading-normal">
+                          {address}
+                        </span>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Crosshair className="h-4 w-4 text-slate-700 shrink-0 mt-0.5" />
+                        <span className="text-slate-600 font-mono text-xs leading-normal">
+                          {lat.toFixed(6)}, {lng.toFixed(6)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setToastMessage(`Historical asset proximity query initiated near coordinates`);
+                          setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Who was here query triggered for GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, ...prev.slice(0, 3)]);
+                        }}
+                        className="flex-1 py-2 px-3 border border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                      >
+                        Who was here?
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nearby = activeBranches.map(b => {
+                            const coords = getBranchCoordinates(b.id, b.name, b.address);
+                            const dist = Math.sqrt(Math.pow(coords.lat - lat, 2) + Math.pow(coords.lng - lng, 2)) * 111;
+                            return { name: b.name, dist };
+                          }).sort((a, b) => a.dist - b.dist)[0];
+
+                          setToastMessage(`Nearest Hub: ${nearby.name} (${nearby.dist.toFixed(1)} km)`);
+                          setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Landmark search: Nearest depot is ${nearby.name} @ ${nearby.dist.toFixed(2)}km.`, ...prev.slice(0, 3)]);
+                        }}
+                        className="flex-1 py-2 px-3 bg-[#007A64] hover:bg-[#006351] text-white font-bold rounded-lg text-xs transition-all cursor-pointer text-center"
+                      >
+                        Find nearby
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1979,334 +2101,945 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             isMapFullscreen ? 'h-full min-h-0 overflow-hidden' : 'min-h-[500px]'
           }`}>
             
-            <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
-              
-              {/* 2. Interactive Search input bar with magnifying glass */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search"
-                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-705 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-inner focus:ring-1 focus:ring-blue-500/20"
-                />
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-                  <Search className="h-4 w-4" />
-                </div>
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 font-mono text-[10px]"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-               {/* 3. Listed Active Fleet Vehicles */}
-              <div className={`flex-1 overflow-y-auto space-y-3.5 pr-1 ${
-                isMapFullscreen ? 'max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)]' : 'max-h-[500px]'
-              }`}>
-                {(() => {
-                  const currentIdlingMinutes = Math.floor((Date.now() - idlingStartTime) / 60000);
-                  const combinedFleetList = displayTrucks.map(t => {
-                    const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
-                    const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
-                    const { hasRealGps } = getTruckCoords(t, simProgress, activeBranches);
-                    const isOnline = isTruckOnline(t);
-                    const speedValue = t.gpsSpeed !== undefined ? Math.round(t.gpsSpeed) : (assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0);
-                    return {
-                      ...t,
-                      id: t.id,
-                      name: t.name,
-                      driver: t.driver || 'No Driver',
-                      type: t.type || 'Carrier',
-                      activeSpeed: speedValue,
-                      avatar: (() => {
-                        const matchedUser = activeUsers.find(u => u.name.toLowerCase() === (t.driver || '').toLowerCase());
-                        return matchedUser?.avatarUrl || '';
-                      })(),
-                      trips: assignedDelivery ? [
-                        {
-                          id: assignedDelivery.id,
-                          title: isLoaded ? 'In Transit' : 'Unloaded Depot Hold',
-                          subtitle: assignedDelivery.invoiceNumber,
-                          stops: [
-                            { address: activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || 'DC Base Depot', time: '02:00 pm', type: 'start' },
-                            { address: assignedDelivery.deliveryAddress, time: 'Pending', type: 'end' }
-                          ]
-                        }
-                      ] : [],
-                      pastTrips: [],
-                      metrics: {
-                        accels: 0,
-                        excessiveSpeed: '0',
-                        harshBrakes: 0,
-                        idling: t.gpsIdlingMins !== undefined ? String(t.gpsIdlingMins) : (speedValue > 0 ? '0' : String(currentIdlingMinutes))
-                      }
-                    };
-                  });
-                  
-                  // Apply Search Query filter
-                  const filteredFleet = combinedFleetList.filter(item => {
-                    const query = searchQuery.toLowerCase();
-                    return (
-                      item.name.toLowerCase().includes(query) ||
-                      item.driver.toLowerCase().includes(query) ||
-                      item.id.toLowerCase().includes(query) ||
-                      item.type.toLowerCase().includes(query)
-                    );
-                  });
-
-                  if (filteredFleet.length === 0) {
-                    return (
-                      <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
-                        No vehicles match "{searchQuery}"
-                      </div>
-                    );
+            {(() => {
+              const currentIdlingMinutes = Math.floor((Date.now() - idlingStartTime) / 60000);
+              const combinedFleetList = displayTrucks.map(t => {
+                const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
+                const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
+                const { hasRealGps } = getTruckCoords(t, simProgress, activeBranches);
+                const isOnline = isTruckOnline(t);
+                const speedValue = t.gpsSpeed !== undefined ? Math.round(t.gpsSpeed) : (assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0);
+                return {
+                  ...t,
+                  id: t.id,
+                  name: t.name,
+                  driver: t.driver || 'No Driver',
+                  type: t.type || 'Carrier',
+                  activeSpeed: speedValue,
+                  avatar: (() => {
+                    const matchedUser = activeUsers.find(u => u.name.toLowerCase() === (t.driver || '').toLowerCase());
+                    return matchedUser?.avatarUrl || '';
+                  })(),
+                  trips: assignedDelivery ? [
+                    {
+                      id: assignedDelivery.id,
+                      title: isLoaded ? 'In Transit' : 'Unloaded Depot Hold',
+                      subtitle: assignedDelivery.invoiceNumber,
+                      stops: [
+                        { address: activeBranches.find(b => b.id === assignedDelivery.originBranch)?.name || 'DC Base Depot', time: '02:00 pm', type: 'start' },
+                        { address: assignedDelivery.deliveryAddress, time: 'Pending', type: 'end' }
+                      ]
+                    }
+                  ] : [],
+                  pastTrips: [],
+                  metrics: {
+                    accels: 0,
+                    excessiveSpeed: '0',
+                    harshBrakes: 0,
+                    idling: t.gpsIdlingMins !== undefined ? String(t.gpsIdlingMins) : (speedValue > 0 ? '0' : String(currentIdlingMinutes))
                   }
+                };
+              });
 
-                  return filteredFleet.map(truckRow => {
-                    const isExpanded = expandedTruckId === truckRow.id;
-                    const speedText = truckRow.activeSpeed > 0 ? `${truckRow.activeSpeed} mph` : '0 mph';
-                    const activeRun = truckRow.trips[0];
-                    
-                    return (
-                      <div 
-                        key={truckRow.id}
-                        className={`bg-white rounded-2xl border transition-all duration-350 shadow-xs overflow-hidden ${
-                          isExpanded 
-                            ? 'border-blue-400 ring-4 ring-blue-500/5' 
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
+              if (viewingDetailsTruckId) {
+                const selectedTruckRow = combinedFleetList.find(t => t.id === viewingDetailsTruckId) || combinedFleetList[0];
+                
+                const fuelPercent = selectedTruckRow?.id ? (72 - (selectedTruckRow.id.charCodeAt(0) % 25)) : 55;
+                const isIgnitionOn = selectedTruckRow?.activeSpeed > 0;
+                const lastIgnitionStr = isIgnitionOn ? 'Just now' : `${3 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) % 10 : 2)} h ${15 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(1) % 40 : 8)} min ago`;
+                const odometerVal = selectedTruckRow?.currentMileage || (120000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 1234 : 168931));
+                const engineHrs = selectedTruckRow?.engineHours || (3000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 35 : 7361));
+                const speedKmh = Math.round((selectedTruckRow?.activeSpeed || 0) * 1.60934);
+
+                return (
+                  <div className="space-y-4 flex-1 flex flex-col overflow-hidden animate-fade-in font-sans">
+                    {/* Header with name and close button */}
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                      <h2 className="text-sm font-semibold text-slate-800">
+                        {selectedTruckRow?.id} - {selectedTruckRow?.name}
+                      </h2>
+                      <button 
+                        type="button"
+                        onClick={() => setViewingDetailsTruckId(null)}
+                        className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Close details"
                       >
-                        
-                        {/* Vehicle Card Header */}
-                        <div 
-                          className="p-4 flex items-center justify-between cursor-pointer select-none gap-3"
-                          onClick={() => {
-                            setExpandedTruckId(isExpanded ? null : truckRow.id);
-                            setSelectedTrackTruckId(truckRow.id); // Bind map centered tracker to selected list row!
-                          }}
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* Accordion list */}
+                    <div className="flex-1 overflow-y-auto space-y-1 pr-1 text-xs text-slate-705">
+                      {/* 1. General Accordion */}
+                      <div className="border-b border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsAccordionOpen(prev => ({ ...prev, general: !prev.general }))}
+                          className="w-full py-3 flex items-center justify-between text-left font-semibold text-slate-700 hover:text-slate-900 transition-colors"
                         >
-                          
-                          <div className="flex items-center gap-3">
-                            
-                            {/* Driver Profile Face or placeholder circle */}
-                            {renderUserAvatarHelper(truckRow.avatar, truckRow.driver, "w-10 h-10 border-2 border-slate-100 shadow-xs")}
-
-                            <div>
-                              <h4 className="font-sans font-bold text-slate-900 leading-tight text-xs flex items-center gap-1.5 md:text-[13px]">
-                                {truckRow.name}
-                              </h4>
-                              <p className="text-[10px] text-slate-400 font-mono mt-0.5 leading-none">
-                                Current Speed: <span className={truckRow.activeSpeed > 0 ? "text-emerald-600 font-bold" : "text-slate-500"}>{speedText}</span>
-                              </p>
-                              <p className="text-[11px] text-slate-500 font-semibold mt-1 flex items-center gap-1.5">
-                                {truckRow.driver}
-                                {isTruckOnline(truckRow) ? (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.25 rounded-full border border-emerald-100">
-                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                    Active / Online
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.25 rounded-full border border-slate-100">
-                                    <span className="w-1.5 h-1.5 bg-slate-350 rounded-full" />
-                                    Offline / Stationary
-                                  </span>
-                                )}
-                              </p>
+                          <span>General</span>
+                          {detailsAccordionOpen.general ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        </button>
+                        {detailsAccordionOpen.general && (
+                          <div className="pb-3 px-1 space-y-2.5 animate-slide-down">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Asset ID</span>
+                              <span className="text-slate-900 font-semibold">{selectedTruckRow?.id}</span>
                             </div>
-
-                          </div>
-
-                          {/* Chevron Icon toggler */}
-                          <button
-                            type="button"
-                            className={`p-1 hover:bg-slate-50 text-slate-400 rounded-lg transition-transform ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                          </button>
-
-                        </div>
-
-                        {/* Expandable Trips Details overlay and Behavior Metrics */}
-                        {isExpanded && (
-                          <div className="border-t border-slate-100 bg-white p-4 space-y-4">
-                            
-                            {/* Trip list progress block */}
-                            {activeRun ? (
-                              <div className="space-y-3">
-                                
-                                <div className="flex items-center justify-between border-b border-dashed border-slate-100 pb-1.5">
-                                  <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 font-sans leading-none flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                    {activeRun.title}
-                                  </span>
-                                  <span className="text-[10px] font-mono text-slate-400 font-bold">
-                                    {activeRun.subtitle}
-                                  </span>
-                                </div>
-
-                                {/* Itinerary Stops list */}
-                                <div className="space-y-3 relative pl-4 border-l-2 border-slate-100 ml-1.5">
-                                  {activeRun.stops.map((stop, sIndex) => (
-                                    <div key={sIndex} className="relative text-[11px] leading-tight">
-                                      
-                                      {/* Stop Marker Circle */}
-                                      <div className={`absolute -left-[23px] top-0.5 w-[12px] h-[12px] rounded-full flex items-center justify-center ${
-                                        stop.type === 'start' 
-                                          ? 'bg-slate-400' 
-                                          : 'bg-[#0070f3] text-white text-[8px] font-extrabold'
-                                      }`}>
-                                        {stop.type === 'start' ? (
-                                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                                        ) : '1'}
-                                      </div>
-
-                                      <div className="flex justify-between gap-1">
-                                        <span className="text-slate-705 font-medium truncate max-w-[150px]" title={stop.address}>
-                                          {stop.address}
-                                        </span>
-                                        <span className="font-mono text-[10px] text-slate-400 whitespace-nowrap">
-                                          {stop.time}
-                                        </span>
-                                      </div>
-
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {/* Parked pills, matching screenshot format */}
-                                {('parkedText' in activeRun && (activeRun as any).parkedText) && (
-                                  <div className="py-1.5 flex justify-center">
-                                    <span className="px-2.5 py-0.5 bg-slate-50 border border-slate-200 text-slate-450 rounded-full text-[10px] font-mono font-medium flex items-center gap-1">
-                                      <Clock className="w-3 h-3 text-slate-300" />
-                                      {(activeRun as any).parkedText}
-                                    </span>
-                                  </div>
-                                )}
-
-                              </div>
-                            ) : (
-                              <p className="text-[10px] text-slate-400 italic">No active dispatch ticket associated.</p>
-                            )}
-
-                            {/* Collapsible History Logs list */}
-                            {truckRow.pastTrips.length > 0 && (
-                              <div className="pt-2 border-t border-slate-100 space-y-2">
-                                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Past Itinerary Logs</span>
-                                <div className="space-y-2">
-                                  {truckRow.pastTrips.map((pastTrip) => (
-                                    <div key={pastTrip.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[10px] space-y-2">
-                                      
-                                      <div className="flex items-center justify-between text-slate-600 font-bold">
-                                        <span className="text-blue-600">{pastTrip.title}</span>
-                                        <span className="font-mono">{pastTrip.distance} &bull; {pastTrip.duration}</span>
-                                      </div>
-
-                                      <div className="space-y-1.5 relative pl-3.5 border-l border-blue-400/50">
-                                        {pastTrip.stops.map((pStop, sIndex) => (
-                                          <div key={sIndex} className="flex justify-between gap-1 text-[9.5px]">
-                                            <span className="truncate max-w-[140px] text-slate-500">{pStop.address}</span>
-                                            <span className="font-mono text-slate-400">{pStop.time}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-
-                                      {pastTrip.parkedText && (
-                                        <div className="flex justify-center pt-0.5">
-                                          <span className="px-2 py-0.25 bg-white border border-slate-150 text-[8.5px] font-mono text-slate-400 rounded-lg">
-                                            {pastTrip.parkedText}
-                                          </span>
-                                        </div>
-                                      )}
-
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Live telematics directly inside card for awesome utility */}
-                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2.5 text-[10px] text-slate-500 font-mono">
-                              <span className="flex items-center gap-1 leading-none py-0.5">
-                                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
-                                Diagnostics Live
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Type</span>
+                              <span className="text-slate-900 font-semibold">{selectedTruckRow?.type}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Assigned Driver</span>
+                              <span className="text-slate-900 font-semibold">{selectedTruckRow?.driver || 'Unassigned'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Branch Base</span>
+                              <span className="text-slate-900 font-semibold">
+                                {activeBranches.find(b => b.id === selectedTruckRow?.branchId)?.name || 'ProSpaces Elmsdale'}
                               </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">License Plate</span>
+                              <span className="text-slate-900 font-semibold">{selectedTruckRow?.licensePlate || 'NS-FLT-881'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">VIN</span>
+                              <span className="text-slate-900 font-semibold font-mono text-[10px]">{selectedTruckRow?.vin || '1FTFW1RG4KFA88291'}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Your pinned sensors Accordion */}
+                      <div className="border-b border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsAccordionOpen(prev => ({ ...prev, pinned: !prev.pinned }))}
+                          className="w-full py-3 flex items-center justify-between text-left"
+                        >
+                          <div className="flex items-center space-x-2 text-teal-700">
+                            <Pin className="h-4 w-4 text-teal-600 rotate-45 fill-teal-600 shrink-0" />
+                            <span className="font-semibold text-teal-700">Your pinned sensors</span>
+                            <Info className="h-3.5 w-3.5 text-slate-400 shrink-0 cursor-help" title="These sensors are pinned to this asset's dashboard" />
+                          </div>
+                          {detailsAccordionOpen.pinned ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        </button>
+                        {detailsAccordionOpen.pinned && (
+                          <div className="pb-3 px-1 space-y-2.5 animate-slide-down">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">Fuel level</span>
+                              <span className="text-slate-900 font-medium">{fuelPercent} %</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">Ignition</span>
+                              <span className="text-slate-900 font-medium">{isIgnitionOn ? 'On' : 'Off'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">Last ignition on</span>
+                              <span className="text-slate-900 font-medium">{lastIgnitionStr}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">Odometer</span>
+                              <span className="text-slate-900 font-medium">{odometerVal.toLocaleString()} km</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">Operating hours</span>
+                              <span className="text-slate-900 font-medium">{engineHrs.toLocaleString()} h</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">PTO hours</span>
+                              <span className="text-slate-900 font-medium">0 h</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium font-sans">Speed</span>
+                              <span className="text-slate-900 font-medium">{speedKmh} km/h</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 3. Latest events Accordion */}
+                      <div className="border-b border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsAccordionOpen(prev => ({ ...prev, events: !prev.events }))}
+                          className="w-full py-3 flex items-center justify-between text-left font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+                        >
+                          <span>Latest events</span>
+                          {detailsAccordionOpen.events ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        </button>
+                        {detailsAccordionOpen.events && (
+                          <div className="pb-3 px-1 space-y-3 animate-slide-down">
+                            <div className="space-y-2">
+                              <div className="flex items-start justify-between text-[11px]">
+                                <div>
+                                  <p className="font-semibold text-slate-900">Geofence Entry: Dartmouth Depot</p>
+                                  <p className="text-slate-400 text-[10px]">Dartmouth DC depot boundaries</p>
+                                </div>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">10:15 AM ADT</span>
+                              </div>
+                              <div className="flex items-start justify-between text-[11px] pt-1.5 border-t border-slate-100">
+                                <div>
+                                  <p className="font-semibold text-slate-900">Stop completed: 84 Charm Ln</p>
+                                  <p className="text-slate-400 text-[10px]">Halifax customer residence delivery</p>
+                                </div>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">08:45 AM ADT</span>
+                              </div>
+                              <div className="flex items-start justify-between text-[11px] pt-1.5 border-t border-slate-100">
+                                <div>
+                                  <p className="font-semibold text-slate-900">Ignition turned off</p>
+                                  <p className="text-slate-400 text-[10px]">At customer address park-and-unload</p>
+                                </div>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">07:55 AM ADT</span>
+                              </div>
+                              <div className="flex items-start justify-between text-[11px] pt-1.5 border-t border-slate-100">
+                                <div>
+                                  <p className="font-semibold text-slate-900">Ignition turned on</p>
+                                  <p className="text-slate-400 text-[10px]">ProSpaces Elmsdale dispatcher launch</p>
+                                </div>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">07:23 AM ADT</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4. Maintenance reminders Accordion */}
+                      <div className="border-b border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsAccordionOpen(prev => ({ ...prev, maintenance: !prev.maintenance }))}
+                          className="w-full py-3 flex items-center justify-between text-left font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+                        >
+                          <span>Maintenance reminders</span>
+                          {detailsAccordionOpen.maintenance ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        </button>
+                        {detailsAccordionOpen.maintenance && (
+                          <div className="pb-3 px-1 space-y-3 animate-slide-down">
+                            <div className="space-y-2">
+                              <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-xl text-[11px] flex items-start gap-2">
+                                <span className="text-amber-500 shrink-0">🔧</span>
+                                <div className="flex-1">
+                                  <p className="font-bold text-amber-900">Oil Change Due Soon</p>
+                                  <p className="text-slate-550 text-[10px] mt-0.5 font-medium">Due at: {(odometerVal + 2500).toLocaleString()} km (Approx. 2,500 km remaining)</p>
+                                </div>
+                              </div>
+                              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] flex items-start gap-2">
+                                <span className="text-slate-500 shrink-0">🚗</span>
+                                <div className="flex-1">
+                                  <p className="font-bold text-slate-700">Tire Rotation & Alignment</p>
+                                  <p className="text-slate-550 text-[10px] mt-0.5 font-medium">Due at: {(odometerVal + 5400).toLocaleString()} km (Approx. 5,400 km remaining)</p>
+                                </div>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  // Open and trigger streetview Simulated camera widget overlay of this truck!
-                                  setCameraFilter(f => f === 'normal' ? 'nv' : 'normal');
-                                  setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Diagnostics bind: ${truckRow.name} Camera pipeline engaged.`, ...prev.slice(0,3)]);
+                                  setReminderTruckId(selectedTruckRow?.id || '');
+                                  setReminderText(`Routine maintenance inspection for ${selectedTruckRow?.name || ''}`);
+                                  setReminderType("Oil Change");
+                                  setReminderDueDate(new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0]);
+                                  setShowReminderModal(true);
                                 }}
-                                className="px-2 py-0.5 border border-slate-200 hover:bg-slate-50 rounded font-semibold text-slate-600 transition-colors"
+                                className="w-full py-1.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg text-[10px] text-slate-600 hover:text-slate-800 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                               >
-                                Toggle live-eye feed
+                                + Add Maintenance Reminder
                               </button>
                             </div>
-
-                            {/* 4. DRIVER PERFORMANCE METRICS (Direct representation from user's image request) */}
-                            <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-105 grid grid-cols-4 gap-2 text-center select-none font-sans mt-3">
-                              
-                              {/* Column 1: Rapid Accels */}
-                              <div className="flex flex-col items-center justify-between space-y-1">
-                                <span className="font-mono text-xs font-black text-slate-800 bg-white border border-slate-200 outline-hidden w-6 h-6 leading-none flex items-center justify-center rounded-lg shadow-xs">
-                                  {truckRow.metrics.accels}
-                                </span>
-                                <div className="text-[8.5px] text-slate-500 font-semibold tracking-tight leading-tight pt-1">
-                                  Rapid Accels
-                                </div>
-                              </div>
-
-                              {/* Column 2: Excessive Speed */}
-                              <div className="flex flex-col items-center justify-between space-y-1">
-                                <span className={`font-mono text-xs font-black w-6 h-6 leading-none flex items-center justify-center rounded-lg shadow-xs bg-white border ${
-                                  truckRow.metrics.excessiveSpeed !== '0' ? 'text-amber-600 border-amber-200 bg-amber-50/20' : 'text-slate-800 border-slate-200'
-                                }`}>
-                                  {truckRow.metrics.excessiveSpeed}
-                                </span>
-                                <div className="text-[8.5px] text-slate-500 font-semibold tracking-tight leading-tight pt-1">
-                                  Excessive Mins Spd
-                                </div>
-                              </div>
-
-                              {/* Column 3: Harsh Brakes */}
-                              <div className="flex flex-col items-center justify-between space-y-1">
-                                <span className={`font-mono text-xs font-black w-6 h-6 leading-none flex items-center justify-center rounded-lg shadow-xs bg-white border ${
-                                  truckRow.metrics.harshBrakes > 0 ? 'text-rose-600 border-rose-250' : 'text-slate-800 border-slate-200'
-                                }`}>
-                                  {truckRow.metrics.harshBrakes}
-                                </span>
-                                <div className="text-[8.5px] text-slate-500 font-semibold tracking-tight leading-tight pt-1">
-                                  Harsh Brakes
-                                </div>
-                              </div>
-
-                              {/* Column 4: Minutes Idling */}
-                              <div className="flex flex-col items-center justify-between space-y-1">
-                                <span className="font-mono text-xs font-black text-slate-800 bg-white border border-slate-200 outline-hidden w-6 h-6 leading-none flex items-center justify-center rounded-lg shadow-xs">
-                                  {truckRow.metrics.idling}
-                                </span>
-                                <div className="text-[8.5px] text-slate-500 font-semibold tracking-tight leading-tight pt-1">
-                                  Minutes Idling
-                                </div>
-                              </div>
-
-                            </div>
-
                           </div>
                         )}
+                      </div>
+
+                      {/* 5. Sensors Accordion */}
+                      <div className="border-b border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsAccordionOpen(prev => ({ ...prev, sensors: !prev.sensors }))}
+                          className="w-full py-3 flex items-center justify-between text-left font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+                        >
+                          <span>Sensors</span>
+                          {detailsAccordionOpen.sensors ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        </button>
+                        {detailsAccordionOpen.sensors && (
+                          <div className="pb-3 px-1 space-y-2.5 animate-slide-down">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Engine Temp</span>
+                              <span className="text-slate-900 font-semibold">88 °C</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Battery Voltage</span>
+                              <span className="text-slate-900 font-semibold">13.8 V</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Tire Pressure (FL / FR)</span>
+                              <span className="text-slate-900 font-semibold">110 / 112 PSI</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Tire Pressure (RL / RR)</span>
+                              <span className="text-slate-900 font-semibold">115 / 115 PSI</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-medium">Cabin Temperature</span>
+                              <span className="text-slate-900 font-semibold">21.5 °C</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                );
+              }
+
+              if (viewingTripsTruckId) {
+                const selectedTruckRow = combinedFleetList.find(t => t.id === viewingTripsTruckId) || combinedFleetList[0];
+                
+                const branchName = activeBranches.find(b => b.id === selectedTruckRow?.branchId)?.name || 'ProSpaces Elmsdale';
+                const branchAddr = activeBranches.find(b => b.id === selectedTruckRow?.branchId)?.address || '500 Windmill Rd, Dartmouth, NS B3B 1B3, Canada';
+                
+                const activeRun = selectedTruckRow?.trips?.[0];
+                const destAddr = activeRun?.stops?.[1]?.address || '84 Charm Ln, Halifax, NS B3E, Canada';
+                const driverName = selectedTruckRow?.driver || 'Bob Rafters';
+
+                const baseLegs = [
+                  {
+                    id: 'leg-1',
+                    type: 'Business',
+                    startTime: '7:23 AM ADT',
+                    endTime: '7:55 AM ADT',
+                    startAddress: branchAddr,
+                    endAddress: destAddr,
+                    driverName: driverName,
+                    distanceKm: 31.9,
+                    durationMins: 32,
+                    idleMins: 4,
+                    exceptionCount: 0
+                  },
+                  { type: 'pause' as const, durationMins: 35 },
+                  {
+                    id: 'leg-2',
+                    type: 'Business',
+                    startTime: '8:31 AM ADT',
+                    endTime: '9:15 AM ADT',
+                    startAddress: destAddr,
+                    endAddress: '137 Chain Lake Dr, Halifax, NS B3S 1B3, Canada',
+                    driverName: driverName,
+                    distanceKm: 42.1,
+                    durationMins: 44,
+                    idleMins: 12,
+                    exceptionCount: 1
+                  },
+                  { type: 'pause' as const, durationMins: 20 },
+                  {
+                    id: 'leg-3',
+                    type: 'Business',
+                    startTime: '9:35 AM ADT',
+                    endTime: '10:45 AM ADT',
+                    startAddress: '137 Chain Lake Dr, Halifax, NS B3S 1B3, Canada',
+                    endAddress: branchAddr,
+                    driverName: driverName,
+                    distanceKm: 54.32,
+                    durationMins: 70,
+                    idleMins: 17,
+                    exceptionCount: 0
+                  }
+                ];
+
+                const query = filterByLocationQuery.toLowerCase();
+                const filteredLegs = baseLegs.filter(leg => {
+                  if (leg.type === 'pause') return true;
+                  return (
+                    leg.startAddress.toLowerCase().includes(query) ||
+                    leg.endAddress.toLowerCase().includes(query)
+                  );
+                });
+
+                const totalTrips = baseLegs.filter(l => l.type === 'Business').length;
+                const totalDistance = baseLegs.reduce((acc, l) => l.type === 'Business' ? acc + l.distanceKm : acc, 0);
+                const totalDuration = baseLegs.reduce((acc, l) => l.type === 'Business' ? acc + l.durationMins : acc, 0);
+                const totalIdle = baseLegs.reduce((acc, l) => l.type === 'Business' ? acc + l.idleMins : acc, 0);
+                const totalExceptions = baseLegs.reduce((acc, l) => l.type === 'Business' ? acc + l.exceptionCount : acc, 0);
+
+                const totalDurationStr = `${Math.floor(totalDuration / 60)}h ${totalDuration % 60}m`;
+                const totalIdleStr = `${totalIdle}m`;
+
+                return (
+                  <div className="space-y-4 flex-1 flex flex-col overflow-hidden animate-fade-in font-sans">
+                    <div className="flex items-center justify-between pb-1">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setViewingTripsTruckId(null);
+                          setFilterByLocationQuery('');
+                        }}
+                        className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 bg-white hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 transition-all cursor-pointer shadow-xs"
+                      >
+                        ← Back to Fleet List
+                      </button>
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-teal-600 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                        Trips Dashboard
+                      </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-slate-500">Date and time</label>
+                        <div className="w-full bg-slate-100/80 border border-slate-200/80 rounded-xl px-3.5 py-2.5 flex items-center space-x-2.5 text-xs text-slate-700 font-medium">
+                          <Calendar className="h-4 w-4 text-slate-500" />
+                          <span>Jul 20, 2026 12:00 AM - Jul 20, 2026 11:59 PM</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-xs font-semibold text-slate-500">Asset</label>
+                          <div className="relative">
+                            <select
+                              value={viewingTripsTruckId || ''}
+                              onChange={(e) => setViewingTripsTruckId(e.target.value)}
+                              className="w-full bg-slate-100/80 hover:bg-slate-200/50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] text-slate-700 font-bold appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500/20"
+                            >
+                              {combinedFleetList.map(t => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-3.5 flex items-center pointer-events-none text-slate-500 text-[10px] font-bold">
+                              ▼
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-xs font-semibold text-slate-500">Driver</label>
+                          <div className="relative">
+                            <select
+                              value={selectedTruckRow?.driver || ''}
+                              onChange={(e) => {
+                                const newDriver = e.target.value;
+                                if (onUpdateTruck && selectedTruckRow) {
+                                  onUpdateTruck({
+                                    ...selectedTruckRow,
+                                    driver: newDriver
+                                  });
+                                }
+                              }}
+                              className="w-full bg-slate-100/80 hover:bg-slate-200/50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] text-slate-705 font-medium appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500/20"
+                            >
+                              <option value="">Driver</option>
+                              {activeUsers.map(u => (
+                                <option key={u.id} value={u.name}>
+                                  {u.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-3.5 flex items-center pointer-events-none text-slate-500 text-[10px] font-bold">
+                              ▼
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={filterByLocationQuery}
+                            onChange={(e) => setFilterByLocationQuery(e.target.value)}
+                            placeholder="Filter by location"
+                            className="w-full bg-slate-100 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-705 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                          />
+                          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                            <MapPin className="h-4 w-4 text-slate-505" />
+                          </div>
+                          {filterByLocationQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setFilterByLocationQuery('')}
+                              className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 font-mono text-[10px]"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-all text-slate-600 cursor-pointer shadow-xs"
+                          title="Filter options"
+                        >
+                          <Sliders className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="p-3 bg-white rounded-2xl border border-slate-200/80 grid grid-cols-5 gap-1 text-center select-none font-sans mt-3 shadow-xs">
+                        <div className="flex flex-col items-center justify-center space-y-0.5">
+                          <span className="text-[11px]">🔀</span>
+                          <span className="text-[11px] font-extrabold text-slate-800">{totalTrips}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-0.5 border-l border-slate-100">
+                          <span className="text-[11px]">📍</span>
+                          <span className="text-[10px] font-extrabold text-slate-800">{totalDistance.toFixed(2)}km</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-0.5 border-l border-slate-100">
+                          <span className="text-[11px]">🕒</span>
+                          <span className="text-[10px] font-extrabold text-slate-800 whitespace-nowrap">{totalDurationStr}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-0.5 border-l border-slate-100">
+                          <span className="text-[11px]">⏸️</span>
+                          <span className="text-[10px] font-extrabold text-slate-800 whitespace-nowrap">{totalIdleStr}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-0.5 border-l border-slate-100">
+                          <span className="text-[11px] text-rose-500">🚨</span>
+                          <span className="text-[11px] font-extrabold text-rose-600">{totalExceptions}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl text-[10.5px] text-slate-600 flex items-start space-x-2 font-medium leading-normal shadow-xs">
+                        <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                        <span>
+                          For more details of all the assets data points please go to{' '}
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              setSelectedTrackTruckId(viewingTripsTruckId);
+                              setToastMessage(`Viewing Track & Events for ${selectedTruckRow?.name}`);
+                            }} 
+                            className="text-blue-700 hover:text-blue-900 underline font-extrabold cursor-pointer"
+                          >
+                            Track & Events
+                          </button>
+                        </span>
+                      </div>
+
+                      <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => setIsTripsAccordionOpen(!isTripsAccordionOpen)}
+                          className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 border-b border-slate-200 transition-colors text-left"
+                        >
+                          <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-800">
+                            <Eye className="h-4 w-4 text-slate-500" />
+                            <span>Mon, Jul 20, 2026</span>
+                          </div>
+                          <div className="flex items-center space-x-3 text-[10px] font-bold text-slate-500">
+                            <span className="flex items-center gap-0.5">📍 {totalDistance.toFixed(2)}km</span>
+                            <span className="flex items-center gap-0.5 text-rose-600 font-extrabold">🚨 {totalExceptions}</span>
+                            {isTripsAccordionOpen ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                          </div>
+                        </button>
+
+                        {isTripsAccordionOpen && (
+                          <div className="p-3 space-y-3 bg-slate-50/20 max-h-[400px] overflow-y-auto">
+                            {filteredLegs.map((leg, index) => {
+                              if (leg.type === 'pause') {
+                                return (
+                                  <div key={`pause-${index}`} className="flex items-center justify-start pl-4 py-1">
+                                    <span className="px-2.5 py-0.5 bg-slate-200/70 border border-slate-300 rounded-lg text-[9px] font-extrabold text-slate-600 flex items-center gap-1 shadow-xs">
+                                      📍 Pause {leg.durationMins}m
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div 
+                                  key={leg.id}
+                                  className="bg-teal-50/50 border-l-4 border-teal-500 rounded-r-xl p-3 shadow-xs space-y-2 transition-all hover:bg-teal-50"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] uppercase font-black tracking-wider text-teal-800">
+                                      {leg.type}
+                                    </span>
+                                    {leg.exceptionCount > 0 && (
+                                      <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded-md flex items-center gap-0.5">
+                                        🚨 {leg.exceptionCount} ALERT
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="relative pl-3 space-y-2 text-[11px] text-slate-705">
+                                    <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-teal-200" />
+                                    <div className="relative">
+                                      <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-500 border border-white" />
+                                      <p className="leading-tight">
+                                        <span className="font-extrabold text-teal-950">{leg.startTime}</span>{' '}
+                                        <span className="text-slate-500">{leg.startAddress}</span>
+                                      </p>
+                                    </div>
+                                    <div className="relative">
+                                      <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-600 border border-white" />
+                                      <p className="leading-tight">
+                                        <span className="font-extrabold text-teal-950">{leg.endTime}</span>{' '}
+                                        <span className="text-slate-500">{leg.endAddress}</span>
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="pt-2 border-t border-teal-100 flex flex-wrap items-center justify-between text-[10px] text-slate-500 font-semibold gap-1">
+                                    <div className="flex items-center space-x-1 text-slate-700 font-extrabold">
+                                      <User className="h-3 w-3 text-teal-600" />
+                                      <span>{leg.driverName}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 text-slate-505 text-[9.5px]">
+                                      <span className="flex items-center gap-0.5">📍 {leg.distanceKm}km</span>
+                                      <span className="flex items-center gap-0.5">🕒 {leg.durationMins}m</span>
+                                      <span className="flex items-center gap-0.5">⏸️ {leg.idleMins}m</span>
+                                      <span className="flex items-center gap-0.5 text-rose-500">🚨 {leg.exceptionCount}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {filteredLegs.length === 0 && (
+                              <div className="text-center py-6 text-slate-400 text-xs">
+                                No stops match location filter
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Apply Search Query filter
+              const filteredFleet = combinedFleetList.filter(item => {
+                const query = searchQuery.toLowerCase();
+                return (
+                  item.name.toLowerCase().includes(query) ||
+                  item.driver.toLowerCase().includes(query) ||
+                  item.id.toLowerCase().includes(query) ||
+                  item.type.toLowerCase().includes(query)
+                );
+              });
+
+              return (
+                <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search"
+                      className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-705 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-inner focus:ring-1 focus:ring-blue-500/20"
+                    />
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                      <Search className="h-4 w-4" />
+                    </div>
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 font-mono text-[10px]"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={`flex-1 overflow-y-auto space-y-3.5 pr-1 ${
+                    isMapFullscreen ? 'max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)]' : 'max-h-[500px]'
+                  }`}>
+                    {filteredFleet.length === 0 ? (
+                      <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
+                        No vehicles match "{searchQuery}"
+                      </div>
+                    ) : (
+                      filteredFleet.map(truckRow => {
+                        const isSelected = selectedTrackTruckId === truckRow.id;
+                        const activeRun = truckRow.trips[0];
+                        const isMoving = truckRow.activeSpeed > 0;
+                        const speedText = truckRow.activeSpeed > 0 ? `${truckRow.activeSpeed} mph` : '0 mph';
+                        const isOnline = isTruckOnline(truckRow);
+                        const statusText = isMoving ? 'Moving' : (isOnline ? 'Idling' : 'Parked');
+                        
+                        const statusBg = isMoving 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100/70' 
+                          : isOnline 
+                            ? 'bg-amber-50 text-amber-700 border-amber-100/70' 
+                            : 'bg-slate-100 text-slate-700 border-slate-200/60';
+                        
+                    const statusDotColor = isMoving 
+                      ? 'bg-emerald-600' 
+                      : isOnline 
+                        ? 'bg-amber-500' 
+                        : 'bg-slate-600';
+
+                    // Helper to get deterministic but static looking last sync time
+                    const getLastSyncText = (truck: any) => {
+                      if (truck.gpsLastHandshake) {
+                        const diffMs = Date.now() - new Date(truck.gpsLastHandshake).getTime();
+                        if (diffMs > 0) {
+                          const diffMins = Math.floor(diffMs / 60000);
+                          if (diffMins < 1) return "Last sync < 1 min ago";
+                          if (diffMins < 60) return `Last sync ${diffMins} min ago`;
+                          const diffHrs = Math.floor(diffMins / 60);
+                          const remainingMins = diffMins % 60;
+                          return `Last sync ${diffHrs} h ${remainingMins} min ago`;
+                        }
+                      }
+                      const idHash = (truck.id || "").split("").reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
+                      const hrs = (idHash % 11) + 1;
+                      const mins = (idHash * 7) % 60;
+                      return `Last sync ${hrs} h ${mins} min ago`;
+                    };
+
+                    // Helper to get custom colors for vehicle icons based on screenshot
+                    const getTruckIconDetails = (name: string) => {
+                      const lower = name.toLowerCase();
+                      if (lower.includes('almon') || lower.includes('2401')) {
+                        return { color: 'text-amber-500 bg-amber-50 border-amber-100', textClass: 'text-amber-600' };
+                      } else if (lower.includes('mtn') || lower.includes('2404') || lower.includes('2408')) {
+                        return { color: 'text-blue-500 bg-blue-50 border-blue-100', textClass: 'text-blue-600' };
+                      }
+                      return { color: 'text-slate-500 bg-slate-50 border-slate-200/60', textClass: 'text-slate-600' };
+                    };
+
+                    const iconDetails = getTruckIconDetails(truckRow.name);
+
+                    return (
+                      <div 
+                        key={truckRow.id}
+                        className={`relative border border-slate-200/65 rounded-xl transition-all duration-300 overflow-visible cursor-pointer ${
+                          isSelected 
+                            ? 'bg-[#e6f9f5] border-teal-200 ring-2 ring-teal-500/10' 
+                            : 'bg-white hover:bg-slate-50'
+                        }`}
+                        onClick={() => {
+                          setSelectedTrackTruckId(truckRow.id);
+                        }}
+                      >
+                        {/* Interactive Click Shield Overlay to close open dropdown menu */}
+                        {activeActionMenuTruckId === truckRow.id && (
+                          <div 
+                            className="fixed inset-0 z-40 cursor-default" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setActiveActionMenuTruckId(null); 
+                            }} 
+                          />
+                        )}
+
+                        {/* Main row layout */}
+                        <div className="p-4 flex items-start justify-between gap-3 select-none">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {/* Vehicle Icon on Left */}
+                            <div className={`p-2.5 rounded-lg border shrink-0 flex items-center justify-center ${iconDetails.color}`}>
+                              <TruckIcon className="w-5 h-5" />
+                            </div>
+
+                            {/* Center details block */}
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                              {/* Row 1: Name and Status Badge */}
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="font-sans font-bold text-slate-850 leading-none text-xs md:text-[13px] truncate">
+                                  {truckRow.name}
+                                </h4>
+                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold leading-none shrink-0 ${statusBg}`}>
+                                  <span className={`w-1.5 h-1.5 ${statusDotColor} rounded-full inline-block`}></span>
+                                  <span>{statusText}</span>
+                                </div>
+                              </div>
+
+                              {/* Row 2: Driver icon and driver name */}
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500 leading-none">
+                                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{truckRow.driver}</span>
+                              </div>
+
+                              {/* Row 3: Clock icon and last sync */}
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 leading-none">
+                                <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>{getLastSyncText(truckRow)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Options dropdown button (three vertical dots) */}
+                          <div className="relative shrink-0 z-50">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveActionMenuTruckId(activeActionMenuTruckId === truckRow.id ? null : truckRow.id);
+                              }}
+                              className={`p-1.5 hover:bg-slate-200/50 rounded-md transition-colors cursor-pointer ${
+                                isSelected ? 'text-teal-600 hover:text-teal-700' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              <MoreVertical className="w-4.5 h-4.5" />
+                            </button>
+
+                            {/* Dropdown menu items */}
+                            {activeActionMenuTruckId === truckRow.id && (
+                              <div 
+                                className="absolute right-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 text-slate-705 py-1 text-[11px] select-none font-sans divide-y divide-slate-100 animate-fade-in"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTrackTruckId(truckRow.id);
+                                      setViewingDetailsTruckId(truckRow.id);
+                                      setViewingTripsTruckId(null);
+                                      setViewingCoordinatesTruckId(null);
+                                      setActiveActionMenuTruckId(null);
+                                      setToastMessage(`Showing details for ${truckRow.name}`);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Details
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTrackTruckId(truckRow.id);
+                                      setViewingTripsTruckId(truckRow.id);
+                                      setViewingDetailsTruckId(null);
+                                      setViewingCoordinatesTruckId(null);
+                                      setActiveActionMenuTruckId(null);
+                                      setToastMessage(`Viewing trips for ${truckRow.name}`);
+                                      setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Trips schedule requested for ${truckRow.name}.`, ...prev.slice(0, 3)]);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Trips
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTrackTruckId(truckRow.id);
+                                      setViewingDetailsTruckId(null);
+                                      setViewingCoordinatesTruckId(null);
+                                      setActiveActionMenuTruckId(null);
+                                      setToastMessage(`Track & Events engaged for ${truckRow.name}`);
+                                      setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Tracking trajectory stream engaged for ${truckRow.name}.`, ...prev.slice(0, 3)]);
+                                      if (mapRef.current) {
+                                        const lat = truckRow.gpsLat || truckRow.lat || 44.6488;
+                                        const lng = truckRow.gpsLng || truckRow.lng || -63.5752;
+                                        mapRef.current.setView([lat, lng], 14);
+                                      }
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Track & Events
+                                  </button>
+                                </div>
+
+                                <div className="py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuTruckId(null);
+                                      const lat = truckRow.gpsLat || truckRow.lat || 44.6488;
+                                      const lng = truckRow.gpsLng || truckRow.lng || -63.5752;
+                                      const nearby = activeBranches.map(b => {
+                                        const coords = getBranchCoordinates(b.id, b.name, b.address);
+                                        const dist = Math.sqrt(Math.pow(coords.lat - lat, 2) + Math.pow(coords.lng - lng, 2)) * 111;
+                                        return { name: b.name, dist };
+                                      }).sort((a, b) => a.dist - b.dist)[0];
+
+                                      setToastMessage(`Nearest Hub: ${nearby.name} (${nearby.dist.toFixed(1)} km)`);
+                                      setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Landmark search for ${truckRow.name}: Nearest depot is ${nearby.name} @ ${nearby.dist.toFixed(2)}km.`, ...prev.slice(0, 3)]);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Find nearby
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuTruckId(null);
+                                      const shareLink = `https://prospaces.ca/track/${truckRow.id}`;
+                                      navigator.clipboard.writeText(shareLink);
+                                      setToastMessage("Live share link copied to clipboard!");
+                                      setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Live tracking hash generated: ${shareLink}`, ...prev.slice(0, 3)]);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Live share
+                                  </button>
+                                </div>
+
+                                <div className="py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuTruckId(null);
+                                      setReminderTruckId(truckRow.id);
+                                      setReminderText(`Routine inspection for ${truckRow.name}`);
+                                      setReminderType("Oil Change");
+                                      setReminderDueDate(new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0]);
+                                      setShowReminderModal(true);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center"
+                                  >
+                                    <div className="flex items-center w-full">
+                                      <div className="bg-slate-850 text-white rounded-full p-0.5 mr-2 flex items-center justify-center w-4 h-4 shrink-0">
+                                        <Wrench className="w-2.5 h-2.5" />
+                                      </div>
+                                      <span className="font-bold">New reminder</span>
+                                    </div>
+                                  </button>
+                                </div>
+
+                                <div className="py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuTruckId(null);
+                                      setViewingCoordinatesTruckId(truckRow.id);
+                                      setViewingDetailsTruckId(null);
+                                      setViewingTripsTruckId(null);
+                                      const lat = truckRow.gpsLat || truckRow.lat || 44.6488;
+                                      const lng = truckRow.gpsLng || truckRow.lng || -63.5752;
+                                      const coordStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                                      navigator.clipboard.writeText(coordStr);
+                                      setToastMessage(`Coords copied: ${coordStr}`);
+                                      setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Coordinates copied for ${truckRow.name}: ${coordStr}`, ...prev.slice(0, 3)]);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Coordinates
+                                  </button>
+                                </div>
+
+                                <div className="py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuTruckId(null);
+                                      const gpsTabBtn = document.getElementById("tab-gps");
+                                      if (gpsTabBtn) {
+                                        gpsTabBtn.click();
+                                        setToastMessage(`Directing to hardware settings for ${truckRow.name}`);
+                                      } else {
+                                        setToastMessage(`Edit mode requested for ${truckRow.name}`);
+                                      }
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
 
                       </div>
                     );
-                  });
-                })()}
+                  })
+                )}
               </div>
-
             </div>
+          );
+        })()}
 
             {/* Live Street view details or Radar Ping Console logs collapsed at the bottom footer */}
             <div className="pt-2.5 border-t border-slate-200 space-y-2 text-slate-505">
@@ -2580,6 +3313,110 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           </table>
         </div>
       </div>
+
+      {/* Reminder Modal */}
+      {showReminderModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-scale-up">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-800 text-white rounded-full p-1.5 flex items-center justify-center">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-sans font-bold text-sm">Schedule Maintenance Reminder</h3>
+                  <p className="text-[10px] text-slate-300 font-mono">
+                    Vehicle ID: {reminderTruckId}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReminderModal(false)}
+                className="text-slate-400 hover:text-white font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const truckName = displayTrucks.find(t => t.id === reminderTruckId)?.name || reminderTruckId;
+              setSysLogs(prev => [
+                `[${new Date().toLocaleTimeString()}] Scheduled [${reminderType}] Alert for ${truckName}: "${reminderText}" due on ${reminderDueDate}`,
+                ...prev.slice(0, 3)
+              ]);
+              setToastMessage(`Reminder scheduled for ${truckName}!`);
+              setShowReminderModal(false);
+            }} className="p-5 space-y-4 text-xs font-sans">
+              
+              <div className="space-y-1">
+                <label className="text-slate-700 font-bold block">Service Category</label>
+                <select
+                  value={reminderType}
+                  onChange={(e) => setReminderType(e.target.value)}
+                  className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                >
+                  <option value="Oil Change">Oil Change & Filter Service</option>
+                  <option value="Brake Inspection">Brake pads & Rotors Inspection</option>
+                  <option value="Tire Rotation">Tire Tread, Pressure & Rotation</option>
+                  <option value="Annual Safety">Annual MVIS Safety Inspection</option>
+                  <option value="Custom Maintenance">Custom Service/Alert Reminder</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-700 font-bold block">Due Date</label>
+                <input
+                  type="date"
+                  required
+                  value={reminderDueDate}
+                  onChange={(e) => setReminderDueDate(e.target.value)}
+                  className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-700 font-bold block">Reminder Notes</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={reminderText}
+                  onChange={(e) => setReminderText(e.target.value)}
+                  placeholder="e.g. Schedule booking with Halifax fleet terminal."
+                  className="w-full border bg-white border-slate-200 px-3 py-2 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500 placeholder-slate-400"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReminderModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>Set Alert</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Action Menu Toast notification feedback */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
     </div>
   );
