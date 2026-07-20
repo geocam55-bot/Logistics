@@ -383,6 +383,14 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     const diffMs = Date.now() - new Date(u.lastActive).getTime();
     return diffMs < 45000;
   };
+
+  const isTruckOnline = (t: any): boolean => {
+    if (t.gpsSource === 'truck' && t.gpsLastHandshake) {
+      const diffMs = Date.now() - new Date(t.gpsLastHandshake).getTime();
+      return diffMs < 300000; // 5 minutes for hardware GPS
+    }
+    return isDriverOnline(t.driver);
+  };
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
   const selectedTruck = selectedTrackTruckId ? displayTrucks.find(t => t.id === selectedTrackTruckId) : (displayTrucks[0] || trucks[0]);
@@ -891,7 +899,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         if (isAssigned) {
           const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
           if (matchedTruck) {
-            const online = isDriverOnline(matchedTruck.driver);
+            const online = isTruckOnline(matchedTruck);
             if (!online) {
               return; // Hide destination if driver is offline
             }
@@ -954,7 +962,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
       if (isAssigned) {
         const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
         if (matchedTruck) {
-          const online = isDriverOnline(matchedTruck.driver);
+          const online = isTruckOnline(matchedTruck);
           if (!online) return; // Skip bounds plotting if driver is offline
         }
       }
@@ -974,7 +982,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
         let destLng: number;
         let isMoving = false;
         
-        const isOnline = isDriverOnline(truck.driver);
+        const isOnline = isTruckOnline(truck);
 
         const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
         if (assignedDelivery) {
@@ -1813,7 +1821,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 if (d.assignedTruck) {
                   const matchedTruck = displayTrucks.find(t => t.id === d.assignedTruck);
                   if (matchedTruck) {
-                    const online = isDriverOnline(matchedTruck.driver);
+                    const online = isTruckOnline(matchedTruck);
                     if (!online) return false; // Filter out destinations of offline drivers
                   }
                 }
@@ -1857,7 +1865,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 let destLng: number;
                 let isMoving = false;
                 
-                const isOnline = isDriverOnline(truck.driver);
+                const isOnline = isTruckOnline(truck);
 
                 const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
                 if (assignedDelivery) {
@@ -2006,8 +2014,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === t.id && d.status !== DeliveryStatus.DELIVERED);
                     const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
                     const { hasRealGps } = getTruckCoords(t, simProgress, activeBranches);
-                    const isOnline = isDriverOnline(t.driver);
-                    const speedValue = assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0;
+                    const isOnline = isTruckOnline(t);
+                    const speedValue = t.gpsSpeed !== undefined ? Math.round(t.gpsSpeed) : (assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0);
                     return {
                       ...t,
                       id: t.id,
@@ -2035,7 +2043,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         accels: 0,
                         excessiveSpeed: '0',
                         harshBrakes: 0,
-                        idling: speedValue > 0 ? '5' : String(currentIdlingMinutes)
+                        idling: t.gpsIdlingMins !== undefined ? String(t.gpsIdlingMins) : (speedValue > 0 ? '0' : String(currentIdlingMinutes))
                       }
                     };
                   });
@@ -2097,7 +2105,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                               </p>
                               <p className="text-[11px] text-slate-500 font-semibold mt-1 flex items-center gap-1.5">
                                 {truckRow.driver}
-                                {isDriverOnline(truckRow.driver) ? (
+                                {isTruckOnline(truckRow) ? (
                                   <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.25 rounded-full border border-emerald-100">
                                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                                     Active / Online
@@ -2220,80 +2228,6 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                 </div>
                               </div>
                             )}
-
-                            {/* Live GPS Dispatch Override Panel */}
-                            <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5 mt-2 bg-amber-50/20 p-2.5 rounded-xl border border-dashed border-amber-200">
-                              <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-850 flex items-center justify-between">
-                                <span className="flex items-center gap-1">📍 Live Dispatch GPS Override</span>
-                                {((truckRow as any).lat !== undefined || (truckRow as any).lng !== undefined) && (
-                                  <button
-                                    onClick={() => {
-                                      if (onUpdateTruck) {
-                                        const updated = { ...truckRow };
-                                        delete (updated as any).lat;
-                                        delete (updated as any).lng;
-                                        onUpdateTruck(updated);
-                                        setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Reset ${truckRow.name} to automatic branch GPS.`, ...prev.slice(0, 4)]);
-                                      }
-                                    }}
-                                    className="text-[9px] text-red-500 hover:underline font-semibold"
-                                  >
-                                    Reset GPS
-                                  </button>
-                                )}
-                              </span>
-                              
-                              <p className="text-[9.5px] text-slate-500 leading-tight">
-                                Broadcast this driver's coordinates manually. Auto-resolves names like <strong>137 Chain Lake Drive</strong>:
-                              </p>
-
-                              <div className="flex gap-1.5 mt-1">
-                                <input
-                                  type="text"
-                                  id={`override-address-${truckRow.id}`}
-                                  key={`override-address-${truckRow.id}-${(truckRow as any).lat || 'empty'}-${(truckRow as any).lng || 'empty'}`}
-                                  placeholder="e.g. 137 Chain Lake Drive"
-                                  className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-500 outline-hidden bg-white text-slate-800"
-                                  defaultValue={((truckRow as any).lat !== undefined || (truckRow as any).lng !== undefined) ? `${(truckRow as any).lat?.toFixed(5)}, ${(truckRow as any).lng?.toFixed(5)}` : ""}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const inputVal = (e.currentTarget as HTMLInputElement).value;
-                                      handleGpsSubmit(truckRow, inputVal);
-                                    }
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`override-address-${truckRow.id}`) as HTMLInputElement | null;
-                                    if (input) {
-                                      handleGpsSubmit(truckRow, input.value);
-                                    }
-                                  }}
-                                  className="px-2.5 py-1 bg-amber-600 text-white hover:bg-amber-700 rounded font-bold text-xs transition-colors"
-                                >
-                                  Apply
-                                </button>
-                              </div>
-
-                              {/* Quick selector chips */}
-                              <div className="flex flex-wrap gap-1 mt-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleGpsSubmit(truckRow, "137 Chain Lake Drive")}
-                                  className="px-1.5 py-0.5 bg-white/80 border border-amber-200/50 hover:bg-amber-100/50 hover:text-amber-700 text-[9px] text-slate-700 rounded transition-colors font-semibold"
-                                >
-                                  📍 137 Chain Lake (Currently At)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleGpsSubmit(truckRow, "500 Windmill Road")}
-                                  className="px-1.5 py-0.5 bg-white/80 border border-slate-200 hover:bg-blue-100/50 hover:text-blue-700 text-[9px] text-slate-700 rounded transition-colors font-semibold"
-                                >
-                                  📍 500 Windmill Rd
-                                </button>
-                              </div>
-                            </div>
 
                             {/* Live telematics directly inside card for awesome utility */}
                             <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2.5 text-[10px] text-slate-500 font-mono">

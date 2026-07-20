@@ -150,7 +150,10 @@ export default function FleetSetup({
       return;
     }
 
+    const existingTruck = trucks.find(t => t.id === truckId);
+    
     const payload: Truck = {
+      ...(existingTruck || {}),
       id: truckId,
       name: truckName.trim(),
       type: truckType,

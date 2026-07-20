@@ -86,12 +86,15 @@ export function serializeToType(
   lng?: number,
   gpsSource?: 'mobile' | 'truck',
   gpsDeviceId?: string,
+  gpsSerialNumber?: string,
   gpsDeviceName?: string,
   gpsSimIccid?: string,
   gpsStatus?: string,
   gpsLastHandshake?: string,
   gpsLat?: number,
-  gpsLng?: number
+  gpsLng?: number,
+  gpsSpeed?: number,
+  gpsIdlingMins?: number
 ): string {
   const baseType = (type || "").trim();
   let res = baseType;
@@ -109,6 +112,9 @@ export function serializeToType(
   }
   if (gpsDeviceId) {
     res += ` ||gpsDeviceId:${encodeURIComponent(gpsDeviceId)}`;
+  }
+  if (gpsSerialNumber) {
+    res += ` ||gpsSerialNumber:${encodeURIComponent(gpsSerialNumber)}`;
   }
   if (gpsDeviceName) {
     res += ` ||gpsDeviceName:${encodeURIComponent(gpsDeviceName)}`;
@@ -128,6 +134,12 @@ export function serializeToType(
   if (gpsLng !== undefined && gpsLng !== null) {
     res += ` ||gpsLng:${gpsLng}`;
   }
+  if (gpsSpeed !== undefined && gpsSpeed !== null) {
+    res += ` ||gpsSpeed:${gpsSpeed}`;
+  }
+  if (gpsIdlingMins !== undefined && gpsIdlingMins !== null) {
+    res += ` ||gpsIdlingMins:${gpsIdlingMins}`;
+  }
   return res;
 }
 
@@ -140,12 +152,15 @@ export function deserializeType(truck: any): any {
   let lng: number | undefined;
   let gpsSource: 'mobile' | 'truck' | undefined;
   let gpsDeviceId: string | undefined;
+  let gpsSerialNumber: string | undefined;
   let gpsDeviceName: string | undefined;
   let gpsSimIccid: string | undefined;
   let gpsStatus: 'Connected' | 'Disconnected' | 'Syncing' | 'Error' | undefined;
   let gpsLastHandshake: string | undefined;
   let gpsLat: number | undefined;
   let gpsLng: number | undefined;
+  let gpsSpeed: number | undefined;
+  let gpsIdlingMins: number | undefined;
 
   const regdueMatch = type.match(/\|\|regdue:([^\s|]+)/);
   if (regdueMatch) {
@@ -175,6 +190,12 @@ export function deserializeType(truck: any): any {
   if (gpsDeviceIdMatch) {
     gpsDeviceId = decodeURIComponent(gpsDeviceIdMatch[1]);
     cleanType = cleanType.replace(/\|\|gpsDeviceId:[^\s|]+/, "");
+  }
+
+  const gpsSerialNumberMatch = type.match(/\|\|gpsSerialNumber:([^\s|]+)/);
+  if (gpsSerialNumberMatch) {
+    gpsSerialNumber = decodeURIComponent(gpsSerialNumberMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsSerialNumber:[^\s|]+/, "");
   }
 
   const gpsDeviceNameMatch = type.match(/\|\|gpsDeviceName:([^\s|]+)/);
@@ -213,6 +234,18 @@ export function deserializeType(truck: any): any {
     cleanType = cleanType.replace(/\|\|gpsLng:[^\s|]+/, "");
   }
 
+  const gpsSpeedMatch = type.match(/\|\|gpsSpeed:([^\s|]+)/);
+  if (gpsSpeedMatch) {
+    gpsSpeed = parseFloat(gpsSpeedMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsSpeed:[^\s|]+/, "");
+  }
+
+  const gpsIdlingMinsMatch = type.match(/\|\|gpsIdlingMins:([^\s|]+)/);
+  if (gpsIdlingMinsMatch) {
+    gpsIdlingMins = parseFloat(gpsIdlingMinsMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsIdlingMins:[^\s|]+/, "");
+  }
+
   return {
     ...truck,
     type: cleanType.trim(),
@@ -221,12 +254,15 @@ export function deserializeType(truck: any): any {
     ...(lng !== undefined && !isNaN(lng) ? { lng } : {}),
     gpsSource: gpsSource || 'mobile',
     gpsDeviceId: gpsDeviceId || '',
+    gpsSerialNumber: gpsSerialNumber || '',
     gpsDeviceName: gpsDeviceName || '',
     gpsSimIccid: gpsSimIccid || '',
     gpsStatus: gpsStatus || 'Disconnected',
     gpsLastHandshake: gpsLastHandshake || '',
     ...(gpsLat !== undefined && !isNaN(gpsLat) ? { gpsLat } : {}),
-    ...(gpsLng !== undefined && !isNaN(gpsLng) ? { gpsLng } : {})
+    ...(gpsLng !== undefined && !isNaN(gpsLng) ? { gpsLng } : {}),
+    ...(gpsSpeed !== undefined && !isNaN(gpsSpeed) ? { gpsSpeed } : {}),
+    ...(gpsIdlingMins !== undefined && !isNaN(gpsIdlingMins) ? { gpsIdlingMins } : {})
   };
 }
 

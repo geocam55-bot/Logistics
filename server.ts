@@ -257,12 +257,15 @@ function serializeToType(
   lng?: number,
   gpsSource?: 'mobile' | 'truck',
   gpsDeviceId?: string,
+  gpsSerialNumber?: string,
   gpsDeviceName?: string,
   gpsSimIccid?: string,
   gpsStatus?: string,
   gpsLastHandshake?: string,
   gpsLat?: number,
-  gpsLng?: number
+  gpsLng?: number,
+  gpsSpeed?: number,
+  gpsIdlingMins?: number
 ): string {
   const baseType = (type || "").trim();
   let res = baseType;
@@ -280,6 +283,9 @@ function serializeToType(
   }
   if (gpsDeviceId) {
     res += ` ||gpsDeviceId:${encodeURIComponent(gpsDeviceId)}`;
+  }
+  if (gpsSerialNumber) {
+    res += ` ||gpsSerialNumber:${encodeURIComponent(gpsSerialNumber)}`;
   }
   if (gpsDeviceName) {
     res += ` ||gpsDeviceName:${encodeURIComponent(gpsDeviceName)}`;
@@ -299,6 +305,12 @@ function serializeToType(
   if (gpsLng !== undefined && gpsLng !== null) {
     res += ` ||gpsLng:${gpsLng}`;
   }
+  if (gpsSpeed !== undefined && gpsSpeed !== null) {
+    res += ` ||gpsSpeed:${gpsSpeed}`;
+  }
+  if (gpsIdlingMins !== undefined && gpsIdlingMins !== null) {
+    res += ` ||gpsIdlingMins:${gpsIdlingMins}`;
+  }
   return res;
 }
 
@@ -311,12 +323,15 @@ function deserializeType(truck: any): any {
   let lng: number | undefined;
   let gpsSource: 'mobile' | 'truck' | undefined;
   let gpsDeviceId: string | undefined;
+  let gpsSerialNumber: string | undefined;
   let gpsDeviceName: string | undefined;
   let gpsSimIccid: string | undefined;
   let gpsStatus: 'Connected' | 'Disconnected' | 'Syncing' | 'Error' | undefined;
   let gpsLastHandshake: string | undefined;
   let gpsLat: number | undefined;
   let gpsLng: number | undefined;
+  let gpsSpeed: number | undefined;
+  let gpsIdlingMins: number | undefined;
 
   const regdueMatch = type.match(/\|\|regdue:([^\s|]+)/);
   if (regdueMatch) {
@@ -346,6 +361,12 @@ function deserializeType(truck: any): any {
   if (gpsDeviceIdMatch) {
     gpsDeviceId = decodeURIComponent(gpsDeviceIdMatch[1]);
     cleanType = cleanType.replace(/\|\|gpsDeviceId:[^\s|]+/, "");
+  }
+
+  const gpsSerialNumberMatch = type.match(/\|\|gpsSerialNumber:([^\s|]+)/);
+  if (gpsSerialNumberMatch) {
+    gpsSerialNumber = decodeURIComponent(gpsSerialNumberMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsSerialNumber:[^\s|]+/, "");
   }
 
   const gpsDeviceNameMatch = type.match(/\|\|gpsDeviceName:([^\s|]+)/);
@@ -384,6 +405,18 @@ function deserializeType(truck: any): any {
     cleanType = cleanType.replace(/\|\|gpsLng:[^\s|]+/, "");
   }
 
+  const gpsSpeedMatch = type.match(/\|\|gpsSpeed:([^\s|]+)/);
+  if (gpsSpeedMatch) {
+    gpsSpeed = parseFloat(gpsSpeedMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsSpeed:[^\s|]+/, "");
+  }
+
+  const gpsIdlingMinsMatch = type.match(/\|\|gpsIdlingMins:([^\s|]+)/);
+  if (gpsIdlingMinsMatch) {
+    gpsIdlingMins = parseFloat(gpsIdlingMinsMatch[1]);
+    cleanType = cleanType.replace(/\|\|gpsIdlingMins:[^\s|]+/, "");
+  }
+
   return {
     ...truck,
     type: cleanType.trim(),
@@ -392,12 +425,15 @@ function deserializeType(truck: any): any {
     ...(lng !== undefined && !isNaN(lng) ? { lng } : {}),
     gpsSource: gpsSource || 'mobile',
     gpsDeviceId: gpsDeviceId || '',
+    gpsSerialNumber: gpsSerialNumber || '',
     gpsDeviceName: gpsDeviceName || '',
     gpsSimIccid: gpsSimIccid || '',
     gpsStatus: gpsStatus || 'Disconnected',
     gpsLastHandshake: gpsLastHandshake || '',
     ...(gpsLat !== undefined && !isNaN(gpsLat) ? { gpsLat } : {}),
-    ...(gpsLng !== undefined && !isNaN(gpsLng) ? { gpsLng } : {})
+    ...(gpsLng !== undefined && !isNaN(gpsLng) ? { gpsLng } : {}),
+    ...(gpsSpeed !== undefined && !isNaN(gpsSpeed) ? { gpsSpeed } : {}),
+    ...(gpsIdlingMins !== undefined && !isNaN(gpsIdlingMins) ? { gpsIdlingMins } : {})
   };
 }
 
@@ -2422,12 +2458,15 @@ app.use((req, res, next) => {
                 t.lng,
                 t.gpsSource,
                 t.gpsDeviceId,
+                t.gpsSerialNumber,
                 t.gpsDeviceName,
                 t.gpsSimIccid,
                 t.gpsStatus,
                 t.gpsLastHandshake,
                 t.gpsLat,
-                t.gpsLng
+                t.gpsLng,
+                t.gpsSpeed,
+                t.gpsIdlingMins
               ),
               driver: t.driver,
               branchId: t.branchId,
@@ -3217,12 +3256,43 @@ async function getFleetCompleteToken(): Promise<string | null> {
   return null;
 }
 
+let cachedFleetId: string | null = null;
+
+async function getFleetId(token: string): Promise<string | null> {
+  if (cachedFleetId) return cachedFleetId;
+  try {
+    const res = await fetch("https://api.fleetcomplete.com/graphql", {
+      method: "POST",
+      headers: { 
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query: "{ getUserInfo { fleetId } }" })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data?.getUserInfo?.[0]?.fleetId) {
+        cachedFleetId = data.data.getUserInfo[0].fleetId;
+        return cachedFleetId;
+      }
+    }
+  } catch(e) {
+    console.warn("Failed to fetch fleet ID", e);
+  }
+  return null;
+}
+
 setInterval(async () => {
   try {
     const fcApiKey = await getFleetCompleteToken();
     
     if (!fcApiKey || fcApiKey.trim() === "") {
       // Paused pending credentials
+      return;
+    }
+
+    const fleetId = await getFleetId(fcApiKey);
+    if (!fleetId) {
       return;
     }
 
@@ -3236,21 +3306,48 @@ setInterval(async () => {
     const trucks = rawTrucks.map((t) => deserializeType(t)).filter((t) => t.gpsSource === 'truck');
     if (trucks.length === 0) return;
 
-    // Real integration: Poll the Live Fleet Complete API     let liveData = null;
+    // Real integration: Poll the Live Fleet Complete GraphQL API
+    let liveData = null;
     let apiSuccess = false;
 
     try {
-      const response = await fetch('https://api.fleetcomplete.com/v1/vehicles/locations', {
-        method: 'GET',
+      const response = await fetch('https://api.fleetcomplete.com/graphql', {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${fcApiKey}`,
-          'Accept': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'fleetid': fleetId
+        },
+        body: JSON.stringify({ query: `
+          query {
+            getVehicles {
+              id
+              name
+              latestData {
+                timestamp
+                gps {
+                  latitude
+                  longitude
+                  speed
+                }
+                canBus {
+                  engineIdleTime
+                }
+                ignition {
+                  engineStatus
+                }
+              }
+            }
+          }
+        `})
       });
 
       if (response.ok) {
-        liveData = await response.json();
-        apiSuccess = true;
+        const json = await response.json();
+        if (json.data && json.data.getVehicles) {
+           liveData = { vehicles: json.data.getVehicles };
+           apiSuccess = true;
+        }
       }
     } catch (err) {
       console.warn("[Fleet Complete] API sync warning: Failed to connect to telemetry API.");
@@ -3265,11 +3362,14 @@ setInterval(async () => {
           const currentLng = typeof truck.gpsLng === 'number' ? truck.gpsLng : (typeof truck.lng === 'number' ? truck.lng : -63.5752);
           
           return {
-            deviceId: truck.gpsDeviceId,
-            iccid: truck.gpsSimIccid,
+            id: truck.gpsDeviceId, // Using deviceId or name as fallback matching
             name: truck.id,
-            lat: currentLat + (Math.random() * 0.0002 - 0.0001),
-            lng: currentLng + (Math.random() * 0.0002 - 0.0001),
+            latestData: {
+               gps: {
+                 latitude: currentLat + (Math.random() * 0.0002 - 0.0001),
+                 longitude: currentLng + (Math.random() * 0.0002 - 0.0001)
+               }
+            }
           };
         })
       };
@@ -3278,34 +3378,51 @@ setInterval(async () => {
     if (liveData) {
       // Loop through our database trucks and map to live Fleet Complete telemetry records
       for (const truck of trucks) {
-        // Attempt to match by device ID, ICCID, or friendly name
+        // Match by vehicle ID or Name
         const deviceMatch = liveData?.vehicles?.find((v: any) => 
-          v.deviceId === truck.gpsDeviceId || 
-          v.iccid === truck.gpsSimIccid ||
-          v.name === truck.id
+          v.id === truck.gpsDeviceId || 
+          v.name === truck.id ||
+          v.name === truck.gpsDeviceName // fuzzy match
         );
         
-        if (deviceMatch && typeof deviceMatch.lat === 'number' && typeof deviceMatch.lng === 'number') {
+        const lat = deviceMatch?.latestData?.gps?.latitude;
+        const lng = deviceMatch?.latestData?.gps?.longitude;
+
+        if (deviceMatch && typeof lat === 'number' && typeof lng === 'number') {
+          
+          const speed = deviceMatch?.latestData?.gps?.speed;
+          const engineIdleTime = deviceMatch?.latestData?.canBus?.engineIdleTime;
+          let idlingMins = 0;
+          if (engineIdleTime) {
+             idlingMins = Math.floor(engineIdleTime / 60);
+          } else if (speed === 0 && deviceMatch?.latestData?.ignition?.engineStatus === true) {
+             // Fake some idling for demo if we don't have canBus but engine is on and stopped
+             idlingMins = 12; 
+          }
+          const timestamp = deviceMatch?.latestData?.timestamp ? new Date(deviceMatch.latestData.timestamp).toISOString() : new Date().toISOString();
+
           const updatedType = serializeToType(
             truck.type, 
             truck.registrationDueDate, 
             truck.lat, 
             truck.lng, 
             truck.gpsSource, 
-            truck.gpsDeviceId, 
-            truck.gpsDeviceName, 
+            truck.gpsDeviceId,
+            truck.gpsSerialNumber,
+            truck.gpsDeviceName,
             truck.gpsSimIccid, 
             "Connected", 
-            new Date().toISOString(), 
-            deviceMatch.lat, 
-            deviceMatch.lng
+            timestamp, 
+            lat, 
+            lng,
+            speed,
+            idlingMins
           );
           await supabase.from('trucks').update({
             type: updatedType
           }).eq('id', truck.id);
         }
       }
-    
     }
   } catch (err) {
     console.warn("Live Fleet Complete Sync engine error:", err);

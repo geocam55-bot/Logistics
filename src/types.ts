@@ -100,6 +100,8 @@ export interface Truck {
   gpsSimIccid?: string;
   gpsStatus?: string;
   gpsLastHandshake?: string;
+  gpsSpeed?: number;
+  gpsIdlingMins?: number;
   gpsLat?: number;
   gpsLng?: number;
 
