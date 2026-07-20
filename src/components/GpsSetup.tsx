@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Truck, Branch } from '../types';
 import { 
   Compass, Plus, Radio, Server, Wifi, Cpu, Settings2, Trash2, Edit2,
-  MapPin, Activity, CheckCircle2, ShieldAlert, Navigation2, Check
+  MapPin, Activity, CheckCircle2, ShieldAlert, Navigation2, Check,
+  Key, RefreshCw, Lock, User
 } from 'lucide-react';
 
 interface GpsSetupProps {
@@ -22,6 +23,95 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
   // Status feedback states
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Fleet Complete Live API States
+  const [telematicsStatus, setTelematicsStatus] = useState<any>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [updatingCredentials, setUpdatingCredentials] = useState(false);
+  
+  // Form inputs for Fleet Complete update
+  const [configMode, setConfigMode] = useState<'apikey' | 'userpass'>('apikey');
+  const [fcApiKey, setFcApiKey] = useState('');
+  const [fcUsername, setFcUsername] = useState('');
+  const [fcPassword, setFcPassword] = useState('');
+  
+  // Feedback specific to Fleet Complete panel
+  const [fcSuccessMsg, setFcSuccessMsg] = useState<string | null>(null);
+  const [fcErrorMsg, setFcErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetchTelematicsStatus();
+  }, []);
+
+  const fetchTelematicsStatus = async () => {
+    setLoadingStatus(true);
+    try {
+      const res = await fetch('/api/telematics/status');
+      if (res.ok) {
+        const data = await res.json();
+        setTelematicsStatus(data);
+        if (data.hasOverrideApiKey || data.hasEnvApiKey) {
+          setConfigMode('apikey');
+        } else if (data.hasOverrideUserPass || data.hasEnvUserPass) {
+          setConfigMode('userpass');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch telematics status', err);
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdatingCredentials(true);
+    setFcSuccessMsg(null);
+    setFcErrorMsg(null);
+    
+    const body: any = {};
+    if (configMode === 'apikey') {
+      if (!fcApiKey.trim()) {
+        setFcErrorMsg('Please enter a valid API Key/Token.');
+        setUpdatingCredentials(false);
+        return;
+      }
+      body.apiKey = fcApiKey.trim();
+    } else {
+      if (!fcUsername.trim() || !fcPassword.trim()) {
+        setFcErrorMsg('Please enter both your Fleet Complete username and password.');
+        setUpdatingCredentials(false);
+        return;
+      }
+      body.username = fcUsername.trim();
+      body.password = fcPassword.trim();
+    }
+
+    try {
+      const res = await fetch('/api/telematics/update-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFcSuccessMsg(data.message || 'Successfully connected!');
+        setFcApiKey('');
+        setFcUsername('');
+        setFcPassword('');
+        // Refresh status
+        await fetchTelematicsStatus();
+      } else {
+        setFcErrorMsg(data.message || 'Failed to connect. Please verify your credentials.');
+      }
+    } catch (err: any) {
+      setFcErrorMsg(`Network error: ${err.message || err}`);
+    } finally {
+      setUpdatingCredentials(false);
+    }
+  };
 
   // Filter trucks that do NOT have a stationary GPS configured yet, OR are currently selected for editing
   const unconfiguredTrucks = trucks.filter(t => !t.gpsDeviceId || t.id === selectedTruckId);
@@ -149,6 +239,177 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
           <span>{errorMsg}</span>
         </div>
       )}
+
+      {/* Fleet Complete Telematics Cloud Sync Card */}
+      <div className="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-blue-100 rounded-xl text-blue-600">
+              <Radio className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <h5 className="text-sm font-bold text-gray-900 flex items-center">
+                <span>Fleet Complete API Gateway Connection</span>
+              </h5>
+              <p className="text-[11px] text-gray-500">Manage live hardware telematics, update bearer tokens, or input system credentials.</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            {loadingStatus ? (
+              <span className="text-xs text-gray-400 flex items-center space-x-1 font-mono">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span>Checking gateway...</span>
+              </span>
+            ) : telematicsStatus?.configured ? (
+              <div className="flex items-center space-x-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider rounded-full font-mono">
+                  Active Sync ({telematicsStatus.activeConfigMode})
+                </span>
+                {telematicsStatus.cachedFleetId && (
+                  <span className="px-2 py-1 bg-slate-200 text-slate-700 text-[9px] font-bold rounded font-mono">
+                    FID: {telematicsStatus.cachedFleetId}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                <span className="px-2.5 py-1 bg-amber-50 border border-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider rounded-full font-mono">
+                  Offline / Unconfigured
+                </span>
+              </div>
+            )}
+            <button
+              onClick={fetchTelematicsStatus}
+              type="button"
+              className="p-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
+              title="Refresh connection status"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Status Alerts */}
+        {fcSuccessMsg && (
+          <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 animate-fade-in">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Connection Verified Successfully!</p>
+              <p className="text-[11px] font-medium opacity-90">{fcSuccessMsg}</p>
+            </div>
+          </div>
+        )}
+
+        {fcErrorMsg && (
+          <div className="bg-rose-50 border border-rose-100 text-rose-800 p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 animate-fade-in">
+            <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Credential Authentication Failed</p>
+              <p className="text-[11px] font-medium opacity-90">{fcErrorMsg}</p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleUpdateCredentials} className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-end gap-4 bg-white p-4 border border-slate-200 rounded-xl">
+            <div className="w-full md:w-1/4 space-y-1">
+              <label className="text-xs font-bold text-gray-700 block">Configuration Method</label>
+              <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setConfigMode('apikey')}
+                  className={`py-1 text-[10px] font-bold rounded-md transition-all ${
+                    configMode === 'apikey'
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  API Key/Token
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfigMode('userpass')}
+                  className={`py-1 text-[10px] font-bold rounded-md transition-all ${
+                    configMode === 'userpass'
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  User Login
+                </button>
+              </div>
+            </div>
+
+            {configMode === 'apikey' ? (
+              <div className="flex-1 space-y-1">
+                <label className="text-xs font-bold text-gray-700 flex items-center">
+                  <Key className="h-3 w-3 mr-1 text-slate-500" />
+                  Fleet Complete API Key (Bearer Token)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Paste your FLEET_COMPLETE_API_KEY token here..."
+                  value={fcApiKey}
+                  onChange={(e) => setFcApiKey(e.target.value)}
+                  className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-mono"
+                />
+              </div>
+            ) : (
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 flex items-center">
+                    <User className="h-3 w-3 mr-1 text-slate-500" />
+                    Fleet Complete Username / Email
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. tracking@prospaces.ca"
+                    value={fcUsername}
+                    onChange={(e) => setFcUsername(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 flex items-center">
+                    <Lock className="h-3 w-3 mr-1 text-slate-500" />
+                    Fleet Complete Password
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={fcPassword}
+                    onChange={(e) => setFcPassword(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-medium"
+                  />
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={updatingCredentials}
+              className="w-full md:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer disabled:opacity-60"
+            >
+              {updatingCredentials ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <Key className="h-3.5 w-3.5" />
+                  <span>Update & Connect Live</span>
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-500 italic mt-1 font-mono">
+            &bull; Dynamic updates are stored securely in-memory. Once tested successfully, tracking coordinates will synchronize instantly (15-second cycles).
+          </p>
+        </form>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         

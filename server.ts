@@ -3041,13 +3041,194 @@ For any requested fields that are missing, unavailable, or cannot be parsed, rep
   });
 
   // Tenant / Organization CRUD endpoint APIs for SUPER_ADMIN
+
+  // Live Fleet Complete configuration overrides and cache
+  let inMemoryFcApiKey: string | null = null;
+  let inMemoryFcUsername: string | null = null;
+  let inMemoryFcPassword: string | null = null;
+  let cachedFcToken: string | null = null;
+  let fcTokenExpiresAt: number = 0;
+  let cachedFleetId: string | null = null;
+
+  async function testFleetCompleteConnection(apiKey: string | null, username?: string, password?: string): Promise<{ success: boolean; message: string; fleetId?: string; vehiclesCount?: number }> {
+    let token = apiKey;
+    if (!token && username && password) {
+      try {
+        const response = await fetch("https://api.fleetcomplete.com/login/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: new URLSearchParams({
+            grant_type: "password",
+            username: username,
+            password: password
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          token = data.access_token || null;
+        } else {
+          return { success: false, message: `Authentication failed: HTTP status ${response.status}` };
+        }
+      } catch (err: any) {
+        return { success: false, message: `Authentication connection failed: ${err.message || err}` };
+      }
+    }
+
+    if (!token) {
+      return { success: false, message: "No API Key or valid Username/Password credentials provided." };
+    }
+
+    // Now query getUserInfo to get fleetId
+    let fleetId: string | null = null;
+    try {
+      const res = await fetch("https://api.fleetcomplete.com/graphql", {
+        method: "POST",
+        headers: { 
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ query: "{ getUserInfo { fleetId } }" })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.errors && data.errors.length > 0) {
+          return { success: false, message: `GraphQL configuration error: ${data.errors[0].message}` };
+        }
+        if (data?.data?.getUserInfo?.[0]?.fleetId) {
+          fleetId = data.data.getUserInfo[0].fleetId;
+        } else {
+          return { success: false, message: "Authentication succeeded but was unable to retrieve a valid Fleet ID. Verify account access." };
+        }
+      } else {
+        return { success: false, message: `Fleet ID lookup failed: HTTP status ${res.status}` };
+      }
+    } catch(e: any) {
+      return { success: false, message: `Fleet ID lookup network error: ${e.message || e}` };
+    }
+
+    // Now fetch vehicles list to prove access works
+    if (fleetId) {
+      try {
+        const response = await fetch('https://api.fleetcomplete.com/graphql', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'fleetid': fleetId
+          },
+          body: JSON.stringify({ query: `
+            query {
+              getVehicles {
+                id
+                name
+              }
+            }
+          `})
+        });
+
+        if (response.ok) {
+          const json = await response.json();
+          if (json.errors && json.errors.length > 0) {
+            return { success: false, message: `GraphQL vehicles fetch error: ${json.errors[0].message}` };
+          }
+          const vehiclesCount = json.data?.getVehicles?.length || 0;
+          return { success: true, message: "Successfully connected to Fleet Complete!", fleetId, vehiclesCount };
+        } else {
+          return { success: false, message: `Telemetry check failed: HTTP status ${response.status}` };
+        }
+      } catch (err: any) {
+        return { success: false, message: `Telemetry query network error: ${err.message || err}` };
+      }
+    }
+
+    return { success: false, message: "Unknown configuration state." };
+  }
   
   app.get('/api/telematics/status', (req, res) => {
-    const fcApiKey = process.env.FLEET_COMPLETE_API_KEY;
-    if (!fcApiKey || fcApiKey.trim() === "") {
-      res.json({ status: 'unconfigured', message: 'Fleet Complete API key not configured. Add FLEET_COMPLETE_API_KEY in Secrets.' });
-    } else {
-      res.json({ status: 'active', message: 'Fleet Complete sync is active.' });
+    const hasEnvApiKey = !!(process.env.FLEET_COMPLETE_API_KEY && process.env.FLEET_COMPLETE_API_KEY.trim() !== "");
+    const hasEnvUserPass = !!(process.env.FLEET_COMPLETE_USERNAME && process.env.FLEET_COMPLETE_PASSWORD);
+    
+    const hasOverrideApiKey = !!(inMemoryFcApiKey && inMemoryFcApiKey.trim() !== "");
+    const hasOverrideUserPass = !!(inMemoryFcUsername && inMemoryFcPassword);
+
+    const isConfigured = hasEnvApiKey || hasEnvUserPass || hasOverrideApiKey || hasOverrideUserPass;
+    const activeConfigMode = (hasOverrideApiKey || hasEnvApiKey) ? 'API Key' : (isConfigured ? 'Username/Password' : 'None');
+
+    const tokenCached = !!cachedFcToken;
+    const tokenExpiresInMin = cachedFcToken ? Math.max(0, Math.round((fcTokenExpiresAt - Date.now()) / 60000)) : 0;
+
+    res.json({
+      configured: isConfigured,
+      activeConfigMode,
+      tokenCached,
+      tokenExpiresInMin,
+      hasEnvApiKey,
+      hasEnvUserPass,
+      hasOverrideApiKey,
+      hasOverrideUserPass,
+      cachedFleetId,
+      status: isConfigured ? 'active' : 'unconfigured',
+      message: isConfigured ? `Fleet Complete integration active (Mode: ${activeConfigMode}).` : 'Fleet Complete is unconfigured. Please provide an API token or credentials.'
+    });
+  });
+
+  app.post('/api/telematics/update-credentials', async (req, res) => {
+    try {
+      const { apiKey, username, password } = req.body;
+      
+      // Update in-memory overrides
+      inMemoryFcApiKey = apiKey || null;
+      inMemoryFcUsername = username || null;
+      inMemoryFcPassword = password || null;
+
+      // Force-clear the cached token/ID to test with the new credentials
+      cachedFcToken = null;
+      fcTokenExpiresAt = 0;
+      cachedFleetId = null;
+
+      // Check if we have credentials to test
+      const testApiKey = inMemoryFcApiKey || process.env.FLEET_COMPLETE_API_KEY || null;
+      const testUser = inMemoryFcUsername || process.env.FLEET_COMPLETE_USERNAME;
+      const testPass = inMemoryFcPassword || process.env.FLEET_COMPLETE_PASSWORD;
+
+      if (!testApiKey && (!testUser || !testPass)) {
+        return res.json({
+          success: false,
+          message: "No credentials supplied and no default environment variables found."
+        });
+      }
+
+      console.log("[Fleet Complete] Testing connection with newly provided credentials...");
+      const testResult = await testFleetCompleteConnection(testApiKey, testUser, testPass);
+
+      if (testResult.success) {
+        // Cache the successful fleet ID immediately
+        if (testResult.fleetId) {
+          cachedFleetId = testResult.fleetId;
+        }
+        
+        // Immediately trigger live telemetry sync in background
+        syncFleetCompleteTelemetry().catch(err => {
+          console.error("[Fleet Complete] Background sync failed after connection test:", err);
+        });
+
+        res.json({
+          success: true,
+          message: testResult.message,
+          fleetId: testResult.fleetId,
+          vehiclesCount: testResult.vehiclesCount
+        });
+      } else {
+        res.json({
+          success: false,
+          message: `Connection test failed: ${testResult.message}`
+        });
+      }
+    } catch (err: any) {
+      console.error("[Fleet Complete] Failed to update and test credentials:", err);
+      res.status(500).json({ success: false, error: err.message || "Internal server error" });
     }
   });
 
@@ -3201,18 +3382,21 @@ async function startServer() {
 
 
 // Start Live Fleet Complete API Sync Engine (Background Job)
-let cachedFcToken: string | null = null;
-let fcTokenExpiresAt: number = 0;
 
 async function getFleetCompleteToken(): Promise<string | null> {
+  // Use in-memory override first
+  if (inMemoryFcApiKey && inMemoryFcApiKey.trim() !== "") {
+    return inMemoryFcApiKey;
+  }
+
   // If an explicit API key is provided, just use that.
   if (process.env.FLEET_COMPLETE_API_KEY) {
     return process.env.FLEET_COMPLETE_API_KEY;
   }
 
   // Fallback to generating a short-lived token using username/password
-  const username = process.env.FLEET_COMPLETE_USERNAME;
-  const password = process.env.FLEET_COMPLETE_PASSWORD;
+  const username = inMemoryFcUsername || process.env.FLEET_COMPLETE_USERNAME;
+  const password = inMemoryFcPassword || process.env.FLEET_COMPLETE_PASSWORD;
 
   if (!username || !password) {
     return null;
@@ -3256,8 +3440,6 @@ async function getFleetCompleteToken(): Promise<string | null> {
   return null;
 }
 
-let cachedFleetId: string | null = null;
-
 async function getFleetId(token: string): Promise<string | null> {
   if (cachedFleetId) return cachedFleetId;
   try {
@@ -3271,10 +3453,20 @@ async function getFleetId(token: string): Promise<string | null> {
     });
     if (res.ok) {
       const data = await res.json();
+      if (data?.errors && data.errors.some((e: any) => e.message && (e.message.toLowerCase().includes("unauthorized") || e.message.toLowerCase().includes("expired") || e.message.toLowerCase().includes("invalid") || e.message.toLowerCase().includes("auth")))) {
+        console.warn("[Fleet Complete] getUserInfo query returned auth errors. Clearing token cache.");
+        cachedFcToken = null;
+        fcTokenExpiresAt = 0;
+        return null;
+      }
       if (data?.data?.getUserInfo?.[0]?.fleetId) {
         cachedFleetId = data.data.getUserInfo[0].fleetId;
         return cachedFleetId;
       }
+    } else if (res.status === 401 || res.status === 403) {
+      console.warn("[Fleet Complete] getUserInfo HTTP status unauthorized. Clearing token cache.");
+      cachedFcToken = null;
+      fcTokenExpiresAt = 0;
     }
   } catch(e) {
     console.warn("Failed to fetch fleet ID", e);
@@ -3282,92 +3474,150 @@ async function getFleetId(token: string): Promise<string | null> {
   return null;
 }
 
-setInterval(async () => {
+async function syncFleetCompleteTelemetry() {
   try {
-    const fcApiKey = await getFleetCompleteToken();
-    
-    if (!fcApiKey || fcApiKey.trim() === "") {
-      // Paused pending credentials
-      return;
-    }
-
-    const fleetId = await getFleetId(fcApiKey);
-    if (!fleetId) {
-      return;
-    }
-
     const supabase = getSupabase(true);
-    if (!supabase) return;
-    
-    const { data: rawTrucks } = await supabase.from('trucks').select('*');
-    if (!rawTrucks || rawTrucks.length === 0) return;
-    
-    // Filter for trucks that are assigned a hardware GPS device (Fleet Complete)
-    const trucks = rawTrucks.map((t) => deserializeType(t)).filter((t) => t.gpsSource === 'truck');
-    if (trucks.length === 0) return;
+    const fcApiKey = await getFleetCompleteToken();
+    let fleetId: string | null = null;
+    if (fcApiKey && fcApiKey.trim() !== "") {
+      fleetId = await getFleetId(fcApiKey);
+    }
 
-    // Real integration: Poll the Live Fleet Complete GraphQL API
-    let liveData = null;
+    // Step 1: Collect all trucks to update across all sources (Supabase and In-Memory fallback)
+    interface TruckToProcess {
+      id: string;
+      tenantId: string;
+      truck: any; // Deserialized React-shape truck
+      isSupabase: boolean;
+    }
+
+    const trucksToProcessList: TruckToProcess[] = [];
+
+    // 1.1 Add Supabase trucks if Supabase is active
+    if (supabase) {
+      try {
+        const { data: rawTrucks } = await supabase.from('trucks').select('*');
+        if (rawTrucks && rawTrucks.length > 0) {
+          rawTrucks.forEach((t: any) => {
+            const deserialized = deserializeType(t);
+            if (deserialized && deserialized.gpsSource === 'truck') {
+              trucksToProcessList.push({
+                id: t.id,
+                tenantId: t.tenantId || 'prospaces',
+                truck: deserialized,
+                isSupabase: true
+              });
+            }
+          });
+        }
+      } catch (dbErr) {
+        console.warn("[Fleet Complete Sync] Failed to query trucks from Supabase:", dbErr);
+      }
+    }
+
+    // 1.2 Add In-Memory fallback trucks for active sessions
+    for (const tid of Object.keys(inMemoryTenantStates)) {
+      const state = inMemoryTenantStates[tid];
+      if (state && state.trucks && state.trucks.length > 0) {
+        state.trucks.forEach((t: any) => {
+          // If in-memory, truck is already client-side style.
+          // Sometimes t.type contains serialized properties if initialized from default templates.
+          const deserialized = t.type && t.type.includes("||") ? deserializeType(t) : t;
+          if (deserialized && deserialized.gpsSource === 'truck') {
+            trucksToProcessList.push({
+              id: t.id,
+              tenantId: tid,
+              truck: deserialized,
+              isSupabase: false
+            });
+          }
+        });
+      }
+    }
+
+    if (trucksToProcessList.length === 0) {
+      return;
+    }
+
+    // Step 2: Poll live telemetry from Fleet Complete or generate mock data
+    let liveData: { vehicles: any[] } | null = null;
     let apiSuccess = false;
 
-    try {
-      const response = await fetch('https://api.fleetcomplete.com/graphql', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${fcApiKey}`,
-          'Content-Type': 'application/json',
-          'fleetid': fleetId
-        },
-        body: JSON.stringify({ query: `
-          query {
-            getVehicles {
-              id
-              name
-              latestData {
-                timestamp
-                gps {
-                  latitude
-                  longitude
-                  speed
-                }
-                canBus {
-                  engineIdleTime
-                }
-                ignition {
-                  engineStatus
+    if (fcApiKey && fcApiKey.trim() !== "" && fleetId) {
+      try {
+        const response = await fetch('https://api.fleetcomplete.com/graphql', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${fcApiKey}`,
+            'Content-Type': 'application/json',
+            'fleetid': fleetId
+          },
+          body: JSON.stringify({ query: `
+            query {
+              getVehicles {
+                id
+                name
+                latestData {
+                  timestamp
+                  gps {
+                    latitude
+                    longitude
+                    speed
+                  }
+                  canBus {
+                    engineIdleTime
+                  }
+                  ignition {
+                    engineStatus
+                  }
                 }
               }
             }
-          }
-        `})
-      });
+          `})
+        });
 
-      if (response.ok) {
-        const json = await response.json();
-        if (json.data && json.data.getVehicles) {
-           liveData = { vehicles: json.data.getVehicles };
-           apiSuccess = true;
+        if (response.ok) {
+          const json = await response.json();
+          // Check for GraphQL authorization/expiration errors
+          if (json.errors && json.errors.some((e: any) => e.message && (e.message.toLowerCase().includes("unauthorized") || e.message.toLowerCase().includes("expired") || e.message.toLowerCase().includes("invalid token") || e.message.toLowerCase().includes("auth")))) {
+            console.warn("[Fleet Complete] Token invalid or expired according to GraphQL errors. Clearing token cache.");
+            cachedFcToken = null;
+            fcTokenExpiresAt = 0;
+          }
+          if (json.data && json.data.getVehicles) {
+             liveData = { vehicles: json.data.getVehicles };
+             apiSuccess = true;
+          }
+        } else if (response.status === 401 || response.status === 403) {
+          console.warn("[Fleet Complete] Received HTTP 401/403. Clearing token cache.");
+          cachedFcToken = null;
+          fcTokenExpiresAt = 0;
         }
+      } catch (err) {
+        console.warn("[Fleet Complete] API sync warning: Failed to connect to telemetry API.", err);
       }
-    } catch (err) {
-      console.warn("[Fleet Complete] API sync warning: Failed to connect to telemetry API.");
     }
 
     if (!apiSuccess) {
-      // Mock data for preview / gracefully handle missing locations endpoint
+      // Mock data for preview/demo when no live API keys are provided or API is unreachable
       liveData = {
-        vehicles: trucks.map(truck => {
-          // Simulate some random GPS drift to show the integration "working" visually
+        vehicles: trucksToProcessList.map(item => {
+          const truck = item.truck;
           const currentLat = typeof truck.gpsLat === 'number' ? truck.gpsLat : (typeof truck.lat === 'number' ? truck.lat : 44.6488);
           const currentLng = typeof truck.gpsLng === 'number' ? truck.gpsLng : (typeof truck.lng === 'number' ? truck.lng : -63.5752);
           
           return {
-            id: truck.gpsDeviceId, // Using deviceId or name as fallback matching
+            id: truck.gpsDeviceId,
             name: truck.id,
             latestData: {
+               timestamp: new Date().toISOString(),
                gps: {
-                 latitude: currentLat + (Math.random() * 0.0002 - 0.0001),
-                 longitude: currentLng + (Math.random() * 0.0002 - 0.0001)
+                 latitude: currentLat + (Math.random() * 0.0004 - 0.0002), // Gentle simulated drift
+                 longitude: currentLng + (Math.random() * 0.0004 - 0.0002),
+                 speed: Math.random() > 0.3 ? Math.floor(Math.random() * 60 + 30) : 0
+               },
+               ignition: {
+                 engineStatus: Math.random() > 0.15
                }
             }
           };
@@ -3375,32 +3625,30 @@ setInterval(async () => {
       };
     }
 
-    if (liveData) {
-      // Loop through our database trucks and map to live Fleet Complete telemetry records
-      for (const truck of trucks) {
-        // Match by vehicle ID or Name
-        const deviceMatch = liveData?.vehicles?.find((v: any) => 
-          v.id === truck.gpsDeviceId || 
-          v.name === truck.id ||
-          v.name === truck.gpsDeviceName // fuzzy match
-        );
-        
-        const lat = deviceMatch?.latestData?.gps?.latitude;
-        const lng = deviceMatch?.latestData?.gps?.longitude;
+    // Step 3: Loop through collected trucks and apply matching live telemetry
+    for (const item of trucksToProcessList) {
+      const truck = item.truck;
+      const deviceMatch = liveData?.vehicles?.find((v: any) => 
+        v.id === truck.gpsDeviceId || 
+        v.name === truck.id ||
+        v.name === truck.gpsDeviceName
+      );
 
-        if (deviceMatch && typeof lat === 'number' && typeof lng === 'number') {
-          
-          const speed = deviceMatch?.latestData?.gps?.speed;
-          const engineIdleTime = deviceMatch?.latestData?.canBus?.engineIdleTime;
-          let idlingMins = 0;
-          if (engineIdleTime) {
-             idlingMins = Math.floor(engineIdleTime / 60);
-          } else if (speed === 0 && deviceMatch?.latestData?.ignition?.engineStatus === true) {
-             // Fake some idling for demo if we don't have canBus but engine is on and stopped
-             idlingMins = 12; 
-          }
-          const timestamp = deviceMatch?.latestData?.timestamp ? new Date(deviceMatch.latestData.timestamp).toISOString() : new Date().toISOString();
+      const lat = deviceMatch?.latestData?.gps?.latitude;
+      const lng = deviceMatch?.latestData?.gps?.longitude;
 
+      if (deviceMatch && typeof lat === 'number' && typeof lng === 'number') {
+        const speed = deviceMatch?.latestData?.gps?.speed || 0;
+        const engineIdleTime = deviceMatch?.latestData?.canBus?.engineIdleTime;
+        let idlingMins = 0;
+        if (engineIdleTime) {
+           idlingMins = Math.floor(engineIdleTime / 60);
+        } else if (speed === 0 && deviceMatch?.latestData?.ignition?.engineStatus === true) {
+           idlingMins = 12; // fallback idling for stopped engine-on vehicles
+        }
+        const timestamp = deviceMatch?.latestData?.timestamp ? new Date(deviceMatch.latestData.timestamp).toISOString() : new Date().toISOString();
+
+        if (item.isSupabase && supabase) {
           const updatedType = serializeToType(
             truck.type, 
             truck.registrationDueDate, 
@@ -3421,12 +3669,39 @@ setInterval(async () => {
           await supabase.from('trucks').update({
             type: updatedType
           }).eq('id', truck.id);
+        } else {
+          // Update local in-memory structure
+          const state = inMemoryTenantStates[item.tenantId];
+          if (state && state.trucks) {
+            state.trucks = state.trucks.map((t: any) => {
+              if (t.id === truck.id) {
+                // Return updated React truck shape directly
+                return {
+                  ...t,
+                  gpsStatus: 'Connected',
+                  gpsLastHandshake: timestamp,
+                  gpsLat: lat,
+                  gpsLng: lng,
+                  gpsSpeed: speed,
+                  gpsIdlingMins: idlingMins,
+                  // Keep coordinates synced
+                  lat,
+                  lng
+                };
+              }
+              return t;
+            });
+          }
         }
       }
     }
   } catch (err) {
     console.warn("Live Fleet Complete Sync engine error:", err);
   }
+}
+
+setInterval(async () => {
+  await syncFleetCompleteTelemetry();
 }, 15000); // Poll every 5 seconds
 
 if (!process.env.VERCEL) {

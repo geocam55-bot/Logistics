@@ -397,6 +397,7 @@ export default function App() {
   const lastMutationTimeRef = useRef<number>(0);
   const recentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const syncStatusRef = useRef<string>('IDLE');
+  const isFirstLoadRef = useRef<boolean>(true);
   useEffect(() => {
     syncStatusRef.current = syncStatus;
   }, [syncStatus]);
@@ -747,10 +748,38 @@ export default function App() {
           const cachedBranches = localStorage.getItem(`prospaces_branches_tenant_${tenantId}`);
           const cachedUsers = localStorage.getItem(`prospaces_users_tenant_${tenantId}`);
 
-          const rawDeliveries = cachedDeliveries ? JSON.parse(cachedDeliveries) : (data.branches ? (data.deliveries || []) : []);
-          const rawTrucks = cachedTrucks ? JSON.parse(cachedTrucks) : (data.branches ? (data.trucks || []) : []);
-          const rawBranches = cachedBranches ? JSON.parse(cachedBranches) : (data.branches || []);
-          const rawUsers = cachedUsers ? JSON.parse(cachedUsers) : (data.branches ? (data.users || []) : []);
+          let rawDeliveries, rawTrucks, rawBranches, rawUsers;
+          let loadedFromCache = false;
+
+          if (isFirstLoadRef.current) {
+            // First load on boot: prioritize local storage so we restore state correctly
+            if (cachedBranches) {
+              rawDeliveries = cachedDeliveries ? JSON.parse(cachedDeliveries) : [];
+              rawTrucks = cachedTrucks ? JSON.parse(cachedTrucks) : [];
+              rawBranches = JSON.parse(cachedBranches);
+              rawUsers = cachedUsers ? JSON.parse(cachedUsers) : [];
+              loadedFromCache = true;
+            } else {
+              // No cache found, use backend's default seed data
+              rawDeliveries = data.deliveries || [];
+              rawTrucks = data.trucks || [];
+              rawBranches = data.branches || [];
+              rawUsers = data.users || [];
+            }
+            isFirstLoadRef.current = false;
+          } else {
+            // Subsequent polls: prefer server's latest data (with updated GPS coordinates)
+            rawDeliveries = (data.deliveries && data.deliveries.length > 0) ? data.deliveries : (cachedDeliveries ? JSON.parse(cachedDeliveries) : []);
+            rawTrucks = (data.trucks && data.trucks.length > 0) ? data.trucks : (cachedTrucks ? JSON.parse(cachedTrucks) : []);
+            rawBranches = (data.branches && data.branches.length > 0) ? data.branches : (cachedBranches ? JSON.parse(cachedBranches) : []);
+            rawUsers = (data.users && data.users.length > 0) ? data.users : (cachedUsers ? JSON.parse(cachedUsers) : []);
+          }
+
+          // Keep localStorage warm with current state
+          localStorage.setItem(`prospaces_deliveries_tenant_${tenantId}`, JSON.stringify(rawDeliveries));
+          localStorage.setItem(`prospaces_trucks_tenant_${tenantId}`, JSON.stringify(rawTrucks));
+          localStorage.setItem(`prospaces_branches_tenant_${tenantId}`, JSON.stringify(rawBranches));
+          localStorage.setItem(`prospaces_users_tenant_${tenantId}`, JSON.stringify(rawUsers));
 
           setDeliveries(rawDeliveries.filter((d: any) => !recentlyDeletedIdsRef.current.has(d.id)));
           setTrucks(rawTrucks.filter((t: any) => !recentlyDeletedIdsRef.current.has(t.id)));
@@ -759,6 +788,11 @@ export default function App() {
           setLastSyncTime(`${new Date().toLocaleTimeString()} (Offline Local Cache)`);
           setDbActive(false);
           setSyncStatus('IDLE');
+
+          // If we restored a custom state from the cache on boot, sync it back to the backend in-memory store
+          if (loadedFromCache) {
+            syncStateToSupabase(tenantId, rawDeliveries, rawTrucks, rawBranches, rawUsers);
+          }
         }
       } catch (err: any) {
         console.error("Failed to fetch live Supabase tenant state:", err);
