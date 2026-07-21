@@ -850,81 +850,11 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Theme Selectors */}
-            <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
-              <button
-                type="button"
-                onClick={() => setMapTheme('streets')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'streets' 
-                    ? 'bg-blue-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Detailed Streets
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapTheme('osm')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'osm' 
-                    ? 'bg-indigo-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                OpenStreetMap
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapTheme('default')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'default' 
-                    ? 'bg-sky-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Simplified
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapTheme('satellite')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'satellite' 
-                    ? 'bg-amber-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Satellite
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapTheme('terrain')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'terrain' 
-                    ? 'bg-emerald-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Terrain
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapTheme('traffic')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                  mapTheme === 'traffic' 
-                    ? 'bg-rose-600 text-white shadow-xs' 
-                    : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Traffic
-              </button>
-            </div>
-
             {/* Desktop Fullscreen Toggle Anchor */}
             <button
               type="button"
               onClick={() => setIsMapFullscreen(!isMapFullscreen)}
-              className="hidden md:inline-flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 font-semibold transition-all cursor-pointer select-none border-l border-slate-700 pl-3 ml-1"
+              className="hidden md:inline-flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 font-semibold transition-all cursor-pointer select-none"
             >
               {isMapFullscreen ? (
                 <>
