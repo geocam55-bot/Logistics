@@ -112,14 +112,45 @@ export default function GoogleMapContainer({
   setViewingTripsTruckId,
 }: GoogleMapContainerProps) {
   const [apiKey, setApiKey] = useState<string>(() => {
-    return (API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY') ? API_KEY_STATIC : '';
+    if (API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY') {
+      return API_KEY_STATIC;
+    }
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('GOOGLE_MAPS_PLATFORM_KEY');
+      if (stored && stored !== 'YOUR_API_KEY') {
+        return stored;
+      }
+    }
+    return '';
   });
   const [isLoadingKey, setIsLoadingKey] = useState<boolean>(() => {
-    return !((API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY'));
+    if (API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY') {
+      return false;
+    }
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('GOOGLE_MAPS_PLATFORM_KEY');
+      if (stored && stored !== 'YOUR_API_KEY') {
+        return false;
+      }
+    }
+    return true;
   });
   const [mapAuthError, setMapAuthError] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [inputKey, setInputKey] = useState<string>('');
+
+  const handleSaveKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = inputKey.trim();
+    if (trimmed) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('GOOGLE_MAPS_PLATFORM_KEY', trimmed);
+      }
+      setApiKey(trimmed);
+      setMapAuthError(false);
+    }
+  };
 
   useEffect(() => {
     let info = `Static key: ${API_KEY_STATIC ? 'Found (len ' + API_KEY_STATIC.length + ')' : 'None'}\n`;
@@ -193,23 +224,61 @@ export default function GoogleMapContainer({
 
   if (!apiKey) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-6 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 text-center font-sans">
-        <div className="max-w-md space-y-4">
-          <h2 className="text-xl font-bold text-amber-400">Google Maps API Key Required</h2>
-          <p className="text-sm text-slate-300">
-            <strong>Step 1:</strong> <a href="https://console.cloud.google.com/google/maps-apis/start?utm_campaign=gmp-code-assist-ais" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-350">Get an API Key</a>
-          </p>
-          <p className="text-sm text-slate-300"><strong>Step 2:</strong> Add your key as a secret in AI Studio:</p>
-          <ul className="text-left text-xs text-slate-400 space-y-1.5 list-disc pl-5">
-            <li>Open <strong>Settings</strong> (⚙️ gear icon, <strong>top-right corner</strong>)</li>
-            <li>Select <strong>Secrets</strong></li>
-            <li>Type <code>GOOGLE_MAPS_PLATFORM_KEY</code> as the secret name, press <strong>Enter</strong></li>
-            <li>Paste your API key as the value, press <strong>Enter</strong></li>
-          </ul>
-          <p className="text-xs text-slate-500 mt-2">The app rebuilds automatically after you add the secret.</p>
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-6 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 text-center font-sans overflow-y-auto">
+        <div className="max-w-md w-full space-y-5 my-auto">
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-amber-400">Google Maps API Key Required</h2>
+            <p className="text-sm text-slate-300">
+              The Google Maps component requires a valid Maps API Key to load.
+            </p>
+          </div>
+
+          {/* Option A: Manual Entry for Shared / Live Preview */}
+          <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/80 text-left space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/25 text-emerald-400 text-xs font-bold">1</span>
+              <p className="text-sm font-semibold text-white">For Shared / Live Builds (Quick Access):</p>
+            </div>
+            <p className="text-xs text-slate-400 leading-normal">
+              Because AI Studio environment secrets are kept secure and hidden on public Shared/Live builds, you can paste your Google Maps API key here. It is saved only in your local browser storage:
+            </p>
+            <form onSubmit={handleSaveKey} className="flex gap-2">
+              <input
+                type="password"
+                placeholder="AIzaSy..."
+                value={inputKey}
+                onChange={(e) => setInputKey(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-800 focus:border-teal-500 text-white rounded px-2.5 py-1.5 text-xs font-mono outline-none placeholder:text-slate-700 transition-colors"
+                autoComplete="off"
+              />
+              <button
+                type="submit"
+                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-slate-950 text-xs font-bold rounded transition-colors cursor-pointer shrink-0"
+              >
+                Save Key
+              </button>
+            </form>
+          </div>
+
+          {/* Option B: Editor Secrets (For Developers) */}
+          <div className="bg-slate-950/20 p-4 rounded-xl border border-slate-850/80 text-left space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-400 text-xs font-bold">2</span>
+              <p className="text-sm font-semibold text-slate-200">For Developers (AI Studio Editor):</p>
+            </div>
+            <p className="text-xs text-slate-300">
+              <a href="https://console.cloud.google.com/google/maps-apis/start?utm_campaign=gmp-code-assist-ais" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-350">Get an API Key</a> and set it up globally:
+            </p>
+            <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-5 leading-normal">
+              <li>Open <strong>Settings</strong> (⚙️ gear icon, <strong>top-right corner</strong>)</li>
+              <li>Select <strong>Secrets</strong></li>
+              <li>Type <code>GOOGLE_MAPS_PLATFORM_KEY</code> as the secret name, press <strong>Enter</strong></li>
+              <li>Paste your API key as the value, press <strong>Enter</strong></li>
+            </ul>
+          </div>
 
           {debugInfo && (
-            <div className="mt-4 p-3 bg-slate-950 text-left rounded-lg border border-slate-800 font-mono text-[10px] text-slate-400 max-w-full overflow-x-auto whitespace-pre">
+            <div className="p-3 bg-slate-950 text-left rounded-lg border border-slate-800 font-mono text-[10px] text-slate-400 max-w-full overflow-x-auto whitespace-pre">
               <p className="text-teal-400 font-bold mb-1 border-b border-slate-800 pb-1">🔍 DIAGNOSTICS:</p>
               {debugInfo}
             </div>
@@ -285,6 +354,23 @@ export default function GoogleMapContainer({
   return (
     <APIProvider apiKey={apiKey} version="weekly">
       <div className="relative w-full h-full">
+        {/* Floating Reset Key Button if key is from localStorage */}
+        {typeof window !== 'undefined' && localStorage.getItem('GOOGLE_MAPS_PLATFORM_KEY') && (
+          <button
+            onClick={() => {
+              if (window.confirm('Are you sure you want to clear the custom Google Maps API Key and reset?')) {
+                localStorage.removeItem('GOOGLE_MAPS_PLATFORM_KEY');
+                setApiKey('');
+                setMapAuthError(false);
+              }
+            }}
+            className="absolute bottom-16 left-3 z-10 px-2.5 py-1 text-[10px] font-semibold bg-slate-900/95 border border-slate-700/80 hover:bg-slate-800 rounded-md text-slate-300 hover:text-white transition-all cursor-pointer shadow-lg flex items-center gap-1.5"
+            title="Clear saved Google Maps API Key from your browser"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-400 animate-spin-slow" />
+            <span>Reset Saved Map Key</span>
+          </button>
+        )}
         <MapInner 
           initialCenter={initialCenter}
           googleMapTypeId={googleMapTypeId}
