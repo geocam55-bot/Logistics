@@ -1526,6 +1526,29 @@ app.use((req, res, next) => {
     }
   });
 
+  app.get("/api/maps-debug", (req, res) => {
+    res.json({
+      GOOGLE_MAPS_PLATFORM_KEY: {
+        exists: !!process.env.GOOGLE_MAPS_PLATFORM_KEY,
+        length: process.env.GOOGLE_MAPS_PLATFORM_KEY ? process.env.GOOGLE_MAPS_PLATFORM_KEY.length : 0,
+        start: process.env.GOOGLE_MAPS_PLATFORM_KEY ? process.env.GOOGLE_MAPS_PLATFORM_KEY.substring(0, 4) : "",
+        end: process.env.GOOGLE_MAPS_PLATFORM_KEY ? process.env.GOOGLE_MAPS_PLATFORM_KEY.substring(process.env.GOOGLE_MAPS_PLATFORM_KEY.length - 4) : ""
+      },
+      VITE_GOOGLE_MAPS_PLATFORM_KEY: {
+        exists: !!process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY,
+        length: process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY ? process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY.length : 0,
+        start: process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY ? process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY.substring(0, 4) : "",
+        end: process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY ? process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY.substring(process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY.length - 4) : ""
+      }
+    });
+  });
+
+  app.get("/api/maps-key", (req, res) => {
+    res.json({
+      key: process.env.GOOGLE_MAPS_PLATFORM_KEY || ""
+    });
+  });
+
   // Public DB diagnostics endpoint to compare dev/prod data counts
   app.get("/api/debug-db", async (req, res) => {
     try {

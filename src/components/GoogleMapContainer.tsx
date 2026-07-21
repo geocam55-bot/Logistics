@@ -88,12 +88,11 @@ interface GoogleMapContainerProps {
   setViewingTripsTruckId?: (id: string | null) => void;
 }
 
-const API_KEY =
+const API_KEY_STATIC =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
   (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
   (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
   '';
-const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
 
 export default function GoogleMapContainer({
   hqCoords,
@@ -112,8 +111,33 @@ export default function GoogleMapContainer({
   setViewingDetailsTruckId,
   setViewingTripsTruckId,
 }: GoogleMapContainerProps) {
+  const [apiKey, setApiKey] = useState<string>(() => {
+    return (API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY') ? API_KEY_STATIC : '';
+  });
+  const [isLoadingKey, setIsLoadingKey] = useState<boolean>(() => {
+    return !((API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY'));
+  });
   const [mapAuthError, setMapAuthError] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+
+  useEffect(() => {
+    // If we don't have a static key, load it dynamically from the server
+    if (!apiKey) {
+      fetch('/api/maps-key')
+        .then(res => res.json())
+        .then(data => {
+          if (data?.key && data.key !== 'YOUR_API_KEY') {
+            setApiKey(data.key);
+          }
+        })
+        .catch(err => console.error('Failed to load dynamic maps API key:', err))
+        .finally(() => {
+          setIsLoadingKey(false);
+        });
+    } else {
+      setIsLoadingKey(false);
+    }
+  }, [apiKey]);
 
   useEffect(() => {
     const originalAuthFailure = (window as any).gm_authFailure;
@@ -136,7 +160,18 @@ export default function GoogleMapContainer({
     }
   };
 
-  if (!hasValidKey) {
+  if (isLoadingKey) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-6 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 text-center font-sans">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm text-slate-400">Loading Map Configuration...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!apiKey) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-6 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 text-center font-sans">
         <div className="max-w-md space-y-4">
@@ -221,7 +256,7 @@ export default function GoogleMapContainer({
   }
 
   return (
-    <APIProvider apiKey={API_KEY} version="weekly">
+    <APIProvider apiKey={apiKey} version="weekly">
       <div className="relative w-full h-full">
         <MapInner 
           initialCenter={initialCenter}
