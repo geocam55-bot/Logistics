@@ -119,22 +119,42 @@ export default function GoogleMapContainer({
   });
   const [mapAuthError, setMapAuthError] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
-    // If we don't have a static key, load it dynamically from the server
+    let info = `Static key: ${API_KEY_STATIC ? 'Found (len ' + API_KEY_STATIC.length + ')' : 'None'}\n`;
+    info += `Global key: ${(globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ? 'Found (len ' + (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY.length + ')' : 'None'}\n`;
+    
     if (!apiKey) {
+      info += `Fetching from /api/maps-key...\n`;
+      setDebugInfo(info);
       fetch('/api/maps-key')
-        .then(res => res.json())
+        .then(res => {
+          info += `Fetch status: ${res.status} ${res.statusText}\n`;
+          setDebugInfo(info);
+          return res.json();
+        })
         .then(data => {
+          info += `JSON received: ${data ? JSON.stringify(data).substring(0, 50) : 'none'}\n`;
           if (data?.key && data.key !== 'YOUR_API_KEY') {
             setApiKey(data.key);
+            info += `Successfully set API key!\n`;
+          } else {
+            info += `API key is missing or is placeholder in response\n`;
           }
+          setDebugInfo(info);
         })
-        .catch(err => console.error('Failed to load dynamic maps API key:', err))
+        .catch(err => {
+          info += `Fetch error: ${err.message || err}\n`;
+          console.error('Failed to load dynamic maps API key:', err);
+          setDebugInfo(info);
+        })
         .finally(() => {
           setIsLoadingKey(false);
         });
     } else {
+      info += `API Key active: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}\n`;
+      setDebugInfo(info);
       setIsLoadingKey(false);
     }
   }, [apiKey]);
@@ -187,6 +207,13 @@ export default function GoogleMapContainer({
             <li>Paste your API key as the value, press <strong>Enter</strong></li>
           </ul>
           <p className="text-xs text-slate-500 mt-2">The app rebuilds automatically after you add the secret.</p>
+
+          {debugInfo && (
+            <div className="mt-4 p-3 bg-slate-950 text-left rounded-lg border border-slate-800 font-mono text-[10px] text-slate-400 max-w-full overflow-x-auto whitespace-pre">
+              <p className="text-teal-400 font-bold mb-1 border-b border-slate-800 pb-1">🔍 DIAGNOSTICS:</p>
+              {debugInfo}
+            </div>
+          )}
         </div>
       </div>
     );
