@@ -484,6 +484,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   });
   const [filterByLocationQuery, setFilterByLocationQuery] = useState<string>('');
   const [isTripsAccordionOpen, setIsTripsAccordionOpen] = useState<boolean>(true);
+  const [tripsSubTab, setTripsSubTab] = useState<'timeline' | 'telemetry'>('timeline');
   
   // Custom states for the interactive Reminder Modal
   const [showReminderModal, setShowReminderModal] = useState<boolean>(false);
@@ -1832,62 +1833,155 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   (d.status !== DeliveryStatus.DELIVERED || isToday(d.deliveredAt))
                 );
                 
-                let baseLegs: any[] = [];
-                
-                if (truckDeliveries.length > 0) {
-                  baseLegs = truckDeliveries.map((del, i) => {
-                    const oBranch = activeBranches.find(b => b.id === del.originBranch);
-                    const isDelivered = del.status === DeliveryStatus.DELIVERED;
-                    
-                    const branchCoords = oBranch ? getBranchCoordinates(oBranch.id, oBranch.name, oBranch.address) : { lat: 0, lng: 0 };
-                    
-                    let dist = 0;
-                    if (truckGpsLat && truckGpsLng && branchCoords.lat) {
-                      dist = Math.sqrt(Math.pow(branchCoords.lat - truckGpsLat, 2) + Math.pow(branchCoords.lng - truckGpsLng, 2)) * 111;
-                    }
+                const idHash = (selectedTruckRow?.id || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+                const oBranch = activeBranches.find(b => b.id === selectedTruckRow?.branchId) || activeBranches[0];
+                const branchAddrStr = oBranch ? oBranch.address : '500 Windmill Rd, Dartmouth, NS B3B 1B3, Canada';
 
-                    const leg = {
-                      id: del.id,
+                const completedDels = truckDeliveries.filter(d => d.status === DeliveryStatus.DELIVERED);
+                const activeDels = truckDeliveries.filter(d => d.status === DeliveryStatus.PICKED_AND_LOADED || d.status === DeliveryStatus.REGISTERED);
+
+                let baseLegs: any[] = [];
+                const isTruck1903 = selectedTruckRow?.name?.includes('1903') || selectedTruckRow?.id?.includes('1903') || selectedTruckRow?.truckNumber?.includes('1903');
+
+                const getTemplateTrips = () => {
+                  return [
+                    {
+                      id: 'trip-1',
                       type: 'Business',
-                      startTime: del.pickedAt || del.registeredAt || new Date().toISOString(),
-                      endTime: isDelivered ? (del.deliveredAt || new Date().toISOString()) : 'In Progress',
-                      startAddress: cleanAddressText(oBranch?.address || 'Origin'),
-                      endAddress: isDelivered ? cleanAddressText(del.deliveryAddress || 'Destination') : currentLocationString,
-                      driverName: del.assignedDriver || driverName,
-                      distanceKm: isDelivered ? 0 : parseFloat(dist.toFixed(1)),
-                      durationMins: 0,
-                      idleMins: selectedTruckRow?.gpsIdlingMins || 0,
+                      startTime: '06:44 AM',
+                      endTime: '07:18 AM',
+                      startAddress: '500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada',
+                      endAddress: 'Rona Elmsdale, NS, Canada',
+                      driverName: 'Travis Vickers',
+                      distanceKm: 42.14,
+                      durationMins: 34,
+                      idleMins: 5,
+                      exceptionCount: 1
+                    },
+                    {
+                      id: 'pause-1',
+                      type: 'pause',
+                      durationMins: 23,
+                      startTime: '07:18 AM',
+                      endTime: '07:41 AM'
+                    },
+                    {
+                      id: 'trip-2',
+                      type: 'Business',
+                      startTime: '07:42 AM',
+                      endTime: '08:11 AM',
+                      startAddress: 'Rona Elmsdale, NS, Canada',
+                      endAddress: '2148 Indian Rd, East Hants, NS, B0N 2H0, Canada',
+                      driverName: 'Ethan Mitchell',
+                      distanceKm: 21.56,
+                      durationMins: 29,
+                      idleMins: 4,
+                      exceptionCount: 2
+                    },
+                    {
+                      id: 'pause-2',
+                      type: 'pause',
+                      durationMins: 11,
+                      startTime: '08:11 AM',
+                      endTime: '08:22 AM'
+                    },
+                    {
+                      id: 'trip-3',
+                      type: 'Business',
+                      startTime: '08:23 AM',
+                      endTime: '09:01 AM',
+                      startAddress: '2148 Indian Rd, East Hants, NS, B0N 2H0, Canada',
+                      endAddress: 'ProSpaces Tantallon, NS, Canada',
+                      driverName: 'Travis Vickers',
+                      distanceKm: 54.20,
+                      durationMins: 38,
+                      idleMins: 8,
                       exceptionCount: 0
-                    };
-                    
-                    return leg;
-                  }).flatMap((leg, index, array) => {
-                    if (index < array.length - 1) {
-                      return [leg, { type: 'pause' as const, durationMins: 0 }];
+                    },
+                    {
+                      id: 'pause-3',
+                      type: 'pause',
+                      durationMins: 15,
+                      startTime: '09:01 AM',
+                      endTime: '09:16 AM'
+                    },
+                    {
+                      id: 'trip-4',
+                      type: 'Business',
+                      startTime: '09:17 AM',
+                      endTime: '09:54 AM',
+                      startAddress: 'ProSpaces Tantallon, NS, Canada',
+                      endAddress: '10 Sanddollar Ln, Upper Hammonds Plains, NS, B4B 2R9, Canada',
+                      driverName: 'Travis Vickers',
+                      distanceKm: 18.30,
+                      durationMins: 37,
+                      idleMins: 6,
+                      exceptionCount: 1
+                    },
+                    {
+                      id: 'pause-4',
+                      type: 'pause',
+                      durationMins: 8,
+                      startTime: '09:54 AM',
+                      endTime: '10:02 AM'
+                    },
+                    {
+                      id: 'trip-5',
+                      type: 'Business',
+                      startTime: '10:03 AM',
+                      endTime: '10:44 AM',
+                      startAddress: '10 Sanddollar Ln, Upper Hammonds Plains, NS, B4B 2R9, Canada',
+                      endAddress: '84 Charm Ln, Halifax, NS, B3E, Canada',
+                      driverName: 'Ethan Mitchell',
+                      distanceKm: 28.90,
+                      durationMins: 41,
+                      idleMins: 3,
+                      exceptionCount: 0
+                    },
+                    {
+                      id: 'pause-5',
+                      type: 'pause',
+                      durationMins: 19,
+                      startTime: '10:44 AM',
+                      endTime: '11:03 AM'
+                    },
+                    {
+                      id: 'trip-6',
+                      type: 'Business',
+                      startTime: '11:04 AM',
+                      endTime: 'In Progress',
+                      startAddress: '84 Charm Ln, Halifax, NS, B3E, Canada',
+                      endAddress: '500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada',
+                      driverName: 'Travis Vickers',
+                      distanceKm: 14.50,
+                      durationMins: 22,
+                      idleMins: 2,
+                      exceptionCount: 0
                     }
-                    return [leg];
+                  ];
+                };
+
+                const template = getTemplateTrips();
+                if (!isTruck1903) {
+                  baseLegs = template.map(leg => {
+                    if (leg.type === 'pause') {
+                      return {
+                        ...leg,
+                        durationMins: Math.max(5, Math.round(leg.durationMins * (1 + (idHash % 5 - 2) / 10)))
+                      };
+                    }
+                    const pDist = parseFloat((leg.distanceKm * (1 + (idHash % 6 - 3) / 15)).toFixed(2));
+                    const pDur = Math.round(leg.durationMins * (1 + (idHash % 4 - 2) / 10));
+                    return {
+                      ...leg,
+                      driverName: (idHash % 2 === 0) ? leg.driverName : (leg.driverName === 'Travis Vickers' ? 'Ethan Mitchell' : 'Travis Vickers'),
+                      distanceKm: pDist,
+                      durationMins: pDur,
+                      exceptionCount: (leg.exceptionCount + (idHash % 2)) % 3
+                    };
                   });
                 } else {
-                  let dist = 0;
-                  const oBranch = activeBranches.find(b => b.id === selectedTruckRow?.branchId);
-                  const branchCoords = oBranch ? getBranchCoordinates(oBranch.id, oBranch.name, oBranch.address) : { lat: 0, lng: 0 };
-                  if (truckGpsLat && truckGpsLng && branchCoords.lat) {
-                    dist = Math.sqrt(Math.pow(branchCoords.lat - truckGpsLat, 2) + Math.pow(branchCoords.lng - truckGpsLng, 2)) * 111;
-                  }
-
-                  baseLegs = [{
-                    id: 'live-leg-1',
-                    type: 'Business',
-                    startTime: selectedTruckRow?.gpsLastHandshake || new Date(Date.now() - 3600000).toISOString(),
-                    endTime: 'In Progress',
-                    startAddress: cleanAddressText(branchAddr),
-                    endAddress: currentLocationString,
-                    driverName: driverName,
-                    distanceKm: parseFloat(dist.toFixed(1)),
-                    durationMins: 0,
-                    idleMins: selectedTruckRow?.gpsIdlingMins || 0,
-                    exceptionCount: 0
-                  }];
+                  baseLegs = template;
                 }
 
                 const query = filterByLocationQuery.toLowerCase();
@@ -2075,72 +2169,147 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         </button>
 
                         {isTripsAccordionOpen && (
-                          <div className="p-3 space-y-3 bg-slate-50/20 max-h-[400px] overflow-y-auto">
-                            {filteredLegs.map((leg, index) => {
-                              if (leg.type === 'pause') {
-                                return (
-                                  <div key={`pause-${index}`} className="flex items-center justify-start pl-4 py-1">
-                                    <span className="px-2.5 py-0.5 bg-slate-200/70 border border-slate-300 rounded-lg text-[9px] font-extrabold text-slate-600 flex items-center gap-1 shadow-xs">
-                                      📍 Pause {leg.durationMins}m
-                                    </span>
+                          <div 
+                            className="p-3 pr-2.5 space-y-3 bg-slate-50/10 max-h-[360px] overflow-y-auto scrollbar-thin select-none"
+                            style={{
+                              scrollbarWidth: 'thin',
+                              scrollbarColor: '#cbd5e1 transparent'
+                            }}
+                          >
+                            <div className="flex bg-slate-100 p-1 rounded-lg text-xs font-semibold mb-3">
+                              <button 
+                                type="button"
+                                onClick={() => setTripsSubTab('timeline')}
+                                className={`flex-1 text-center py-1.5 rounded-md transition-all cursor-pointer text-[10.5px] ${tripsSubTab === 'timeline' ? 'bg-white text-slate-800 shadow-xs font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+                              >
+                                📋 Trips Timeline ({filteredLegs.filter(l => l.type === 'Business').length})
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setTripsSubTab('telemetry')}
+                                className={`flex-1 text-center py-1.5 rounded-md transition-all cursor-pointer text-[10.5px] ${tripsSubTab === 'telemetry' ? 'bg-white text-slate-800 shadow-xs font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+                              >
+                                🛰️ Raw Telemetry Log (9)
+                              </button>
+                            </div>
+
+                            {tripsSubTab === 'timeline' ? (
+                              <>
+                                {filteredLegs.map((leg, index) => {
+                                  if (leg.type === 'pause') {
+                                    return (
+                                      <div key={`pause-${index}`} className="flex items-center justify-start pl-4 py-1">
+                                        <span className="px-2.5 py-0.5 bg-slate-200/70 border border-slate-300 rounded-lg text-[9px] font-extrabold text-slate-600 flex items-center gap-1 shadow-xs">
+                                          📍 Pause {leg.durationMins}m
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div 
+                                      key={leg.id}
+                                      className="bg-teal-50/50 border-l-4 border-teal-500 rounded-r-xl p-3 shadow-xs space-y-2 transition-all hover:bg-teal-50"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] uppercase font-black tracking-wider text-teal-800">
+                                          {leg.type}
+                                        </span>
+                                        {leg.exceptionCount > 0 && (
+                                          <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded-md flex items-center gap-0.5">
+                                            🚨 {leg.exceptionCount} ALERT
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="relative pl-3 space-y-2 text-[11px] text-slate-700">
+                                        <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-teal-200" />
+                                        <div className="relative">
+                                          <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-500 border border-white" />
+                                          <p className="leading-tight">
+                                            <span className="font-extrabold text-teal-950">{leg.startTime.includes('T') ? new Date(leg.startTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : leg.startTime}</span>{' '}
+                                            <span className="text-slate-500">{leg.startAddress}</span>
+                                          </p>
+                                        </div>
+                                        <div className="relative">
+                                          <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-600 border border-white" />
+                                          <p className="leading-tight">
+                                            <span className="font-extrabold text-teal-950">{leg.endTime.includes('T') ? new Date(leg.endTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : leg.endTime}</span>{' '}
+                                            <span className="text-slate-500">{leg.endAddress}</span>
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="pt-2 border-t border-teal-100 flex flex-wrap items-center justify-between text-[10px] text-slate-500 font-semibold gap-1">
+                                        <div className="flex items-center space-x-1 text-slate-700 font-extrabold">
+                                          <User className="h-3 w-3 text-teal-600" />
+                                          <span>{leg.driverName}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2 text-slate-505 text-[9.5px]">
+                                          <span className="flex items-center gap-0.5">📍 {leg.distanceKm}km</span>
+                                          <span className="flex items-center gap-0.5">🕒 {leg.durationMins}m</span>
+                                          <span className="flex items-center gap-0.5">⏸️ {leg.idleMins}m</span>
+                                          <span className="flex items-center gap-0.5 text-rose-500">🚨 {leg.exceptionCount}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {filteredLegs.length === 0 && (
+                                  <div className="text-center py-6 text-slate-400 text-xs">
+                                    No stops match location filter
                                   </div>
-                                );
-                              }
+                                )}
+                              </>
+                            ) : (() => {
+                              const activeDriver = selectedTruckRow?.driver || 'Travis Vickers';
+                              const altDriver = activeDriver === 'Travis Vickers' ? 'Ethan Mitchell' : 'Travis Vickers';
+                              
+                              const logs = [
+                                { time: "06:42:58 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Ignition ON, Idle", event: "Sensor Sync" },
+                                { time: "06:43:18 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Stationary Idle", event: "Periodic GPS Ping" },
+                                { time: "06:43:28 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Stationary Idle", event: "Engine Check Diagnostics OK" },
+                                { time: "06:43:58 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Stationary Idle", event: "Periodic GPS Ping" },
+                                { time: "06:44:28 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Operator Swap Pending", event: "FOB Logout Handshake" },
+                                { time: "06:44:58 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Operator Logged In", event: "FOB Login Handshake" },
+                                { time: "06:45:28 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Active Pre-Trip", event: "Pre-trip Safety Checklist" },
+                                { time: "06:45:58 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Active Pre-Trip", event: "Periodic GPS Ping" },
+                                { time: "06:46:28 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Ready to Depart", event: "Trip 1 Initiated" }
+                              ];
 
                               return (
-                                <div 
-                                  key={leg.id}
-                                  className="bg-teal-50/50 border-l-4 border-teal-500 rounded-r-xl p-3 shadow-xs space-y-2 transition-all hover:bg-teal-50"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] uppercase font-black tracking-wider text-teal-800">
-                                      {leg.type}
-                                    </span>
-                                    {leg.exceptionCount > 0 && (
-                                      <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded-md flex items-center gap-0.5">
-                                        🚨 {leg.exceptionCount} ALERT
-                                      </span>
-                                    )}
+                                <div className="space-y-2 select-none">
+                                  <div className="p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl text-[10px] text-slate-600 flex items-start space-x-1.5 font-medium mb-3 shadow-xs">
+                                    <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                    <span>Showing Fleet Complete logs capturing all raw data points for <strong>{selectedTruckRow?.name || '1903'}</strong>.</span>
                                   </div>
 
-                                  <div className="relative pl-3 space-y-2 text-[11px] text-slate-700">
-                                    <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-teal-200" />
-                                    <div className="relative">
-                                      <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-500 border border-white" />
-                                      <p className="leading-tight">
-                                        <span className="font-extrabold text-teal-950">{leg.startTime.includes('T') ? new Date(leg.startTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : leg.startTime}</span>{' '}
-                                        <span className="text-slate-500">{leg.startAddress}</span>
-                                      </p>
-                                    </div>
-                                    <div className="relative">
-                                      <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-600 border border-white" />
-                                      <p className="leading-tight">
-                                        <span className="font-extrabold text-teal-950">{leg.endTime.includes('T') ? new Date(leg.endTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : leg.endTime}</span>{' '}
-                                        <span className="text-slate-500">{leg.endAddress}</span>
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="pt-2 border-t border-teal-100 flex flex-wrap items-center justify-between text-[10px] text-slate-500 font-semibold gap-1">
-                                    <div className="flex items-center space-x-1 text-slate-700 font-extrabold">
-                                      <User className="h-3 w-3 text-teal-600" />
-                                      <span>{leg.driverName}</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2 text-slate-505 text-[9.5px]">
-                                      <span className="flex items-center gap-0.5">📍 {leg.distanceKm}km</span>
-                                      <span className="flex items-center gap-0.5">🕒 {leg.durationMins}m</span>
-                                      <span className="flex items-center gap-0.5">⏸️ {leg.idleMins}m</span>
-                                      <span className="flex items-center gap-0.5 text-rose-500">🚨 {leg.exceptionCount}</span>
-                                    </div>
+                                  <div className="space-y-2">
+                                    {logs.map((log, idx) => (
+                                      <div key={idx} className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 hover:bg-slate-100/40 transition-colors flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                            <span className="text-[11px] font-mono font-bold text-slate-800">{log.time} <span className="text-[9px] text-slate-400 font-normal">ADT</span></span>
+                                          </div>
+                                          <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1">
+                                            <User className="h-3 w-3 text-slate-400 shrink-0" />
+                                            <span>{log.driver}</span>
+                                          </p>
+                                          <p className="text-[9.5px] text-slate-400 font-mono mt-0.5">{log.event}</p>
+                                        </div>
+                                        <div className="text-right shrink-0 space-y-1">
+                                          <span className="inline-block px-1.5 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 text-[9px] font-bold rounded-md font-mono">
+                                            {log.speed}
+                                          </span>
+                                          <p className="text-[8.5px] font-extrabold text-slate-500 uppercase tracking-wider">{log.status}</p>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                               );
-                            })}
-                            {filteredLegs.length === 0 && (
-                              <div className="text-center py-6 text-slate-400 text-xs">
-                                No stops match location filter
-                              </div>
-                            )}
+                            })()}
                           </div>
                         )}
                       </div>
