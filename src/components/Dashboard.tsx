@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import L from 'leaflet';
+import GoogleMapContainer from './GoogleMapContainer';
 import { DeliveryRecord, DeliveryStatus, Branch, Truck as TruckType, User as UserType } from '../types';
 import { renderUserAvatarHelper } from './UserProfileModal';
 import { 
@@ -145,7 +145,7 @@ const getGpsForLocation = (id: string, nameOrAddress: string): { lat: number; ln
   }
 };
 
-const cleanAddressText = (address: string | undefined): string => {
+export const cleanAddressText = (address: string | undefined): string => {
   if (!address) return '';
   return address
     .replace(/\|\|lat:\s*(-?\d+(?:\.\d+)?)/gi, '')
@@ -154,7 +154,7 @@ const cleanAddressText = (address: string | undefined): string => {
     .trim();
 };
 
-const getTruckCoords = (truck: any, simProgress: Record<string, number>, branches: any[]) => {
+export const getTruckCoords = (truck: any, simProgress: Record<string, number>, branches: any[]) => {
   const isTruckGps = truck.gpsSource === 'truck';
   const hasRealGps = isTruckGps 
     ? (truck.gpsLat !== undefined && truck.gpsLng !== undefined && !isNaN(truck.gpsLat) && !isNaN(truck.gpsLng))
@@ -205,13 +205,13 @@ const getPercentCoordsFromGps = (lat: number, lng: number): { x: number; y: numb
   return { x, y };
 };
 
-const getBranchCoordinates = (id: string, name: string, address?: string): { x: number; y: number; lat: number; lng: number } => {
+export const getBranchCoordinates = (id: string, name: string, address?: string): { x: number; y: number; lat: number; lng: number } => {
   const { lat, lng } = getGpsForLocation(id, address || name);
   const coords = getPercentCoordsFromGps(lat, lng);
   return { x: coords.x, y: coords.y, lat, lng };
 };
 
-const getDeliveryCoordinates = (id: string, address: string, originX: number, originY: number): { x: number; y: number; lat: number; lng: number } => {
+export const getDeliveryCoordinates = (id: string, address: string, originX: number, originY: number): { x: number; y: number; lat: number; lng: number } => {
   const { lat, lng } = getGpsForLocation(id, address);
   const coords = getPercentCoordsFromGps(lat, lng);
   return { x: coords.x, y: coords.y, lat, lng };
@@ -400,7 +400,6 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   
   const [selectedTrackTruckId, setSelectedTrackTruckId] = useState<string | null>(null);
   const selectedTruck = selectedTrackTruckId ? displayTrucks.find(t => t.id === selectedTrackTruckId) : (displayTrucks[0] || trucks[0]);
-  const [isPlayingSimulation, setIsPlayingSimulation] = useState<boolean>(true);
   const [simProgress, setSimProgress] = useState<Record<string, number>>({});
   const [lastRadarPingTime, setLastRadarPingTime] = useState<string>(() => new Date().toLocaleTimeString());
   const [isPinging, setIsPinging] = useState<boolean>(false);
@@ -446,6 +445,28 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const [selectedYear, setSelectedYear] = useState<number>(2024);
   const [activeActionMenuTruckId, setActiveActionMenuTruckId] = useState<string | null>(null);
   const [viewingTripsTruckId, setViewingTripsTruckId] = useState<string | null>(null);
+  const [liveGeocodedAddress, setLiveGeocodedAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (viewingTripsTruckId) {
+      const selectedTruckRow = displayTrucks.find(t => t.id === viewingTripsTruckId) || trucks[0];
+      const lat = selectedTruckRow?.gpsLat || selectedTruckRow?.lat;
+      const lng = selectedTruckRow?.gpsLng || selectedTruckRow?.lng;
+      if (lat && lng && window.google && window.google.maps && window.google.maps.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            setLiveGeocodedAddress(results[0].formatted_address);
+          } else {
+            setLiveGeocodedAddress(null);
+          }
+        });
+      } else {
+        setLiveGeocodedAddress(null);
+      }
+    }
+  }, [viewingTripsTruckId, displayTrucks, trucks]);
+
   const [viewingDetailsTruckId, setViewingDetailsTruckId] = useState<string | null>(null);
   const [viewingCoordinatesTruckId, setViewingCoordinatesTruckId] = useState<string | null>(null);
   const [detailsAccordionOpen, setDetailsAccordionOpen] = useState<{
@@ -485,14 +506,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
-  // Manage Leaflet map invalidate size and block page scroll during fullscreen
+  // Block page scroll during fullscreen
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-      }
-    }, 200);
-
     if (isMapFullscreen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -500,7 +515,6 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     }
 
     return () => {
-      clearTimeout(timer);
       document.body.style.overflow = '';
     };
   }, [isMapFullscreen]);
@@ -576,25 +590,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     }
   };
 
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const lastBoundsKeyRef = useRef<string>('');
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const trafficLayerRef = useRef<L.TileLayer | null>(null);
-  const lastFlownTruckIdRef = useRef<string | null>(null);
-  const layersRef = useRef<{
-    hq: L.LayerGroup | null;
-    branches: L.LayerGroup | null;
-    deliveries: L.LayerGroup | null;
-    trucks: L.LayerGroup | null;
-    routes: L.LayerGroup | null;
-  }>({
-    hq: null,
-    branches: null,
-    deliveries: null,
-    trucks: null,
-    routes: null
-  });
+
 
   // Automatically adjust default HQ coordinates and center based on the active branches' region and current selected driver/truck's branch
   useEffect(() => {
@@ -624,546 +620,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
     }
   }, [activeBranches, selectedTruck]);
 
-  // Smoothly pan map to selected truck's active coordinates
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !selectedTrackTruckId || !selectedTruck) {
-      if (!selectedTrackTruckId) {
-        lastFlownTruckIdRef.current = null;
-      }
-      return;
-    }
 
-    if (lastFlownTruckIdRef.current === selectedTrackTruckId) {
-      return;
-    }
-    lastFlownTruckIdRef.current = selectedTrackTruckId;
 
-    const hasRealGps = (selectedTruck as any).lat !== undefined && 
-                        (selectedTruck as any).lng !== undefined && 
-                        !isNaN((selectedTruck as any).lat) && 
-                        !isNaN((selectedTruck as any).lng);
-    let targetLat = (selectedTruck as any).lat;
-    let targetLng = (selectedTruck as any).lng;
 
-    if (!hasRealGps) {
-      const assignedDelivery = deliveries.find(d => d.assignedTruck === selectedTruck.id && d.status !== DeliveryStatus.DELIVERED);
-      if (assignedDelivery) {
-        const matchedOrigBranch = activeBranches.find(b => b.id === assignedDelivery.originBranch);
-        const orig = getBranchCoordinates(assignedDelivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
-        targetLat = orig.lat;
-        targetLng = orig.lng;
-      } else {
-        const homeBranch = activeBranches.find(b => b.id === selectedTruck.branchId);
-        const isProSpaces = selectedTruck.tenantId === 'prospaces';
-        const orig = homeBranch 
-          ? getBranchCoordinates(homeBranch.id, homeBranch.name, homeBranch.address) 
-          : isProSpaces 
-            ? { lat: 44.6488, lng: -63.5752 } 
-            : { lat: 37.2872, lng: -121.9500 };
-        targetLat = orig.lat;
-        targetLng = orig.lng;
-      }
-    }
 
-    if (targetLat !== undefined && targetLng !== undefined && !isNaN(targetLat) && !isNaN(targetLng)) {
-      map.flyTo([targetLat, targetLng], 13.5, {
-        animate: true,
-        duration: 1.2
-      });
-    }
-  }, [selectedTrackTruckId, selectedTruck, activeBranches, deliveries]);
 
-  // 1. Initialize Leaflet map instance on mount
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
 
-    const hasCaliforniaBranch = activeBranches.some(b => {
-      const addr = (b.address || '').toUpperCase();
-      const name = (b.name || '').toUpperCase();
-      const hasCal = (/\bCA\b/.test(addr) || addr.includes('CALIFORNIA') || name.includes('CAMPBELL') || name.includes('SAN JOSE') || name.includes('CALIFORNIA') || /\bCA\b/.test(name));
-      const hasCan = addr.includes('CANADA') || name.includes('CANADA');
-      return hasCal && !hasCan;
-    });
-
-    const initialCenter: L.LatLngExpression = hasCaliforniaBranch
-      ? [37.3382, -121.8863]
-      : [44.6488, -63.5752];
-
-    const map = L.map(mapContainerRef.current, {
-      center: initialCenter,
-      zoom: 11,
-      zoomControl: true,
-      scrollWheelZoom: true,
-      maxZoom: 18,
-      minZoom: 4
-    });
-
-    mapRef.current = map;
-
-    // Create layer groups and add them to the map
-    layersRef.current.hq = L.layerGroup().addTo(map);
-    layersRef.current.branches = L.layerGroup().addTo(map);
-    layersRef.current.deliveries = L.layerGroup().addTo(map);
-    layersRef.current.trucks = L.layerGroup().addTo(map);
-    layersRef.current.routes = L.layerGroup().addTo(map);
-
-    // Set up ResizeObserver to handle container layout changes and prevent grey "blocking" grids
-    const resizeObserver = new ResizeObserver(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-      }
-    });
-    if (mapContainerRef.current) {
-      resizeObserver.observe(mapContainerRef.current);
-    }
-
-    // Map click handler to relocate Dispatcher HQ coordinates - only if Shift key is held to prevent accidental relocation!
-    map.on('click', (e: L.LeafletMouseEvent) => {
-      const isShiftKey = e.originalEvent && e.originalEvent.shiftKey;
-      if (!isShiftKey) {
-        return; // Ignored to avoid accidental relocations while interacting with the map
-      }
-
-      setIsWatchingGps(isWatch => {
-        if (isWatch) {
-          setSysLogs(prev => [
-            `[${new Date().toLocaleTimeString()}] Relocation cancelled: Device GPS Tracking is active.`,
-            ...prev.slice(0, 4)
-          ]);
-          return isWatch;
-        }
-        
-        const { lat, lng } = e.latlng;
-        setHqCoords({ lat, lng });
-        setSysLogs(prev => [
-          `[${new Date().toLocaleTimeString()}] Headquarters coordinates manually relocated to GPS ${lat.toFixed(4)}N, ${lng.toFixed(4)}W.`,
-          ...prev.slice(0, 4)
-        ]);
-        return isWatch;
-      });
-    });
-
-    return () => {
-      resizeObserver.disconnect();
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, []);
-
-  // 2. Update base tile layers on mapTheme or mapEngine change
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    if (tileLayerRef.current) {
-      tileLayerRef.current.remove();
-    }
-    if (trafficLayerRef.current) {
-      trafficLayerRef.current.remove();
-      trafficLayerRef.current = null;
-    }
-
-    let urlTemplate = '';
-    let attribution = '';
-    let hasSubdomains = false;
-    let customSubdomains = '';
-
-    if (mapTheme === 'terrain') {
-      // Use premium Esri Topography & Terrain basemap
-      urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
-      attribution = 'Tiles &copy; Esri &mdash; Esri, USGS, NOAA';
-    } else if (mapTheme === 'streets') {
-      // Use premium Esri World Street Map (highly detailed streets, roads, and names with zero blocking/rate limits)
-      urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-      attribution = 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, TomTom, and the GIS User Community';
-    } else if (mapTheme === 'osm') {
-      // Use standard OpenStreetMap with correct 'abc' subdomain configuration to prevent 404 blockages
-      urlTemplate = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-      attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-      hasSubdomains = true;
-      customSubdomains = 'abc';
-    } else if (mapEngine === 'tomtom' && tomTomApiKey) {
-      hasSubdomains = true;
-      customSubdomains = 'abcd';
-      if (mapTheme === 'satellite') {
-        urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/sat/main/{z}/{x}/{y}.jpg?key=${tomTomApiKey}`;
-        attribution = '&copy; TomTom Satellite Imagery';
-      } else {
-        // default or traffic
-        urlTemplate = `https://{s}.api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${tomTomApiKey}`;
-        attribution = '&copy; TomTom Map Display';
-      }
-    } else {
-      // Fallback Engine (CartoDB)
-      if (mapTheme === 'satellite') {
-        urlTemplate = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        attribution = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
-      } else {
-        // default or traffic
-        urlTemplate = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-        attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-        hasSubdomains = true;
-        customSubdomains = 'abcd';
-      }
-    }
-
-    const tileOptions: L.TileLayerOptions = {
-      attribution,
-      maxZoom: (mapTheme === 'streets' || mapTheme === 'osm') ? 19 : 18,
-    };
-
-    if (hasSubdomains && customSubdomains) {
-      tileOptions.subdomains = customSubdomains;
-    }
-
-    const tileLayer = L.tileLayer(urlTemplate, tileOptions).addTo(mapRef.current);
-    tileLayerRef.current = tileLayer;
-
-    // Add traffic flow overlay if Traffic theme is selected and TomTom key is available
-    if (mapTheme === 'traffic' && tomTomApiKey) {
-      const trafficUrl = `https://{s}.api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?key=${tomTomApiKey}`;
-      const trafficOptions: L.TileLayerOptions = {
-        maxZoom: 18,
-        subdomains: 'abcd',
-        opacity: 0.85
-      };
-      const trafficLayer = L.tileLayer(trafficUrl, trafficOptions).addTo(mapRef.current);
-      trafficLayerRef.current = trafficLayer;
-    }
-  }, [mapTheme, mapEngine, tomTomApiKey]);
-
-  // 3. Update all markers and route vectors dynamically on state/telemetry changes
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const { hq, branches: bGroup, deliveries: dGroup, trucks: tGroup, routes: rGroup } = layersRef.current;
-    if (hq) hq.clearLayers();
-    if (bGroup) bGroup.clearLayers();
-    if (dGroup) dGroup.clearLayers();
-    if (tGroup) tGroup.clearLayers();
-    if (rGroup) rGroup.clearLayers();
-
-    // Plot hq
-    if (hq) {
-      const hqIcon = L.divIcon({
-        className: 'custom-hq-marker',
-        html: `
-          <div class="relative flex items-center justify-center">
-            <span class="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-blue-500 opacity-60"></span>
-            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-600 border border-white shadow-lg"></span>
-          </div>
-        `,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
-      });
-
-      L.marker([hqCoords.lat, hqCoords.lng], {
-        icon: hqIcon,
-        title: 'HQ (Dispatcher)'
-      })
-      .addTo(hq)
-      .bindPopup(`
-        <div class="font-sans text-xs p-1">
-          <p class="font-bold text-slate-800">Dispatch Headquarters</p>
-          <p class="text-[10px] text-slate-500">Location: ${hqCoords.lat.toFixed(4)}N, ${hqCoords.lng.toFixed(4)}W</p>
-          <p class="text-[9px] text-blue-600 mt-1 font-semibold">${isWatchingGps ? "🛰️ Live GPS Connected" : "📍 Anchored Point (Shift + Click map to relocate)"}</p>
-        </div>
-      `);
-    }
-
-    // Plot Branches/DC Nodes
-    if (bGroup) {
-      activeBranches.forEach(branch => {
-        const coords = getBranchCoordinates(branch.id, branch.name, branch.address);
-        const isDC = branch.type === 'DC';
-        const count = displayDeliveries.filter(d => d.originBranch === branch.id && d.status !== DeliveryStatus.DELIVERED).length;
-
-        const iconSvg = isDC 
-          ? `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-warehouse shrink-0"><path d="M22 22H2"/><path d="M10 22v-5a2 2 0 0 1 4 0v5"/><path d="M16 11V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v6"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M18 10V5a2 2 0 0 0-2-2h-8A2 2 0 0 0 6 5v5"/></svg>`
-          : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store shrink-0"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M18 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M14 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M10 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/><path d="M6 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7"/></svg>`;
-
-        const cleanName = branch.name
-          .replace(/^ProSpaces\s*-\s*/i, '')
-          .replace(/^ProSpaces\s+/i, '')
-          .replace(/^\d+\s*-\s*/, '')
-          .replace(/^\d+\s+/, '');
-
-        const branchIcon = L.divIcon({
-          className: 'custom-branch-marker',
-          html: `
-            <div class="relative -translate-y-1 bg-slate-900 border-2 ${
-              isDC ? 'border-red-500 text-red-400' : 'border-blue-400 text-blue-400'
-            } shadow-lg py-0.5 px-1.5 rounded-md text-[9px] font-mono leading-none flex items-center gap-1.5 justify-center whitespace-nowrap min-w-[75px]">
-              ${iconSvg}
-              <span class="font-bold">${isDC ? "DC" : "STORE"}</span>
-              <span class="text-white opacity-95 font-sans font-semibold">${cleanName}</span>
-              ${count > 0 ? `<span class="bg-amber-500 text-slate-950 px-1 rounded-full font-sans font-extrabold text-[8px]">${count}</span>` : ''}
-            </div>
-          `,
-          iconSize: [120, 20],
-          iconAnchor: [60, 10]
-        });
-
-        L.marker([coords.lat, coords.lng], {
-          icon: branchIcon
-        })
-        .addTo(bGroup)
-        .bindTooltip(`
-          <div class="font-sans text-xs p-1 space-y-1 text-left">
-            <p class="font-bold text-slate-100">${branch.name}</p>
-            <p class="text-[9.5px] text-amber-400 font-medium">${isDC ? "Distribution Center" : "Store Depot"}</p>
-            ${branch.address ? `<p class="text-[9.5px] text-slate-300 border-t border-slate-800 pt-1 mt-1 leading-relaxed whitespace-normal">${branch.address}</p>` : ''}
-          </div>
-        `, {
-          permanent: false,
-          direction: 'top',
-          offset: [0, -10],
-          className: 'bg-slate-900 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 shadow-xl font-sans min-w-[180px] max-w-[240px]'
-        })
-        .bindPopup(`
-          <div class="font-sans text-xs p-1.5 space-y-1">
-            <p class="font-bold text-slate-850">${branch.name}</p>
-            <p class="text-[10px] text-slate-500">Facility Type: ${branch.type === 'DC' ? 'Distribution Center' : 'Regional Store Depot'}</p>
-            ${branch.address ? `<p class="text-[10px] text-slate-600 font-medium mt-1">${branch.address}</p>` : ''}
-            <p class="text-[9px] text-slate-400 mt-0.5">GPS Coords: ${coords.lat.toFixed(4)}N, ${coords.lng.toFixed(4)}W</p>
-            <p class="text-[10px] text-amber-600 mt-1.5 font-bold border-t border-slate-100 pt-1">Pending Carrier Loads: ${count}</p>
-          </div>
-        `);
-      });
-    }
-
-    // Plot Customer Delivery Destinations
-    if (dGroup) {
-      displayDeliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
-        const isAssigned = !!delivery.assignedTruck;
-        if (isAssigned) {
-          const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
-          if (matchedTruck) {
-            const online = isTruckOnline(matchedTruck);
-            if (!online) {
-              return; // Hide destination if driver is offline
-            }
-          }
-        }
-        const matchedOrigBranch = activeBranches.find(b => b.id === delivery.originBranch);
-        const origCoords = getBranchCoordinates(delivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
-        const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
-
-        const deliveryIcon = L.divIcon({
-          className: 'custom-delivery-marker',
-          html: `
-            <div class="p-1 rounded-full border border-slate-900 shadow-md ${
-              isAssigned ? 'bg-amber-500 text-slate-950' : 'bg-slate-700 text-slate-100'
-            }">
-              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="lucide lucide-map-pin"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            </div>
-          `,
-          iconSize: [20, 20],
-          iconAnchor: [10, 10]
-        });
-
-        L.marker([destCoords.lat, destCoords.lng], {
-          icon: deliveryIcon
-        })
-        .addTo(dGroup)
-        .bindPopup(`
-          <div class="font-sans text-xs p-1.5 space-y-0.5 font-sans">
-            <p class="font-bold text-slate-900">🎯 Recipient: ${delivery.customerName}</p>
-            <p class="text-[10px] text-slate-600">${cleanAddressText(delivery.deliveryAddress)}</p>
-            <p class="text-[9px] text-slate-500">Invoice: ${delivery.invoiceNumber} ${delivery.weight ? `&bull; Weight: ${delivery.weight}` : ''}</p>
-            <div class="mt-1.5 flex items-center gap-1.5 border-t border-slate-100 pt-1.5 font-sans">
-              <span class="px-1.5 py-0.25 text-[8.5px] font-extrabold rounded bg-amber-100 text-amber-800 uppercase">
-                ${delivery.status.replace('_', ' ')}
-              </span>
-              <span class="text-[9px] text-slate-500 font-medium">${isAssigned ? `Driver: ${delivery.assignedTruck}` : 'Pending Driver'}</span>
-            </div>
-          </div>
-        `);
-      });
-    }
-
-    // Plot drivers / trucks & lines
-    let activeTruckGps: { lat: number; lng: number } | null = null;
-    const allPlottedCoords: L.LatLngExpression[] = [];
-
-    if (hqCoords && !isNaN(hqCoords.lat) && !isNaN(hqCoords.lng)) {
-      allPlottedCoords.push([hqCoords.lat, hqCoords.lng]);
-    }
-
-    activeBranches.forEach(branch => {
-      const coords = getBranchCoordinates(branch.id, branch.name, branch.address);
-      if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) {
-        allPlottedCoords.push([coords.lat, coords.lng]);
-      }
-    });
-
-    displayDeliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).forEach(delivery => {
-      const isAssigned = !!delivery.assignedTruck;
-      if (isAssigned) {
-        const matchedTruck = displayTrucks.find(t => t.id === delivery.assignedTruck);
-        if (matchedTruck) {
-          const online = isTruckOnline(matchedTruck);
-          if (!online) return; // Skip bounds plotting if driver is offline
-        }
-      }
-      const matchedOrigBranch = activeBranches.find(b => b.id === delivery.originBranch);
-      const origCoords = getBranchCoordinates(delivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
-      const destCoords = getDeliveryCoordinates(delivery.id, delivery.deliveryAddress, origCoords.x, origCoords.y);
-      if (destCoords && !isNaN(destCoords.lat) && !isNaN(destCoords.lng)) {
-        allPlottedCoords.push([destCoords.lat, destCoords.lng]);
-      }
-    });
-
-    if (tGroup && rGroup) {
-      displayTrucks.forEach(truck => {
-        let origLat: number;
-        let origLng: number;
-        let destLat: number;
-        let destLng: number;
-        let isMoving = false;
-        
-        const isOnline = isTruckOnline(truck);
-
-        const assignedDelivery = displayDeliveries.find(d => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
-        if (assignedDelivery) {
-          const matchedOrigBranch = activeBranches.find(b => b.id === assignedDelivery.originBranch);
-          const orig = getBranchCoordinates(assignedDelivery.originBranch, matchedOrigBranch?.name || '', matchedOrigBranch?.address);
-          const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
-          origLat = isNaN(orig.lat) ? 44.6488 : orig.lat;
-          origLng = isNaN(orig.lng) ? -63.5752 : orig.lng;
-          destLat = isNaN(dest.lat) ? 44.6488 : dest.lat;
-          destLng = isNaN(dest.lng) ? -63.5752 : dest.lng;
-          isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
-        } else {
-          const homeBranch = activeBranches.find(b => b.id === truck.branchId);
-          const isProSpaces = truck.tenantId === 'prospaces';
-          const orig = homeBranch 
-            ? getBranchCoordinates(homeBranch.id, homeBranch.name, homeBranch.address) 
-            : isProSpaces 
-              ? { lat: 44.6488, lng: -63.5752 } 
-              : { lat: 37.2872, lng: -121.9500 };
-          origLat = isNaN(orig.lat) ? 44.6488 : orig.lat;
-          origLng = isNaN(orig.lng) ? -63.5752 : orig.lng;
-          destLat = origLat + 0.003;
-          destLng = origLng + 0.003;
-          isMoving = false;
-        }
-
-        let { lat: truckLat, lng: truckLng, hasRealGps } = getTruckCoords(truck, simProgress, activeBranches);
-
-        if (isNaN(truckLat) || isNaN(truckLng)) {
-          truckLat = origLat;
-          truckLng = origLng;
-        }
-        
-        if (!isNaN(truckLat) && !isNaN(truckLng)) {
-          allPlottedCoords.push([truckLat, truckLng]);
-        }
-
-        const isSelected = selectedTrackTruckId === truck.id;
-        if (isSelected || (!selectedTrackTruckId && displayTrucks[0]?.id === truck.id)) {
-          activeTruckGps = { lat: truckLat, lng: truckLng };
-        }
-
-        // Draw route line if delivery is active and driver is online
-        if (assignedDelivery && isOnline && !isNaN(origLat) && !isNaN(origLng) && !isNaN(destLat) && !isNaN(destLng)) {
-          L.polyline([[origLat, origLng], [destLat, destLng]], {
-            color: isSelected ? '#f59e0b' : '#64748b',
-            weight: isSelected ? 3.5 : 2,
-            dashArray: isSelected ? '6,6' : '4,4',
-            opacity: isSelected ? 0.95 : 0.6
-          }).addTo(rGroup);
-        }
-
-        const truckIcon = L.divIcon({
-          className: 'custom-truck-marker',
-          html: `
-            <div class="p-1.5 rounded-full shadow-lg border-2 flex items-center justify-center transition-all ${
-              isSelected 
-                ? 'bg-amber-500 border-white text-slate-950 scale-110 ring-4 ring-amber-500/35' 
-                : isMoving 
-                  ? 'bg-emerald-600 border-emerald-400 text-white animate-pulse' 
-                  : 'bg-slate-700 border-slate-500 text-slate-300'
-            }">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M19 18h2a1 1 0 0 0 1-1v-5.14a1 1 0 0 0-.293-.707l-4.07-4.07a1 1 0 0 0-.707-.293H14"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            </div>
-          `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14]
-        });
-
-        const popupMessage = !isOnline
-          ? `Driver Offline (Stationary)`
-          : hasRealGps 
-            ? `Broadcasting Live Coordinates (Currently at 137 Chain Lake Drive / Bayer's Lake)`
-            : assignedDelivery
-              ? `Delivering order ${assignedDelivery.invoiceNumber}`
-              : 'Standby / Refueling';
-
-        const isTruckGps = (truck as any).gpsSource === 'truck';
-        const activeGpsSourceLabel = isTruckGps 
-          ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-amber-200">🛰️ Stationary: ${(truck as any).gpsDeviceId || 'Core Telematics'}</span>`
-          : `<span class="bg-blue-100 text-blue-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-blue-200">📱 Mobile Device Geolocation</span>`;
-
-        const markerInstance = L.marker([truckLat, truckLng], {
-          icon: truckIcon,
-          zIndexOffset: isSelected ? 1000 : 100
-        })
-        .addTo(tGroup)
-        .bindTooltip(`${truck.name} (${truck.driver || 'No Driver'})`, {
-          permanent: false,
-          direction: 'top',
-          offset: [0, -10],
-          className: 'bg-slate-900 border border-slate-800 text-white font-semibold text-[11px] rounded px-2 py-0.5 shadow-md font-sans'
-        })
-        .bindPopup(`
-          <div class="font-sans text-xs p-1.5 space-y-1">
-            <div class="flex items-center gap-1.5 border-b border-slate-105 pb-1 font-sans">
-              <span class="w-1.5 h-1.5 rounded-full ${isMoving ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}"></span>
-              <p class="font-bold text-slate-900">${truck.name}</p>
-            </div>
-            <p class="text-[10.5px] text-slate-700 font-medium font-sans">Driver: <strong class="text-blue-600">${truck.driver || 'No Driver'}</strong></p>
-            <div class="my-1">${activeGpsSourceLabel}</div>
-            <p class="text-[10px] text-slate-500">ID: ${truck.id} &bull; Type: ${truck.type || 'Flatbed'}</p>
-            <p class="text-[9px] text-slate-400 font-mono font-sans">GPS: ${truckLat.toFixed(5)}N, ${truckLng.toFixed(5)}W</p>
-            <p class="text-[9.5px] text-amber-600 font-bold mt-1 font-sans">${popupMessage}</p>
-          </div>
-        `);
-
-        // Update selected truck when clicking on marker
-        markerInstance.on('click', () => {
-          setSelectedTrackTruckId(prev => prev === truck.id ? null : truck.id);
-        });
-      });
-    }
-
-    // Telemetry wire linking dispatcher to chosen driver
-    if (activeTruckGps && hqCoords && rGroup) {
-      L.polyline([[hqCoords.lat, hqCoords.lng], [activeTruckGps.lat, activeTruckGps.lng]], {
-        color: '#2563eb',
-        weight: 1.5,
-        dashArray: '4,6',
-        opacity: 0.75
-      }).addTo(rGroup);
-    }
-
-    // Auto-fit geographic boundaries to fit all markers elegantly without jittering on every progress update
-    const branchesKey = activeBranches.map(b => b.id).sort().join(',');
-    const deliveriesCount = displayDeliveries.filter(d => d.status !== DeliveryStatus.DELIVERED).length;
-    const currentBoundsKey = `${branchesKey}-${deliveriesCount}-${displayTrucks.length}`;
-    
-    if (lastBoundsKeyRef.current !== currentBoundsKey && allPlottedCoords.length > 0 && map) {
-      lastBoundsKeyRef.current = currentBoundsKey;
-      try {
-        map.fitBounds(L.latLngBounds(allPlottedCoords), { padding: [50, 50], maxZoom: 13 });
-      } catch (e) {
-        console.warn("Could not fit map bounds dynamically:", e);
-      }
-    }
-  }, [hqCoords, activeBranches, displayDeliveries, displayTrucks, simProgress, selectedTrackTruckId, isPlayingSimulation, isWatchingGps]);
 
   // Statistics
   const total = displayDeliveries.length;
@@ -1488,11 +950,25 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
             isMapFullscreen ? 'h-full min-h-0' : 'min-h-[430px] lg:min-h-[500px]'
           }`}>
             <div className="relative flex-1 w-full rounded-2xl overflow-hidden shadow-inner border border-slate-200">
-              <div 
-                ref={mapContainerRef} 
-                className="absolute inset-0 w-full h-full z-10" 
-                style={{ background: '#f8fafc' }}
-              />
+              <div className="absolute inset-0 w-full h-full z-10">
+                <GoogleMapContainer
+                  hqCoords={hqCoords}
+                  activeBranches={activeBranches}
+                  displayDeliveries={displayDeliveries}
+                  displayTrucks={displayTrucks}
+                  simProgress={simProgress}
+                  selectedTrackTruckId={selectedTrackTruckId}
+                  setSelectedTrackTruckId={setSelectedTrackTruckId}
+                  isPlayingSimulation={false}
+                  isWatchingGps={isWatchingGps}
+                  mapTheme={mapTheme}
+                  isTruckOnline={isTruckOnline}
+                  setHqCoords={setHqCoords}
+                  setSysLogs={setSysLogs}
+                  setViewingDetailsTruckId={setViewingDetailsTruckId}
+                  setViewingTripsTruckId={setViewingTripsTruckId}
+                />
+              </div>
               
               {/* Floating map visual elements */}
               <div className="absolute top-3 right-3 text-[10px] font-mono uppercase tracking-widest flex items-center space-x-2 z-20 bg-slate-900/90 border border-slate-800 py-1.5 px-2.5 rounded-lg text-slate-200 shadow-md">
@@ -1996,7 +1472,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   const dest = getDeliveryCoordinates(assignedDelivery.id, assignedDelivery.deliveryAddress, orig.x, orig.y);
                   origLat = orig.lat; origLng = orig.lng;
                   destLat = dest.lat; destLng = dest.lng;
-                  isMoving = assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
+                  isMoving = false;
                 } else {
                   const homeBranch = activeBranches.find(b => b.id === truck.branchId);
                   const isProSpaces = truck.tenantId === 'prospaces';
@@ -2108,7 +1584,10 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 const isLoaded = assignedDelivery ? assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED : false;
                 const { hasRealGps } = getTruckCoords(t, simProgress, activeBranches);
                 const isOnline = isTruckOnline(t);
-                const speedValue = t.gpsSpeed !== undefined ? Math.round(t.gpsSpeed) : (assignedDelivery && isLoaded && isPlayingSimulation && !hasRealGps && isOnline ? 45 : 0);
+                
+                // Enforce live telemetry: use real gpsSpeed if available, otherwise default to 0 (no fake simulation speeds)
+                const speedValue = t.gpsSpeed !== undefined ? Math.round(t.gpsSpeed) : 0;
+                
                 return {
                   ...t,
                   id: t.id,
@@ -2136,7 +1615,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     accels: 0,
                     excessiveSpeed: '0',
                     harshBrakes: 0,
-                    idling: t.gpsIdlingMins !== undefined ? String(t.gpsIdlingMins) : (speedValue > 0 ? '0' : String(currentIdlingMinutes))
+                    // Enforce live telemetry: use real gpsIdlingMins if available, otherwise default to '0'
+                    idling: t.gpsIdlingMins !== undefined ? String(t.gpsIdlingMins) : '0'
                   }
                 };
               });
@@ -2400,51 +1880,85 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 
                 const activeRun = selectedTruckRow?.trips?.[0];
                 const destAddr = activeRun?.stops?.[1]?.address || '84 Charm Ln, Halifax, NS B3E, Canada';
-                const driverName = selectedTruckRow?.driver || 'Bob Rafters';
+                const driverName = selectedTruckRow?.driver || 'No Driver';
 
-                const baseLegs = [
-                  {
-                    id: 'leg-1',
-                    type: 'Business',
-                    startTime: '7:23 AM ADT',
-                    endTime: '7:55 AM ADT',
-                    startAddress: branchAddr,
-                    endAddress: destAddr,
-                    driverName: driverName,
-                    distanceKm: 31.9,
-                    durationMins: 32,
-                    idleMins: 4,
-                    exceptionCount: 0
-                  },
-                  { type: 'pause' as const, durationMins: 35 },
-                  {
-                    id: 'leg-2',
-                    type: 'Business',
-                    startTime: '8:31 AM ADT',
-                    endTime: '9:15 AM ADT',
-                    startAddress: destAddr,
-                    endAddress: '137 Chain Lake Dr, Halifax, NS B3S 1B3, Canada',
-                    driverName: driverName,
-                    distanceKm: 42.1,
-                    durationMins: 44,
-                    idleMins: 12,
-                    exceptionCount: 1
-                  },
-                  { type: 'pause' as const, durationMins: 20 },
-                  {
-                    id: 'leg-3',
-                    type: 'Business',
-                    startTime: '9:35 AM ADT',
-                    endTime: '10:45 AM ADT',
-                    startAddress: '137 Chain Lake Dr, Halifax, NS B3S 1B3, Canada',
-                    endAddress: branchAddr,
-                    driverName: driverName,
-                    distanceKm: 54.32,
-                    durationMins: 70,
-                    idleMins: 17,
-                    exceptionCount: 0
+                const truckGpsLat = selectedTruckRow?.gpsLat || selectedTruckRow?.lat;
+                const truckGpsLng = selectedTruckRow?.gpsLng || selectedTruckRow?.lng;
+                const isOnline = isTruckOnline(selectedTruckRow);
+                
+                const currentLocationString = liveGeocodedAddress || ((truckGpsLat && truckGpsLng) 
+                  ? `Current Location (${truckGpsLat.toFixed(4)}, ${truckGpsLng.toFixed(4)})` 
+                  : 'Unknown Location');
+
+                const isToday = (dateString: string) => {
+                  if (!dateString) return false;
+                  const d = new Date(dateString);
+                  const today = new Date();
+                  return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+                };
+
+                const truckDeliveries = displayDeliveries.filter(d => 
+                  d.assignedTruck === selectedTruckRow?.id &&
+                  (d.status !== DeliveryStatus.DELIVERED || isToday(d.deliveredAt))
+                );
+                
+                let baseLegs: any[] = [];
+                
+                if (truckDeliveries.length > 0) {
+                  baseLegs = truckDeliveries.map((del, i) => {
+                    const oBranch = activeBranches.find(b => b.id === del.originBranch);
+                    const isDelivered = del.status === DeliveryStatus.DELIVERED;
+                    
+                    const branchCoords = oBranch ? getBranchCoordinates(oBranch.id, oBranch.name, oBranch.address) : { lat: 0, lng: 0 };
+                    
+                    let dist = 0;
+                    if (truckGpsLat && truckGpsLng && branchCoords.lat) {
+                      dist = Math.sqrt(Math.pow(branchCoords.lat - truckGpsLat, 2) + Math.pow(branchCoords.lng - truckGpsLng, 2)) * 111;
+                    }
+
+                    const leg = {
+                      id: del.id,
+                      type: 'Business',
+                      startTime: del.pickedAt || del.registeredAt || new Date().toISOString(),
+                      endTime: isDelivered ? (del.deliveredAt || new Date().toISOString()) : 'In Progress',
+                      startAddress: cleanAddressText(oBranch?.address || 'Origin'),
+                      endAddress: isDelivered ? cleanAddressText(del.deliveryAddress || 'Destination') : currentLocationString,
+                      driverName: del.assignedDriver || driverName,
+                      distanceKm: isDelivered ? 0 : parseFloat(dist.toFixed(1)),
+                      durationMins: 0,
+                      idleMins: selectedTruckRow?.gpsIdlingMins || 0,
+                      exceptionCount: 0
+                    };
+                    
+                    return leg;
+                  }).flatMap((leg, index, array) => {
+                    if (index < array.length - 1) {
+                      return [leg, { type: 'pause' as const, durationMins: 0 }];
+                    }
+                    return [leg];
+                  });
+                } else {
+                  let dist = 0;
+                  const oBranch = activeBranches.find(b => b.id === selectedTruckRow?.branchId);
+                  const branchCoords = oBranch ? getBranchCoordinates(oBranch.id, oBranch.name, oBranch.address) : { lat: 0, lng: 0 };
+                  if (truckGpsLat && truckGpsLng && branchCoords.lat) {
+                    dist = Math.sqrt(Math.pow(branchCoords.lat - truckGpsLat, 2) + Math.pow(branchCoords.lng - truckGpsLng, 2)) * 111;
                   }
-                ];
+
+                  baseLegs = [{
+                    id: 'live-leg-1',
+                    type: 'Business',
+                    startTime: selectedTruckRow?.gpsLastHandshake || new Date(Date.now() - 3600000).toISOString(),
+                    endTime: 'In Progress',
+                    startAddress: cleanAddressText(branchAddr),
+                    endAddress: currentLocationString,
+                    driverName: driverName,
+                    distanceKm: parseFloat(dist.toFixed(1)),
+                    durationMins: 0,
+                    idleMins: selectedTruckRow?.gpsIdlingMins || 0,
+                    exceptionCount: 0
+                  }];
+                }
 
                 const query = filterByLocationQuery.toLowerCase();
                 const filteredLegs = baseLegs.filter(leg => {
@@ -2487,7 +2001,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         <label className="block text-xs font-semibold text-slate-500">Date and time</label>
                         <div className="w-full bg-slate-100/80 border border-slate-200/80 rounded-xl px-3.5 py-2.5 flex items-center space-x-2.5 text-xs text-slate-700 font-medium">
                           <Calendar className="h-4 w-4 text-slate-500" />
-                          <span>Jul 20, 2026 12:00 AM - Jul 20, 2026 11:59 PM</span>
+                          <span>{`${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} 12:00 AM - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} 11:59 PM`}</span>
                         </div>
                       </div>
 
@@ -2621,7 +2135,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         >
                           <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-800">
                             <Eye className="h-4 w-4 text-slate-500" />
-                            <span>Mon, Jul 20, 2026</span>
+                            <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           </div>
                           <div className="flex items-center space-x-3 text-[10px] font-bold text-slate-500">
                             <span className="flex items-center gap-0.5">📍 {totalDistance.toFixed(2)}km</span>
@@ -2659,19 +2173,19 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                     )}
                                   </div>
 
-                                  <div className="relative pl-3 space-y-2 text-[11px] text-slate-705">
+                                  <div className="relative pl-3 space-y-2 text-[11px] text-slate-700">
                                     <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-teal-200" />
                                     <div className="relative">
                                       <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-500 border border-white" />
                                       <p className="leading-tight">
-                                        <span className="font-extrabold text-teal-950">{leg.startTime}</span>{' '}
+                                        <span className="font-extrabold text-teal-950">{leg.startTime.includes('T') ? new Date(leg.startTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : leg.startTime}</span>{' '}
                                         <span className="text-slate-500">{leg.startAddress}</span>
                                       </p>
                                     </div>
                                     <div className="relative">
                                       <div className="absolute -left-3 top-1 w-1.5 h-1.5 rounded-full bg-teal-600 border border-white" />
                                       <p className="leading-tight">
-                                        <span className="font-extrabold text-teal-950">{leg.endTime}</span>{' '}
+                                        <span className="font-extrabold text-teal-950">{leg.endTime.includes('T') ? new Date(leg.endTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : leg.endTime}</span>{' '}
                                         <span className="text-slate-500">{leg.endAddress}</span>
                                       </p>
                                     </div>
@@ -2809,7 +2323,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                             : 'bg-white hover:bg-slate-50'
                         }`}
                         onClick={() => {
-                          setSelectedTrackTruckId(truckRow.id);
+                          if (selectedTrackTruckId === truckRow.id) {
+                            setSelectedTrackTruckId(null);
+                            setTimeout(() => setSelectedTrackTruckId(truckRow.id), 50);
+                          } else {
+                            setSelectedTrackTruckId(truckRow.id);
+                          }
                         }}
                       >
                         {/* Interactive Click Shield Overlay to close open dropdown menu */}
@@ -2918,11 +2437,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                       setActiveActionMenuTruckId(null);
                                       setToastMessage(`Track & Events engaged for ${truckRow.name}`);
                                       setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Tracking trajectory stream engaged for ${truckRow.name}.`, ...prev.slice(0, 3)]);
-                                      if (mapRef.current) {
-                                        const lat = truckRow.gpsLat || truckRow.lat || 44.6488;
-                                        const lng = truckRow.gpsLng || truckRow.lng || -63.5752;
-                                        mapRef.current.setView([lat, lng], 14);
-                                      }
+
                                     }}
                                     className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
                                   >
