@@ -3472,6 +3472,12 @@ async function startServer() {
         try {
           let template = fs.readFileSync(path.join(process.cwd(), "index.html"), "utf-8");
           template = await vite.transformIndexHtml(url, template);
+          const keyScript = `<script>window.GOOGLE_MAPS_PLATFORM_KEY = ${JSON.stringify(process.env.GOOGLE_MAPS_PLATFORM_KEY || "")};</script>`;
+          if (template.includes("<head>")) {
+            template = template.replace("<head>", `<head>${keyScript}`);
+          } else {
+            template = keyScript + template;
+          }
           res.status(200).set({ "Content-Type": "text/html" }).end(template);
         } catch (e: any) {
           next(e);
@@ -3485,9 +3491,25 @@ async function startServer() {
 
   if (isProduction) {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.use(express.static(distPath, { index: false }));
+    app.get("*", (req, res, next) => {
+      const url = req.originalUrl;
+      // Skip API and files/assets
+      if (url.startsWith("/api") || url.includes(".")) {
+        return next();
+      }
+      try {
+        let template = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+        const keyScript = `<script>window.GOOGLE_MAPS_PLATFORM_KEY = ${JSON.stringify(process.env.GOOGLE_MAPS_PLATFORM_KEY || "")};</script>`;
+        if (template.includes("<head>")) {
+          template = template.replace("<head>", `<head>${keyScript}`);
+        } else {
+          template = keyScript + template;
+        }
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e) {
+        next(e);
+      }
     });
   }
 
