@@ -127,6 +127,81 @@ const getEffectivePdfUrl = (delivery: DeliveryRecord): string => {
   return generateScannedSvgForDelivery(delivery, docType);
 };
 
+// Robust date normalizer into YYYY-MM-DD
+export const parseToYYYYMMDD = (dateStr?: string | null): string | null => {
+  if (!dateStr) return null;
+  const str = dateStr.trim();
+  if (!str) return null;
+
+  // 1. Direct YYYY-MM-DD pattern (e.g. 2026-07-16 or 2026-07-16T12:00:00)
+  const ymdMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    return `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+  }
+
+  // 2. M/D/YYYY or MM/DD/YYYY or M/D/YY pattern (e.g. 7/16/2026 or 07/16/2026 or 6/16/2026, 11:15:48 AM or 3/24/26)
+  const mdYMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (mdYMatch) {
+    const month = mdYMatch[1].padStart(2, '0');
+    const day = mdYMatch[2].padStart(2, '0');
+    let year = mdYMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    return `${year}-${month}-${day}`;
+  }
+
+  // 3. Fallback to JS Date parsing (e.g. "July 16, 2026" or "June 09, 2026" or "Thu Jul 16 2026")
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return null;
+};
+
+// Extracts all associated YYYY-MM-DD date tags for a delivery record
+export const getDeliveryDatesYYYYMMDD = (record: DeliveryRecord) => {
+  const dates = new Set<string>();
+
+  const deliveredDate = parseToYYYYMMDD(record.deliveredAt);
+  if (deliveredDate) dates.add(deliveredDate);
+
+  const registeredDate = parseToYYYYMMDD(record.registeredAt);
+  if (registeredDate) dates.add(registeredDate);
+
+  const pickedDate = parseToYYYYMMDD(record.pickedAt);
+  if (pickedDate) dates.add(pickedDate);
+
+  const returnedDate = parseToYYYYMMDD(record.returnedAt);
+  if (returnedDate) dates.add(returnedDate);
+
+  if (Array.isArray(record.history)) {
+    record.history.forEach(h => {
+      const hDate = parseToYYYYMMDD(h.timestamp);
+      if (hDate) dates.add(hDate);
+    });
+  }
+
+  if (record.destinationNotes) {
+    const noteMatches = record.destinationNotes.match(/\b(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b/gi);
+    if (noteMatches) {
+      noteMatches.forEach(m => {
+        const p = parseToYYYYMMDD(m);
+        if (p) dates.add(p);
+      });
+    }
+  }
+
+  return {
+    deliveredDate,
+    registeredDate,
+    primaryDate: deliveredDate || registeredDate || (Array.from(dates)[0] || null),
+    allDates: Array.from(dates)
+  };
+};
+
 export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches, users }: DeliveryQueueProps) {
   const BRANCHES = branches || [];
   const [searchQuery, setSearchQuery] = useState('');
@@ -218,8 +293,8 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
     setFormPhoto(record.deliveryPhoto || '');
     setFormPdfUrl(record.pdfUrl || getEffectivePdfUrl(record) || '');
     setFormPicker(record.assignedPicker || '');
-    setFormRegisteredAt(record.registeredAt ? record.registeredAt.substring(0, 10) : new Date().toISOString().substring(0, 10));
-    setFormDeliveredAt(record.deliveredAt ? record.deliveredAt.substring(0, 10) : '');
+    setFormRegisteredAt(parseToYYYYMMDD(record.registeredAt) || new Date().toISOString().substring(0, 10));
+    setFormDeliveredAt(parseToYYYYMMDD(record.deliveredAt) || '');
     
     setIsModalOpen(true);
   };
@@ -486,20 +561,25 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
       }
     }
 
-    // 4. Date Filter (track by deliveredAt if delivered, or registeredAt if not yet delivered)
+    // 4. Date Filter (tracks across normalized registered, delivered, history, and OCR parsed timestamps)
     if (selectedDateFilter) {
-      const recordDate = record.deliveredAt 
-        ? record.deliveredAt.substring(0, 10) 
-        : record.registeredAt?.substring(0, 10);
-        
+      const { registeredDate, primaryDate, allDates } = getDeliveryDatesYYYYMMDD(record);
       const isCompleted = record.status === DeliveryStatus.DELIVERED || record.status === DeliveryStatus.RETURNED;
-      
-      // Roll over incomplete tickets from previous days to the currently filtered date
-      if (!isCompleted && recordDate && recordDate < selectedDateFilter) {
-        return true;
-      }
 
-      if (recordDate !== selectedDateFilter) {
+      // Direct match on any associated date for this record (deliveredAt, registeredAt, history, OCR date)
+      const matchesExplicitDate = allDates.includes(selectedDateFilter);
+
+      if (matchesExplicitDate) {
+        // Document directly matches the selected date
+      } else if (!isCompleted) {
+        // Roll over active/incomplete tickets registered on or before the selected date
+        const regDate = registeredDate || primaryDate;
+        if (regDate && regDate < selectedDateFilter) {
+          // Allow active ticket to roll over
+        } else {
+          return false;
+        }
+      } else {
         return false;
       }
     }

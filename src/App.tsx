@@ -1849,6 +1849,21 @@ export default function App() {
                               </span>
                             )}
                           </button>
+
+                          <button
+                            onClick={() => {
+                              setActiveTab('document-import');
+                              setIsMobileNavOpen(false);
+                            }}
+                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
+                              activeTab === 'document-import'
+                                ? 'bg-blue-800 text-white shadow-sm'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <FileDown className="h-4 w-4 text-indigo-500" />
+                            <span>Doc Import</span>
+                          </button>
                         </>
                       )}
 
@@ -1942,21 +1957,6 @@ export default function App() {
 
                           <button
                             onClick={() => {
-                              setActiveTab('document-import');
-                              setIsMobileNavOpen(false);
-                            }}
-                            className={`w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center space-x-2.5 transition-all cursor-pointer ${
-                              activeTab === 'document-import'
-                                ? 'bg-blue-800 text-white shadow-sm'
-                                : 'text-slate-700 hover:bg-slate-50'
-                            }`}
-                          >
-                            <FileDown className="h-4 w-4" />
-                            <span>Doc Import</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
                               setActiveTab('stores');
                               setIsMobileNavOpen(false);
                             }}
@@ -2030,6 +2030,16 @@ export default function App() {
                       >
                         <ClipboardList className="h-4 w-4" />
                         <span>Freight Board</span>
+                      </button>
+
+                      <button
+                        onClick={() => { setActiveTab('document-import'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'document-import' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <FileDown className="h-4 w-4 text-indigo-600" />
+                        <span>Doc Import</span>
                       </button>
                     </div>
                   </div>
@@ -2135,15 +2145,6 @@ export default function App() {
                       >
                         <Sparkles className="h-4 w-4 text-purple-500" />
                         <span>Enterprise Hub</span>
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('document-import'); setActiveNavDropdown(null); }}
-                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                          activeTab === 'document-import' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                        }`}
-                      >
-                        <FileDown className="h-4 w-4" />
-                        <span>Doc Import</span>
                       </button>
                       <button
                         onClick={() => { setActiveTab('stores'); setActiveNavDropdown(null); }}
