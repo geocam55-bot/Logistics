@@ -911,6 +911,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                   setSysLogs={setSysLogs}
                   setViewingDetailsTruckId={setViewingDetailsTruckId}
                   setViewingTripsTruckId={setViewingTripsTruckId}
+                  viewingTrackEventsTruckId={viewingTrackEventsTruckId}
+                  setViewingTrackEventsTruckId={setViewingTrackEventsTruckId}
                 />
               </div>
               

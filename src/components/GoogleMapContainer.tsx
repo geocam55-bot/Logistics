@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { Branch, DeliveryRecord, Truck, DeliveryStatus } from '../types';
 import { Activity, Settings, MapPin, Truck as TruckIcon, User, Clock, Users, MoreVertical, X, Car } from 'lucide-react';
@@ -86,6 +86,8 @@ interface GoogleMapContainerProps {
   setSysLogs: React.Dispatch<React.SetStateAction<string[]>>;
   setViewingDetailsTruckId?: (id: string | null) => void;
   setViewingTripsTruckId?: (id: string | null) => void;
+  viewingTrackEventsTruckId?: string | null;
+  setViewingTrackEventsTruckId?: (id: string | null) => void;
 }
 
 const API_KEY_STATIC =
@@ -110,6 +112,8 @@ export default function GoogleMapContainer({
   setSysLogs,
   setViewingDetailsTruckId,
   setViewingTripsTruckId,
+  viewingTrackEventsTruckId,
+  setViewingTrackEventsTruckId,
 }: GoogleMapContainerProps) {
   const [apiKey, setApiKey] = useState<string>(() => {
     if (API_KEY_STATIC && API_KEY_STATIC !== 'YOUR_API_KEY') {
@@ -389,6 +393,8 @@ export default function GoogleMapContainer({
           setSysLogs={setSysLogs}
           setViewingDetailsTruckId={setViewingDetailsTruckId}
           setViewingTripsTruckId={setViewingTripsTruckId}
+          viewingTrackEventsTruckId={viewingTrackEventsTruckId}
+          setViewingTrackEventsTruckId={setViewingTrackEventsTruckId}
         />
       </div>
     </APIProvider>
@@ -414,11 +420,44 @@ function MapInner({
   setSysLogs,
   setViewingDetailsTruckId,
   setViewingTripsTruckId,
+  viewingTrackEventsTruckId,
+  setViewingTrackEventsTruckId,
 }: any) {
   const map = useMap();
   const lastFlownTruckIdRef = useRef<string | null>(null);
   const lastBoundsKeyRef = useRef<string>('');
   const [openPopup, setOpenPopup] = useState<any>(null);
+
+  const trackEventsTruck = displayTrucks.find((t: any) => t.id === viewingTrackEventsTruckId);
+  const trackWaypoints = useMemo(() => {
+    if (!viewingTrackEventsTruckId) return [];
+
+    return [
+      { lat: 44.9752, lng: -63.5042, label: 'Elmsdale Terminal Depot', type: 'start', time: '08:00 AM' },
+      { lat: 44.9406, lng: -63.5358, label: 'Hwy 102 Enfield Checkpoint', type: 'arrow', dir: '↘', time: '08:12 AM', speed: '88 km/h' },
+      { lat: 44.8700, lng: -63.5500, label: 'Hwy 102 Goffs Interchange', type: 'arrow', dir: '↙', time: '08:25 AM', speed: '92 km/h' },
+      { lat: 44.8100, lng: -63.5900, label: 'Fall River Junction', type: 'arrow', dir: '↗', time: '08:40 AM', speed: '75 km/h' },
+      { lat: 44.7500, lng: -63.5950, label: 'Waverley Road Checkpoint', type: 'arrow', dir: '↘', time: '08:52 AM', speed: '62 km/h' },
+      { lat: 44.7000, lng: -63.5600, label: 'Forest Hills Connector', type: 'arrow', dir: '↘', time: '09:05 AM', speed: '70 km/h' },
+      { lat: 44.6950, lng: -63.5850, label: 'Event #8 - Dartmouth Depot Stop', type: 'badge', number: '8', time: '09:20 AM', speed: '0 km/h (Ignition OFF)', status: 'Completed' },
+      { lat: 44.6650, lng: -63.5700, label: 'Halifax Peninsula Link', type: 'arrow', dir: '↗', time: '09:45 AM', speed: '55 km/h' },
+      { lat: 44.6400, lng: -63.6600, label: 'Beechville Hwy 103 Link', type: 'arrow', dir: '↖', time: '10:05 AM', speed: '80 km/h' },
+      { lat: 44.6500, lng: -63.7200, label: 'Lakeside Industrial Park', type: 'arrow', dir: '↗', time: '10:20 AM', speed: '65 km/h' },
+      { lat: 44.6800, lng: -63.8100, label: 'Event #5 - Stillwater Lake Delivery Stop', type: 'badge', number: '5', time: '10:45 AM', speed: '0 km/h (Delivery Completed)', status: 'Delivered' },
+      { lat: 44.7364, lng: -63.7854, label: 'Hammonds Plains Rd', type: 'arrow', dir: '↗', time: '11:15 AM', speed: '72 km/h' },
+      { lat: 44.7303, lng: -63.6617, label: 'Event #2 - Bedford Hwy Hub', type: 'badge', number: '2', time: '11:40 AM', speed: '12 km/h (Idling)', status: 'Idling' },
+      { lat: 44.7642, lng: -63.6823, label: 'Lower Sackville Connector', type: 'arrow', dir: '↖', time: '12:00 PM', speed: '85 km/h' },
+      { lat: 44.8100, lng: -63.5900, label: 'Fall River Return Link', type: 'arrow', dir: '↗', time: '12:18 PM', speed: '90 km/h' },
+      { lat: 44.9752, lng: -63.5042, label: 'Elmsdale Terminal Return', type: 'end', time: '12:45 PM' }
+    ];
+  }, [viewingTrackEventsTruckId]);
+
+  useEffect(() => {
+    if (!map || !viewingTrackEventsTruckId || trackWaypoints.length === 0) return;
+    const bounds = new google.maps.LatLngBounds();
+    trackWaypoints.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+    map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+  }, [map, viewingTrackEventsTruckId, trackWaypoints]);
   const [popupAddress, setPopupAddress] = useState<string>('Loading address...');
 
   useEffect(() => {
@@ -779,6 +818,51 @@ function MapInner({
           );
         })}
 
+        {/* Track & Events Trajectory Route Polyline */}
+        {viewingTrackEventsTruckId && trackWaypoints.length > 0 && (
+          <MapPolyline
+            key={`track-polyline-${viewingTrackEventsTruckId}`}
+            path={trackWaypoints.map(p => ({ lat: p.lat, lng: p.lng }))}
+            color="#2563eb"
+            weight={5}
+            opacity={0.9}
+            dashed={false}
+          />
+        )}
+
+        {/* Track & Events Waypoint Markers */}
+        {viewingTrackEventsTruckId && trackWaypoints.map((p, idx) => (
+          <AdvancedMarker
+            key={`track-wp-${idx}`}
+            position={{ lat: p.lat, lng: p.lng }}
+            title={p.label}
+            onClick={() => setOpenPopup({
+              type: 'track-event',
+              position: { lat: p.lat, lng: p.lng },
+              title: p.label,
+              number: p.number,
+              time: p.time,
+              speed: p.speed,
+              status: p.status,
+              truckName: trackEventsTruck?.name || viewingTrackEventsTruckId
+            })}
+          >
+            {p.type === 'start' || p.type === 'end' ? (
+              <div className="relative flex items-center justify-center w-6 h-6 bg-rose-600 border-2 border-white rounded-full shadow-md cursor-pointer hover:scale-125 transition-transform z-30">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+            ) : p.type === 'badge' ? (
+              <div className="relative flex items-center justify-center w-7 h-7 bg-rose-600 border-2 border-white rounded-full shadow-lg text-white font-extrabold text-xs cursor-pointer hover:scale-125 transition-transform z-30">
+                {p.number}
+              </div>
+            ) : (
+              <div className="relative flex items-center justify-center w-5 h-5 bg-blue-600 border border-white rounded-full shadow text-white font-bold text-[10px] cursor-pointer hover:scale-125 transition-transform z-20">
+                {p.dir}
+              </div>
+            )}
+          </AdvancedMarker>
+        ))}
+
         {/* Polylines for Active Delivery Routes */}
         {routesToDraw.map((route) => (
           <MapPolyline
@@ -810,6 +894,17 @@ function MapInner({
             headerDisabled={true}
           >
             <div className="font-sans text-xs p-1 min-w-[150px]">
+              {openPopup.type === 'track-event' && (
+                <div className="p-1 font-sans text-xs min-w-[190px]">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-1 mb-1 font-bold text-slate-800">
+                    <span>{openPopup.number ? `Event #${openPopup.number}` : 'Route Checkpoint'}</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-800 font-mono px-1.5 py-0.5 rounded border border-blue-200">{openPopup.truckName}</span>
+                  </div>
+                  <p className="text-slate-800 font-semibold mt-1">{openPopup.title}</p>
+                  {openPopup.speed && <p className="text-[11px] text-slate-600 mt-1">Speed: <strong className="text-slate-900">${openPopup.speed}</strong></p>}
+                  {openPopup.time && <p className="text-[11px] text-slate-600">Time: <strong className="text-slate-900">${openPopup.time}</strong></p>}
+                </div>
+              )}
               {openPopup.type === 'hq' && (
                 <div>
                   <p className="font-bold text-slate-800">Dispatch Headquarters</p>
