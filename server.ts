@@ -137,7 +137,7 @@ function getSupabase(reqOrBypass?: any, bypassCircuitBreaker: boolean = false) {
   return supabaseClient;
 }
 
-function withTimeout<T>(promise: Promise<T> | any, ms: number = 15000): Promise<T> {
+function withTimeout<T>(promise: Promise<T> | any, ms: number = 45000): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
@@ -1401,12 +1401,12 @@ app.use((req, res, next) => {
 
       // Perform a ping / select test query against the database with a safe timeout to check if schema is constructed
       let testQuery = supabase.from("tenants").select("id").limit(1);
-      let { data, error } = await withTimeout<any>(testQuery, 15000);
+      let { data, error } = await withTimeout<any>(testQuery, 45000);
 
       if (error) {
          console.warn("Supabase connection: tenants table query failed, trying branches table fallback...");
          let fallbackQuery = supabase.from("branches").select("id").limit(1);
-         const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 15000);
+         const { error: branchesErr } = await withTimeout<any>(fallbackQuery, 45000);
         if (!branchesErr) {
           error = null;
         }
@@ -1545,7 +1545,7 @@ app.use((req, res, next) => {
 
   app.get("/api/maps-key", (req, res) => {
     res.json({
-      key: process.env.GOOGLE_MAPS_PLATFORM_KEY || ""
+      key: process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || ""
     });
   });
 
@@ -1648,7 +1648,7 @@ app.use((req, res, next) => {
           .from("users")
           .select("*")
           .ilike("email", email.trim()),
-        15000
+        45000
       )) as any;
 
       if (error) {
@@ -1684,7 +1684,7 @@ app.use((req, res, next) => {
             .from("tenants")
             .select("*")
             .eq("id", user.tenantId),
-          15000
+          45000
         )) as any;
 
         return res.json({
@@ -2117,7 +2117,7 @@ app.use((req, res, next) => {
         });
       }
 
-      // Fetch all tables in parallel with a timeout to prevent hanging (safe 15000ms timeout)
+      // Fetch all tables in parallel with a timeout to prevent hanging (safe 45000ms timeout)
       let [rBranches, rTrucks, rUsers, rDeliveries] = await withTimeout<any>(
         Promise.all([
           supabase.from("branches").select("*").eq("tenantId", tenantId),
@@ -2125,7 +2125,7 @@ app.use((req, res, next) => {
           supabase.from("users").select("*").eq("tenantId", tenantId),
           supabase.from("deliveries").select("*").eq("tenantId", tenantId)
         ]),
-        15000
+        45000
       );
 
       // If schema tables don't exist yet, it'll error.
@@ -3942,9 +3942,10 @@ async function syncFleetCompleteTelemetry() {
                 const duplicateTruck = matches.find((m: any) => m.id === vehicleName);
                 if (duplicateTruck) {
                   console.log(`[Fleet Complete Sync] Deleting duplicate auto-discovered truck from database: ${duplicateTruck.id}`);
-                  await supabase.from('trucks').delete().eq('id', duplicateTruck.id).catch(err => {
-                    console.warn("[Fleet Complete Sync] Error deleting duplicate truck:", err);
-                  });
+                  const { error: delErr } = await supabase.from('trucks').delete().eq('id', duplicateTruck.id);
+                  if (delErr) {
+                    console.warn("[Fleet Complete Sync] Error deleting duplicate truck:", delErr);
+                  }
                 }
               }
             }
@@ -4155,7 +4156,7 @@ async function syncFleetCompleteTelemetry() {
 
 setInterval(async () => {
   await syncFleetCompleteTelemetry();
-}, 15000); // Poll every 5 seconds
+}, 15000); // Poll every 15 seconds
 
 if (!process.env.VERCEL) {
   startServer();

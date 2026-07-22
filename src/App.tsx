@@ -108,6 +108,7 @@ function deduplicateUsers(usersList: User[]): User[] {
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
+  const [activeNavDropdown, setActiveNavDropdown] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [allTenants, setAllTenants] = useState<Tenant[]>(() => {
     const cached = localStorage.getItem('prospaces_all_tenants');
@@ -166,6 +167,23 @@ export default function App() {
     isServiceRoleKeyAnon?: boolean;
     error?: string | null;
   } | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.nav-dropdown-container')) {
+        setActiveNavDropdown(null);
+      }
+    };
+    if (activeNavDropdown) {
+      document.addEventListener('mousedown', handleGlobalClick);
+      document.addEventListener('touchstart', handleGlobalClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClick);
+      document.removeEventListener('touchstart', handleGlobalClick);
+    };
+  }, [activeNavDropdown]);
 
   // Load custom credentials from localStorage on mount and register them with the backend memory store.
   // Performs a startup check to automatically prune credentials matching default environment variables
@@ -1969,146 +1987,174 @@ export default function App() {
               
               {/* Group 1: Dispatcher Space */}
               {showDispatcherSpace && (
-                <div className="group relative">
-                  <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
+                <div 
+                  className="relative nav-dropdown-container"
+                >
+                  <button 
+                    onClick={() => setActiveNavDropdown(prev => prev === 'dispatcher' ? null : 'dispatcher')}
+                    className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                     <span>Dispatcher Space</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform" />
+                    <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${activeNavDropdown === 'dispatcher' ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5 min-w-[200px] z-[100] animate-in fade-in zoom-in-95 duration-100">
-                    <button
-                      onClick={() => setActiveTab('dashboard')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <LayoutDashboard className="h-4 w-4" />
-                      <span>HQ Dashboard</span>
-                    </button>
-
-                    {showAdminSpace && (
+                  <div className={`absolute left-0 top-full pt-1 min-w-[200px] z-[100] transition-all duration-200 ${activeNavDropdown === 'dispatcher' ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2 pointer-events-none'}`}>
+                    <div className="flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5">
                       <button
-                        onClick={() => setActiveTab('live-dashboard')}
+                        onClick={() => { setActiveTab('dashboard'); setActiveNavDropdown(null); }}
                         className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                          activeTab === 'live-dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                         }`}
                       >
-                        <Activity className="h-4 w-4 text-[#FF5A1F]" />
-                        <span>Live Monitor</span>
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>HQ Dashboard</span>
                       </button>
-                    )}
 
-                    <button
-                      onClick={() => setActiveTab('queue')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'queue' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <ClipboardList className="h-4 w-4" />
-                      <span>Freight Board</span>
-                    </button>
+                      {showAdminSpace && (
+                        <button
+                          onClick={() => { setActiveTab('live-dashboard'); setActiveNavDropdown(null); }}
+                          className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                            activeTab === 'live-dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <Activity className="h-4 w-4 text-[#FF5A1F]" />
+                          <span>Live Monitor</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => { setActiveTab('queue'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'queue' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        <span>Freight Board</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Group 2: Picker Space */}
               {showPickerSpace && (
-                <div className="group relative">
-                  <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
+                <div 
+                  className="relative nav-dropdown-container"
+                >
+                  <button 
+                    onClick={() => setActiveNavDropdown(prev => prev === 'picker' ? null : 'picker')}
+                    className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                     <span>Picker Space</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform" />
+                    <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${activeNavDropdown === 'picker' ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5 min-w-[200px] z-[100] animate-in fade-in zoom-in-95 duration-100">
-                    <button
-                      onClick={() => setActiveTab('scanner')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'scanner' ? 'bg-amber-50 text-amber-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <Scan className="h-4 w-4 text-amber-600" />
-                      <span>Loading Scanner</span>
-                    </button>
+                  <div className={`absolute left-0 top-full pt-1 min-w-[200px] z-[100] transition-all duration-200 ${activeNavDropdown === 'picker' ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2 pointer-events-none'}`}>
+                    <div className="flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5">
+                      <button
+                        onClick={() => { setActiveTab('scanner'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'scanner' ? 'bg-amber-50 text-amber-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <Scan className="h-4 w-4 text-amber-600" />
+                        <span>Loading Scanner</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Group 3: Driver Space */}
               {showDriverSpace && (
-                <div className="group relative">
-                  <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
+                <div 
+                  className="relative nav-dropdown-container"
+                >
+                  <button 
+                    onClick={() => setActiveNavDropdown(prev => prev === 'driver' ? null : 'driver')}
+                    className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     <span>Driver Space</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform" />
+                    <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${activeNavDropdown === 'driver' ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5 min-w-[200px] z-[100] animate-in fade-in zoom-in-95 duration-100">
-                    <button
-                      onClick={() => setActiveTab('epod')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'epod' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <TruckIcon className="h-4 w-4 text-emerald-600" />
-                      <span>Mobile EPOD</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('inspections')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'inspections' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <Shield className="h-4 w-4 text-blue-500" />
-                      <span>Vehicle Inspections</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('fuel')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'fuel' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <Activity className="h-4 w-4 text-rose-500" />
-                      <span>Fuel Tracker</span>
-                    </button>
+                  <div className={`absolute left-0 top-full pt-1 min-w-[200px] z-[100] transition-all duration-200 ${activeNavDropdown === 'driver' ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2 pointer-events-none'}`}>
+                    <div className="flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5">
+                      <button
+                        onClick={() => { setActiveTab('epod'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'epod' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <TruckIcon className="h-4 w-4 text-emerald-600" />
+                        <span>Mobile EPOD</span>
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('inspections'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'inspections' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <Shield className="h-4 w-4 text-blue-500" />
+                        <span>Vehicle Inspections</span>
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('fuel'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'fuel' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <Activity className="h-4 w-4 text-rose-500" />
+                        <span>Fuel Tracker</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Group 4: Admin Space */}
               {showAdminSpace && (
-                <div className="group relative">
-                  <button className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer">
+                <div 
+                  className="relative nav-dropdown-container"
+                >
+                  <button 
+                    onClick={() => setActiveNavDropdown(prev => prev === 'admin' ? null : 'admin')}
+                    className="flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
                     <span>Admin Space</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:rotate-180 transition-transform" />
+                    <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${activeNavDropdown === 'admin' ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5 min-w-[200px] z-[100] animate-in fade-in zoom-in-95 duration-100">
-                    <button
-                      onClick={() => setActiveTab('enterprise-hub')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'enterprise-hub' ? 'bg-purple-50 text-purple-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <Sparkles className="h-4 w-4 text-purple-500" />
-                      <span>Enterprise Hub</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('document-import')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        activeTab === 'document-import' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <FileDown className="h-4 w-4" />
-                      <span>Doc Import</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('stores')}
-                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
-                        ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab) ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span>System Config</span>
-                    </button>
+                  <div className={`absolute left-0 top-full pt-1 min-w-[200px] z-[100] transition-all duration-200 ${activeNavDropdown === 'admin' ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2 pointer-events-none'}`}>
+                    <div className="flex flex-col bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl p-1.5">
+                      <button
+                        onClick={() => { setActiveTab('enterprise-hub'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'enterprise-hub' ? 'bg-purple-50 text-purple-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <Sparkles className="h-4 w-4 text-purple-500" />
+                        <span>Enterprise Hub</span>
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('document-import'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          activeTab === 'document-import' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <FileDown className="h-4 w-4" />
+                        <span>Doc Import</span>
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('stores'); setActiveNavDropdown(null); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center space-x-2.5 transition-all cursor-pointer ${
+                          ['stores', 'trucks', 'gps', 'users', 'architecture'].includes(activeTab) ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>System Config</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

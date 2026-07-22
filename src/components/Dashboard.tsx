@@ -46,7 +46,11 @@ import {
   X,
   Pin,
   Target,
-  Crosshair
+  Crosshair,
+  Power,
+  Bell,
+  Filter,
+  ChevronRight
 } from 'lucide-react';
 
 // Regional Coordinate Dictionary for high-accuracy live geolocating
@@ -443,8 +447,17 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
   const [selectedMonth, setSelectedMonth] = useState<string>('April');
   const [selectedDay, setSelectedDay] = useState<number>(12);
   const [selectedYear, setSelectedYear] = useState<number>(2024);
+  const [isTrackEventsExpanded, setIsTrackEventsExpanded] = useState<boolean>(true);
+  const [trackEventsSearch, setTrackEventsSearch] = useState<string>("");
+  const [showTrackEventsFilter, setShowTrackEventsFilter] = useState<boolean>(false);
+  const [showTrackEventsAsset, setShowTrackEventsAsset] = useState<boolean>(false);
+  const [showTrackEventsDate, setShowTrackEventsDate] = useState<boolean>(false);
+  const [filterIgnition, setFilterIgnition] = useState({ on: false, off: false });
+  const [filterStatus, setFilterStatus] = useState({ driving: false, idling: false, parked: false });
+
   const [activeActionMenuTruckId, setActiveActionMenuTruckId] = useState<string | null>(null);
   const [viewingTripsTruckId, setViewingTripsTruckId] = useState<string | null>(null);
+  const [viewingTrackEventsTruckId, setViewingTrackEventsTruckId] = useState<string | null>(null);
   const [liveGeocodedAddress, setLiveGeocodedAddress] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1555,12 +1568,13 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               if (viewingDetailsTruckId) {
                 const selectedTruckRow = combinedFleetList.find(t => t.id === viewingDetailsTruckId) || combinedFleetList[0];
                 
-                const fuelPercent = selectedTruckRow?.id ? (72 - (selectedTruckRow.id.charCodeAt(0) % 25)) : 55;
-                const isIgnitionOn = selectedTruckRow?.activeSpeed > 0;
+                const fuelPercent = selectedTruckRow?.fuelLevel ?? (selectedTruckRow?.id ? (72 - (selectedTruckRow.id.charCodeAt(0) % 25)) : 55);
+                const isIgnitionOn = (selectedTruckRow?.activeSpeed > 0) || (selectedTruckRow?.gpsIdlingMins > 0) || (selectedTruckRow?.metrics?.idling && parseInt(selectedTruckRow.metrics.idling) > 0);
                 const lastIgnitionStr = isIgnitionOn ? 'Just now' : `${3 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) % 10 : 2)} h ${15 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(1) % 40 : 8)} min ago`;
                 const odometerVal = selectedTruckRow?.currentMileage || (120000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 1234 : 168931));
                 const engineHrs = selectedTruckRow?.engineHours || (3000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 35 : 7361));
-                const speedKmh = Math.round((selectedTruckRow?.activeSpeed || 0) * 1.60934);
+                const ptoHrs = selectedTruckRow?.ptoHours || (selectedTruckRow?.gpsIdlingMins ? Math.floor(selectedTruckRow.gpsIdlingMins / 60) : 0);
+                const speedKmh = Math.round(selectedTruckRow?.activeSpeed || 0);
 
                 return (
                   <div className="space-y-4 flex-1 flex flex-col overflow-hidden animate-fade-in font-sans">
@@ -1661,7 +1675,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium font-sans">PTO hours</span>
-                              <span className="text-slate-900 font-medium">0 h</span>
+                              <span className="text-slate-900 font-medium">{ptoHrs} h</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium font-sans">Speed</span>
@@ -1841,6 +1855,8 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 const activeDels = truckDeliveries.filter(d => d.status === DeliveryStatus.PICKED_AND_LOADED || d.status === DeliveryStatus.REGISTERED);
 
                 let baseLegs: any[] = [];
+                
+                const activeDriver = selectedTruckRow?.driver || 'Travis Vickers';
                 const isTruck1903 = selectedTruckRow?.name?.includes('1903') || selectedTruckRow?.id?.includes('1903') || selectedTruckRow?.truckNumber?.includes('1903');
 
                 const getTemplateTrips = () => {
@@ -1852,7 +1868,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       endTime: '07:18 AM',
                       startAddress: '500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada',
                       endAddress: 'Rona Elmsdale, NS, Canada',
-                      driverName: 'Travis Vickers',
+                      driverName: activeDriver,
                       distanceKm: 42.14,
                       durationMins: 34,
                       idleMins: 5,
@@ -1872,7 +1888,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       endTime: '08:11 AM',
                       startAddress: 'Rona Elmsdale, NS, Canada',
                       endAddress: '2148 Indian Rd, East Hants, NS, B0N 2H0, Canada',
-                      driverName: 'Ethan Mitchell',
+                      driverName: activeDriver,
                       distanceKm: 21.56,
                       durationMins: 29,
                       idleMins: 4,
@@ -1892,7 +1908,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       endTime: '09:01 AM',
                       startAddress: '2148 Indian Rd, East Hants, NS, B0N 2H0, Canada',
                       endAddress: 'ProSpaces Tantallon, NS, Canada',
-                      driverName: 'Travis Vickers',
+                      driverName: activeDriver,
                       distanceKm: 54.20,
                       durationMins: 38,
                       idleMins: 8,
@@ -1912,7 +1928,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       endTime: '09:54 AM',
                       startAddress: 'ProSpaces Tantallon, NS, Canada',
                       endAddress: '10 Sanddollar Ln, Upper Hammonds Plains, NS, B4B 2R9, Canada',
-                      driverName: 'Travis Vickers',
+                      driverName: activeDriver,
                       distanceKm: 18.30,
                       durationMins: 37,
                       idleMins: 6,
@@ -1932,7 +1948,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       endTime: '10:44 AM',
                       startAddress: '10 Sanddollar Ln, Upper Hammonds Plains, NS, B4B 2R9, Canada',
                       endAddress: '84 Charm Ln, Halifax, NS, B3E, Canada',
-                      driverName: 'Ethan Mitchell',
+                      driverName: activeDriver,
                       distanceKm: 28.90,
                       durationMins: 41,
                       idleMins: 3,
@@ -1952,7 +1968,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       endTime: 'In Progress',
                       startAddress: '84 Charm Ln, Halifax, NS, B3E, Canada',
                       endAddress: '500 Windmill Road, Dartmouth, NS, B3B 1B3, Canada',
-                      driverName: 'Travis Vickers',
+                      driverName: activeDriver,
                       distanceKm: 14.50,
                       durationMins: 22,
                       idleMins: 2,
@@ -1974,7 +1990,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                     const pDur = Math.round(leg.durationMins * (1 + (idHash % 4 - 2) / 10));
                     return {
                       ...leg,
-                      driverName: (idHash % 2 === 0) ? leg.driverName : (leg.driverName === 'Travis Vickers' ? 'Ethan Mitchell' : 'Travis Vickers'),
+                      driverName: leg.driverName,
                       distanceKm: pDist,
                       durationMins: pDur,
                       exceptionCount: (leg.exceptionCount + (idHash % 2)) % 3
@@ -2262,19 +2278,20 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                 )}
                               </>
                             ) : (() => {
+                              
                               const activeDriver = selectedTruckRow?.driver || 'Travis Vickers';
-                              const altDriver = activeDriver === 'Travis Vickers' ? 'Ethan Mitchell' : 'Travis Vickers';
+                              const altDriver = activeDriver;
                               
                               const logs = [
-                                { time: "06:42:58 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Ignition ON, Idle", event: "Sensor Sync" },
-                                { time: "06:43:18 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Stationary Idle", event: "Periodic GPS Ping" },
-                                { time: "06:43:28 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Stationary Idle", event: "Engine Check Diagnostics OK" },
-                                { time: "06:43:58 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Stationary Idle", event: "Periodic GPS Ping" },
-                                { time: "06:44:28 AM", driver: isTruck1903 ? "Ethan Mitchell" : altDriver, speed: "0 km/h", status: "Operator Swap Pending", event: "FOB Logout Handshake" },
-                                { time: "06:44:58 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Operator Logged In", event: "FOB Login Handshake" },
-                                { time: "06:45:28 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Active Pre-Trip", event: "Pre-trip Safety Checklist" },
-                                { time: "06:45:58 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Active Pre-Trip", event: "Periodic GPS Ping" },
-                                { time: "06:46:28 AM", driver: isTruck1903 ? "Travis Vickers" : activeDriver, speed: "0 km/h", status: "Ready to Depart", event: "Trip 1 Initiated" }
+                                { time: "06:42:58 AM", driver: activeDriver, speed: "0 km/h", status: "Ignition ON, Idle", event: "Sensor Sync" },
+                                { time: "06:43:18 AM", driver: activeDriver, speed: "0 km/h", status: "Stationary Idle", event: "Periodic GPS Ping" },
+                                { time: "06:43:28 AM", driver: activeDriver, speed: "0 km/h", status: "Stationary Idle", event: "Engine Check Diagnostics OK" },
+                                { time: "06:43:58 AM", driver: activeDriver, speed: "0 km/h", status: "Stationary Idle", event: "Periodic GPS Ping" },
+                                { time: "06:44:28 AM", driver: activeDriver, speed: "0 km/h", status: "Operator Swap Pending", event: "FOB Logout Handshake" },
+                                { time: "06:44:58 AM", driver: activeDriver, speed: "0 km/h", status: "Operator Logged In", event: "FOB Login Handshake" },
+                                { time: "06:45:28 AM", driver: activeDriver, speed: "0 km/h", status: "Active Pre-Trip", event: "Pre-trip Safety Checklist" },
+                                { time: "06:45:58 AM", driver: activeDriver, speed: "0 km/h", status: "Active Pre-Trip", event: "Periodic GPS Ping" },
+                                { time: "06:46:28 AM", driver: activeDriver, speed: "0 km/h", status: "Ready to Depart", event: "Trip 1 Initiated" }
                               ];
 
                               return (
@@ -2318,6 +2335,236 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                 );
               }
 
+              if (viewingTrackEventsTruckId) {
+                const selectedTruckRow = combinedFleetList.find(t => t.id === viewingTrackEventsTruckId) || combinedFleetList[0];
+                
+                
+                const activeDriver = selectedTruckRow?.driver || 'Travis Vickers';
+                const isTruck1903 = selectedTruckRow?.name?.includes('1903') || selectedTruckRow?.id?.includes('1903') || selectedTruckRow?.truckNumber?.includes('1903');
+                
+                const currentSpeed = selectedTruckRow?.activeSpeed || 0;
+                const logs = Array.from({ length: 20 }).map((_, i) => {
+                  const d = new Date(Date.now() - i * 30000);
+                  const speed = i === 0 ? Math.round(currentSpeed * 1.60934) : Math.max(0, Math.round(currentSpeed * 1.60934) - Math.floor(Math.abs(Math.sin(i * 1234)) * 20) + 10);
+                  const isIgnitionOn = speed > 0 || (currentSpeed === 0 && i < 5);
+                  return {
+                    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' }),
+                    driver: activeDriver,
+                    speed: `${speed} km/h`,
+                    status: isIgnitionOn ? "On" : "Off",
+                    isOn: isIgnitionOn
+                  };
+                });
+                
+                const filteredLogs = logs.filter(log => {
+                  if (trackEventsSearch && !log.driver.toLowerCase().includes(trackEventsSearch.toLowerCase()) && !log.time.toLowerCase().includes(trackEventsSearch.toLowerCase()) && !log.speed.toLowerCase().includes(trackEventsSearch.toLowerCase())) {
+                    return false;
+                  }
+                  if (filterIgnition.on && !filterIgnition.off && !log.isOn) return false;
+                  if (filterIgnition.off && !filterIgnition.on && log.isOn) return false;
+                  
+                  if (filterStatus.driving || filterStatus.idling || filterStatus.parked) {
+                    const speedVal = parseInt(log.speed);
+                    const isDriving = speedVal > 0;
+                    const isIdling = speedVal === 0 && log.isOn;
+                    const isParked = speedVal === 0 && !log.isOn;
+                    if (!(filterStatus.driving && isDriving) && !(filterStatus.idling && isIdling) && !(filterStatus.parked && isParked)) {
+                      return false;
+                    }
+                  }
+                  return true;
+                });
+                const todayFormatted = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                const todaySimple = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                return (
+                  <div className="flex-1 flex flex-col overflow-hidden animate-fade-in font-sans h-full bg-slate-50 relative">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4 shrink-0 px-2 pt-2 bg-white">
+                      <h2 className="text-sm font-semibold text-slate-800">
+                        Track & Events
+                      </h2>
+                      <button 
+                        type="button"
+                        onClick={() => setViewingTrackEventsTruckId(null)}
+                        className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Close Track & Events"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto scrollbar-thin space-y-5 px-3 pb-4">
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-slate-500 font-medium">Date and time</label>
+                          <div className="relative">
+                            <div onClick={() => setShowTrackEventsDate(!showTrackEventsDate)} className="flex items-center justify-between bg-slate-200/50 border-none rounded-md p-2.5 text-xs text-slate-700 font-medium cursor-pointer transition-colors hover:bg-slate-200/80">
+                              <div className="flex items-center">
+                                <Calendar className="h-4 w-4 mr-2 text-slate-600" />
+                                {todaySimple} 12:00 AM - {todaySimple} 11:59 PM
+                              </div>
+                              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showTrackEventsDate ? 'rotate-180' : ''}`} />
+                            </div>
+                            {showTrackEventsDate && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 p-3">
+                                <div className="text-sm font-semibold text-slate-700 mb-2">Select Date & Time Range</div>
+                                <input type="datetime-local" className="w-full text-xs p-2 border border-slate-200 rounded-md mb-2" defaultValue={`${new Date().toISOString().slice(0,10)}T00:00`} />
+                                <input type="datetime-local" className="w-full text-xs p-2 border border-slate-200 rounded-md" defaultValue={`${new Date().toISOString().slice(0,10)}T23:59`} />
+                                <button onClick={() => setShowTrackEventsDate(false)} className="mt-3 w-full bg-slate-800 text-white py-1.5 rounded-md text-xs font-medium">Apply</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-slate-500 font-medium">Asset</label>
+                          <div className="relative">
+                            <div onClick={() => setShowTrackEventsAsset(!showTrackEventsAsset)} className="flex items-center justify-between bg-slate-200/50 border-none rounded-md p-2.5 text-xs text-slate-700 font-medium cursor-pointer transition-colors hover:bg-slate-200/80">
+                              <span>{selectedTruckRow?.name || '1903 - Elmsdale Windows'}</span>
+                              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showTrackEventsAsset ? 'rotate-180' : ''}`} />
+                            </div>
+                            {showTrackEventsAsset && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                                {combinedFleetList.map(t => (
+                                  <div 
+                                    key={t.id} 
+                                    className="p-2.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                                    onClick={() => {
+                                      setViewingTrackEventsTruckId(t.id);
+                                      setShowTrackEventsAsset(false);
+                                    }}
+                                  >
+                                    {t.name}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 relative">
+                          <div className="relative flex-1">
+                            <input 
+                              type="text" 
+                              placeholder="Search" 
+                              value={trackEventsSearch}
+                              onChange={(e) => setTrackEventsSearch(e.target.value)}
+                              className="w-full bg-slate-200/50 border-none rounded-md py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 text-slate-700 placeholder-slate-400 font-medium" 
+                            />
+                            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={() => setShowTrackEventsFilter(!showTrackEventsFilter)}
+                            className={`p-2 shrink-0 text-slate-700 transition-colors rounded-md cursor-pointer ${showTrackEventsFilter || filterStatus.driving || filterStatus.idling || filterStatus.parked || filterIgnition.on || filterIgnition.off ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-200'}`}
+                          >
+                            <Filter className="h-4 w-4" />
+                          </button>
+                          
+                          {showTrackEventsFilter && (
+                            <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-semibold text-slate-800">Filters</h3>
+                                <Filter className="h-4 w-4 text-slate-500" />
+                              </div>
+                              
+                              <div className="mb-4">
+                                <div className="text-xs font-semibold text-slate-500 mb-2">Filter by status</div>
+                                <div className="flex items-center gap-3">
+                                  <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={filterStatus.driving} onChange={(e) => setFilterStatus({...filterStatus, driving: e.target.checked})} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <Navigation className="h-3 w-3 text-blue-500 transform rotate-45" />
+                                    <span className="text-xs text-slate-700">Driving</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={filterStatus.idling} onChange={(e) => setFilterStatus({...filterStatus, idling: e.target.checked})} className="rounded border-slate-300 text-amber-500 focus:ring-amber-500" />
+                                    <Pause className="h-3 w-3 text-amber-500" />
+                                    <span className="text-xs text-slate-700">Idling</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={filterStatus.parked} onChange={(e) => setFilterStatus({...filterStatus, parked: e.target.checked})} className="rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
+                                    <div className="h-2.5 w-2.5 bg-slate-600 rounded-sm"></div>
+                                    <span className="text-xs text-slate-700">Parked</span>
+                                  </label>
+                                </div>
+                              </div>
+                              
+                              <div className="mb-4">
+                                <div className="text-xs font-semibold text-slate-500 mb-2">Ignition state</div>
+                                <div className="flex items-center gap-4">
+                                  <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={filterIgnition.on} onChange={(e) => setFilterIgnition({...filterIgnition, on: e.target.checked})} className="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500" />
+                                    <span className="text-xs text-slate-700">Ignition on</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={filterIgnition.off} onChange={(e) => setFilterIgnition({...filterIgnition, off: e.target.checked})} className="rounded border-slate-300 text-slate-500 focus:ring-slate-500" />
+                                    <span className="text-xs text-slate-700">Ignition off</span>
+                                  </label>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg cursor-pointer">
+                                <span className="text-xs text-slate-500">Event types</span>
+                                <ChevronRight className="h-4 w-4 text-slate-400" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2 pb-4">
+                        <div 
+                          className="flex items-center justify-between py-2 border-b-2 border-slate-300 sticky top-0 z-10 bg-slate-50 pb-2 mb-3 cursor-pointer"
+                          onClick={() => setIsTrackEventsExpanded(!isTrackEventsExpanded)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4 text-slate-700" />
+                            <span className="text-xs font-bold text-slate-900">{todayFormatted}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 text-slate-500">
+                              <Bell className="h-3 w-3" />
+                              <span className="text-[10px] font-bold mt-0.5">0</span>
+                            </div>
+                            <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isTrackEventsExpanded ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+
+                        {isTrackEventsExpanded && (
+                          <div className="space-y-2 relative">
+                            {filteredLogs.map((log, idx) => (
+                              <div key={idx} className="bg-white rounded-md p-3 shadow-xs flex flex-col gap-2.5 hover:shadow-sm transition-shadow">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-3.5 w-3.5 text-slate-500" />
+                                    <span className="text-xs font-semibold text-slate-600">{log.time}</span>
+                                  </div>
+                                  <div className={`flex items-center gap-1 border ${log.isOn ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'} rounded px-1.5 py-0.5`}>
+                                    <Power className={`h-3 w-3 ${log.isOn ? 'text-emerald-500' : 'text-slate-400'}`} />
+                                    <span className={`text-[10px] font-medium ${log.isOn ? 'text-emerald-700' : 'text-slate-500'}`}>{log.status}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-3.5 w-3.5 text-slate-500" />
+                                    <span className="text-[11px] font-medium text-slate-600">{log.driver}</span>
+                                  </div>
+                                  <div className="text-[11px] font-medium text-slate-600">
+                                    {log.speed}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {filteredLogs.length === 0 && (
+                              <div className="text-center text-xs text-slate-400 py-4">No events found matching criteria.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               // Apply Search Query filter
               const filteredFleet = combinedFleetList.filter(item => {
                 const query = searchQuery.toLowerCase();
@@ -2504,6 +2751,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                       setSelectedTrackTruckId(truckRow.id);
                                       setViewingDetailsTruckId(truckRow.id);
                                       setViewingTripsTruckId(null);
+                                      setViewingTrackEventsTruckId(null);
                                       setViewingCoordinatesTruckId(null);
                                       setActiveActionMenuTruckId(null);
                                       setToastMessage(`Showing details for ${truckRow.name}`);
@@ -2518,6 +2766,7 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                       setSelectedTrackTruckId(truckRow.id);
                                       setViewingTripsTruckId(truckRow.id);
                                       setViewingDetailsTruckId(null);
+                                      setViewingTrackEventsTruckId(null);
                                       setViewingCoordinatesTruckId(null);
                                       setActiveActionMenuTruckId(null);
                                       setToastMessage(`Viewing trips for ${truckRow.name}`);
@@ -2532,11 +2781,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                                     onClick={() => {
                                       setSelectedTrackTruckId(truckRow.id);
                                       setViewingDetailsTruckId(null);
+                                      setViewingTripsTruckId(null);
+                                      setViewingTrackEventsTruckId(truckRow.id);
                                       setViewingCoordinatesTruckId(null);
                                       setActiveActionMenuTruckId(null);
                                       setToastMessage(`Track & Events engaged for ${truckRow.name}`);
                                       setSysLogs(prev => [`[${new Date().toLocaleTimeString()}] Tracking trajectory stream engaged for ${truckRow.name}.`, ...prev.slice(0, 3)]);
-
                                     }}
                                     className="w-full text-left px-4 py-1.5 hover:bg-teal-50 hover:text-teal-800 transition-colors flex items-center font-semibold"
                                   >
