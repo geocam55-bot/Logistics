@@ -76,7 +76,7 @@ const generateScannedSvgForDelivery = (delivery: DeliveryRecord, docType: string
     <rect x="40" y="90" width="570" height="150" fill="#f8fafc" stroke="#e2e8f0" rx="8" />
     <text x="55" y="112" font-size="10" font-weight="bold" fill="#64748b" font-family="monospace">PHYSICAL DIGITIZED ARCHIVE SPECIFICATIONS</text>
     <text x="55" y="132" font-size="16" font-weight="extrabold" fill="${headerBg}" font-family="monospace">TICKET ID: ${safeId}</text>
-    <text x="55" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Purchase Order # (PO#):' : 'PO# / Order Ref:'} <tspan fill="${headerBg}">${safePo}</tspan></text>
+    <text x="55" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Purchase Order # (PO#):' : isCredit ? 'Credit Note #:' : isRma ? 'RMA #:' : 'Sales Order # (SO#):'} <tspan fill="${headerBg}">${safePo}</tspan></text>
     <text x="320" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Pickup Date (pickup Date):' : 'Registration Date:'} <tspan fill="#0f172a">${safeDate}</tspan></text>
     <text x="55" y="178" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Supplier Name & Address (Supplier):' : 'Customer / Recipient:'} <tspan fill="#0f172a">${safeCust}</tspan></text>
     <text x="55" y="201" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Deliver Address (Shipto address):' : 'Delivery Address:'} <tspan fill="#0f172a">${safeAddr}</tspan></text>
@@ -682,7 +682,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         {isSupplierPickup ? 'PO#' :
                          isCreditDoc ? 'Credit#' :
                          isRmaDoc ? 'RMA#' :
-                         'PO#'}
+                         'SO#'}
                       </span>
                       <strong className="text-slate-800 text-xs font-bold">{delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id}</strong>
                     </div>
@@ -695,7 +695,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                           {isSupplierPickup ? `PO#: ${delivery.invoiceNumber || delivery.epicorSalesOrder}` :
                            isCreditDoc ? `Credit#: ${delivery.invoiceNumber}` :
                            isRmaDoc ? `RMA#: ${delivery.invoiceNumber}` :
-                           `PO#: ${delivery.invoiceNumber}`}
+                           `SO#: ${delivery.invoiceNumber || delivery.epicorSalesOrder}`}
                         </span>
                         {getEffectivePdfUrl(delivery) && (
                           <>
@@ -718,7 +718,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                       <div className="flex items-center space-x-2 mt-1">
                         <MapPin className="h-3.5 w-3.5 text-red-500 shrink-0" />
                         <span className="text-xs font-bold text-gray-900">
-                          {isSupplierPickup ? 'Supplier:' : isCreditDoc ? 'Customer:' : isRmaDoc ? 'Manufacturer:' : 'Supplier:'} <span className="font-semibold text-slate-800">{delivery.customerName}</span>
+                          {isSupplierPickup ? 'Supplier:' : isCreditDoc ? 'Customer:' : isRmaDoc ? 'Manufacturer:' : 'Customer:'} <span className="font-semibold text-slate-800">{delivery.customerName}</span>
                         </span>
                         <span className="text-gray-300">&bull;</span>
                         <span className="text-xs font-bold text-gray-900 truncate max-w-xs">
@@ -929,8 +929,8 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                             {isSupplierPickup ? 'Supplier Pickup Instructions' : isCreditDoc ? 'Credit Memo Processing Details' : isRmaDoc ? 'RMA Return Dispatch Details' : 'Recipient Delivery Instructions'}
                           </h5>
                           <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2 shadow-sm">
-                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Purchase Order # (PO#):' : 'PO# / Order Ref:'}</span> <strong className="font-mono text-blue-700">{delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id}</strong></p>
-                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Supplier Name & Address (Supplier):' : 'Supplier / Customer:'}</span> <strong className="text-slate-900">{delivery.customerName}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Purchase Order # (PO#):' : isCreditDoc ? 'Credit Note #:' : isRmaDoc ? 'RMA #:' : 'Sales Order # (SO#):'}</span> <strong className="font-mono text-blue-700">{delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Supplier Name & Address (Supplier):' : isCreditDoc ? 'Customer Name:' : isRmaDoc ? 'Manufacturer:' : 'Customer Name:'}</span> <strong className="text-slate-900">{delivery.customerName}</strong></p>
                             <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Deliver Address (Shipto address):' : 'Delivery Address:'}</span> <strong className="text-slate-900">{delivery.deliveryAddress}</strong></p>
                             <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Pickup Date (pickup Date):' : 'Date Registered:'}</span> <strong className="font-mono text-slate-800">{new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong></p>
                             <p><span className="text-slate-500 font-semibold">Phone Contact:</span> <strong className="font-mono">{delivery.phone}</strong></p>
