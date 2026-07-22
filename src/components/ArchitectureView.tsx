@@ -1249,10 +1249,11 @@ const FACTORY_DEFAULT_TEMPLATES: Record<DocType, DocTemplate> = {
     title: 'PROSPACES REGIONAL SUPPLY PICKUP DISPATCH AUTHORIZATION',
     subtitle: 'WAREHOUSE LOGISTICS VENDOR FREIGHT CLAIMS',
     fields: {
-      'Supplier Code': { label: 'Supplier Code', value: 'VND-MILWAUKEE-99', x: 500, y: 30, w: 125, h: 25, page: 1 },
-      'Date': { label: 'Pickup Date', value: 'June 09, 2026', x: 500, y: 65, w: 125, h: 22, page: 1 },
-      'Warehouse Location': { label: 'Warehouse Origin', value: 'Milwaukee Central Logistics Hub - NS Terminal', x: 40, y: 115, w: 230, h: 22, page: 1 },
-      'Item Specifications': { label: 'Pickup Specs', value: 'Dock 4-B Premium Cargo Consignment Freight', x: 40, y: 145, w: 250, h: 35, page: 1 },
+      'Purchase Order #': { label: 'Purchase Order # (PO#)', value: '1032', x: 500, y: 25, w: 125, h: 25, page: 1 },
+      'Supplier Code': { label: 'Supplier Code', value: 'VND-MILWAUKEE-99', x: 500, y: 55, w: 125, h: 22, page: 1 },
+      'Date': { label: 'Pickup Date (pickup Date)', value: 'June 09, 2026', x: 500, y: 80, w: 125, h: 22, page: 1 },
+      'Supplier Name': { label: 'Supplier Name & Address (Supplier)', value: 'Milwaukee Central Logistics Hub - 1042 Vendor Way', x: 40, y: 115, w: 230, h: 22, page: 1 },
+      'Ship To': { label: 'Deliver Address (Shipto address)', value: '3680 RONA Tantallon, Hammonds Inc. Tantallon NS B3Z 1H3', x: 40, y: 145, w: 250, h: 35, page: 1 },
     },
     sampleItems: [
       { qty: '15', desc: 'M18 Fuel Lithium Brushless 1/2" Hammer Drill Kits', price: 'Consigned freight' },
@@ -1655,10 +1656,11 @@ export default function ArchitectureView({
         title: 'PROSPACES REGIONAL SUPPLY PICKUP DISPATCH AUTHORIZATION',
         subtitle: 'WAREHOUSE LOGISTICS VENDOR FREIGHT CLAIMS',
         fields: {
-          'Supplier Code': { label: 'Supplier Code', value: 'VND-MILWAUKEE-99', x: 500, y: 30, w: 125, h: 25 },
-          'Date': { label: 'Pickup Date', value: 'June 09, 2026', x: 500, y: 65, w: 125, h: 22 },
-          'Warehouse Location': { label: 'Warehouse Origin', value: 'Milwaukee Central Logistics Hub - NS Terminal', x: 40, y: 115, w: 230, h: 22 },
-          'Item Specifications': { label: 'Pickup Specs', value: 'Dock 4-B Premium Cargo Consignment Freight', x: 40, y: 145, w: 250, h: 35 },
+          'Purchase Order #': { label: 'Purchase Order # (PO#)', value: '1032', x: 500, y: 25, w: 125, h: 25 },
+          'Supplier Code': { label: 'Supplier Code', value: 'VND-MILWAUKEE-99', x: 500, y: 55, w: 125, h: 22 },
+          'Date': { label: 'Pickup Date (pickup Date)', value: 'June 09, 2026', x: 500, y: 80, w: 125, h: 22 },
+          'Supplier Name': { label: 'Supplier Name & Address (Supplier)', value: 'Milwaukee Central Logistics Hub - 1042 Vendor Way', x: 40, y: 115, w: 230, h: 22 },
+          'Ship To': { label: 'Deliver Address (Shipto address)', value: '3680 RONA Tantallon, Hammonds Inc. Tantallon NS B3Z 1H3', x: 40, y: 145, w: 250, h: 35 },
         },
         sampleItems: [
           { qty: '15', desc: 'M18 Fuel Lithium Brushless 1/2" Hammer Drill Kits', price: 'Consigned freight' },
@@ -2760,21 +2762,47 @@ export default function ArchitectureView({
   const createRecordFromExtracted = async () => {
     if (!extractionResult) return;
     
-    // Pick the custom barcoded ID or make one
-    const docIdKey = selectedDocType === 'Order' ? 'Order #' : selectedDocType === 'Credit' ? 'Credit Note #' : selectedDocType === 'Supplier Pickup' ? 'Supplier Code' : 'RMA #';
-    const rawVal = editedFields[docIdKey] || `REC-${Math.floor(1000 + Math.random() * 9000)}`;
-    const recordId = rawVal.trim().replace(/\s+/g, '-');
+    const isSupplierPickup = selectedDocType === 'Supplier Pickup';
+    
+    // Pick PO# / Order # / Credit# / RMA#
+    let poOrDocNumber = '';
+    if (isSupplierPickup) {
+      poOrDocNumber = editedFields['Purchase Order #'] || editedFields['PO#'] || editedFields['PO Number'] || editedFields['Supplier Code'] || `PO-${Math.floor(10000 + Math.random() * 90000)}`;
+    } else if (selectedDocType === 'Credit') {
+      poOrDocNumber = editedFields['Credit Note #'] || editedFields['CR#'] || `CR-${Math.floor(10000 + Math.random() * 90000)}`;
+    } else if (selectedDocType === 'RMA') {
+      poOrDocNumber = editedFields['RMA #'] || `RMA-${Math.floor(10000 + Math.random() * 90000)}`;
+    } else {
+      poOrDocNumber = editedFields['Order #'] || editedFields['PO#'] || `SO-${Math.floor(10000 + Math.random() * 90000)}`;
+    }
 
-    const customerVal = editedFields['Customer Name'] || editedFields['Manufacturer'] || editedFields['Warehouse Location'] || 'Corporate Consignee';
-    const addressVal = editedFields['Ship To'] || editedFields['Return Reason'] || editedFields['Item Specifications'] || 'No additional specifications provided';
-    const dateVal = editedFields['Date'] || new Date().toLocaleString();
-    const weightVal = editedFields['Gross Weight'] || editedFields['Weight'] || '';
-    const orderTotalVal = editedFields['Subtotal'] || editedFields['Total Credit'] || '';
+    const recordId = poOrDocNumber.trim().replace(/\s+/g, '-');
+
+    let customerVal = '';
+    let addressVal = '';
+
+    if (isSupplierPickup) {
+      customerVal = editedFields['Supplier Name'] || editedFields['Supplier Name & Address'] || editedFields['Warehouse Location'] || 'Milwaukee Central Logistics Hub - Vendor Station';
+      addressVal = editedFields['Ship To'] || editedFields['Deliver Address'] || editedFields['Shipto address'] || editedFields['Item Specifications'] || '3680 RONA Tantallon, Hammonds Inc. Tantallon NS B3Z 1H3';
+    } else if (selectedDocType === 'RMA') {
+      customerVal = editedFields['Manufacturer'] || editedFields['Vendor'] || 'Dewalt Tool Corp Depot Atlantic';
+      addressVal = editedFields['Return Destination'] || editedFields['Ship To'] || '700 Windmill Rd, Dartmouth NS';
+    } else if (selectedDocType === 'Credit') {
+      customerVal = editedFields['Customer Name'] || editedFields['Refund Recipient'] || 'Atlantic Deck Builders Co.';
+      addressVal = editedFields['Return Reason'] || 'Hammonds Plains Branch Hub';
+    } else {
+      customerVal = editedFields['Customer Name'] || 'Atlantic Builders Ltd.';
+      addressVal = editedFields['Ship To'] || editedFields['Delivery Address'] || '547 King St Bridgewater NS';
+    }
+
+    const dateVal = editedFields['Date'] || editedFields['Pickup Date'] || new Date().toLocaleString();
+    const weightVal = editedFields['Gross Weight'] || editedFields['Weight'] || '1,450 lbs';
+    const orderTotalVal = editedFields['Subtotal'] || editedFields['Total Credit'] || '$1,280.00';
 
     let physicalPdfLink: string | undefined = undefined;
     let fileUri = uploadedFiles[selectedDocType];
 
-    // If there is no uploaded file, generate a beautiful high-fidelity SVG mockup containing all fields
+    // If there is no uploaded file, generate a high-fidelity SVG mockup containing all fields
     if (!fileUri) {
       try {
         const svgString = generateSvgDocumentForTemplate(activeTemplate, editedFields, recordId, selectedDocType);
@@ -2828,7 +2856,8 @@ export default function ArchitectureView({
       status: DeliveryStatus.REGISTERED,
       registeredAt: new Date().toLocaleString(),
       pdfUrl: physicalPdfLink,
-      destinationNotes: `[Automated PDF Capture - Type: ${selectedDocType}] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: ${dateVal}.${physicalPdfLink ? ` Physical Document stored: ${physicalPdfLink}` : ''}`,
+      documentType: selectedDocType,
+      destinationNotes: `[Automated PDF Capture - Type: ${selectedDocType}] PO#: ${recordId} | Supplier/Customer: ${customerVal} | Date: ${dateVal}. Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%.${physicalPdfLink ? ` Physical Document stored: ${physicalPdfLink}` : ''}`,
       history: [
         {
           status: DeliveryStatus.REGISTERED,

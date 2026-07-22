@@ -28,6 +28,7 @@ export interface DeliveryRecord {
   customerSignature?: string; // Base64 or live SVG string
   deliveryPhoto?: string; // Live image description or actual asset URL
   pdfUrl?: string; // Link to the uploaded physical invoice/receipt PDF
+  documentType?: string; // E.g., 'Supplier Pickup', 'Order', 'Credit', 'RMA'
   history: HistoryEvent[];
   tenantId?: string;
 }

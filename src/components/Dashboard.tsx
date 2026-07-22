@@ -1570,12 +1570,12 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               if (viewingDetailsTruckId) {
                 const selectedTruckRow = combinedFleetList.find(t => t.id === viewingDetailsTruckId) || combinedFleetList[0];
                 
-                const fuelPercent = selectedTruckRow?.fuelLevel ?? (selectedTruckRow?.id ? (72 - (selectedTruckRow.id.charCodeAt(0) % 25)) : 55);
+                const fuelPercent = (selectedTruckRow as any)?.fuelLevel ?? (selectedTruckRow?.id ? (72 - (selectedTruckRow.id.charCodeAt(0) % 25)) : 55);
                 const isIgnitionOn = (selectedTruckRow?.activeSpeed > 0) || (selectedTruckRow?.gpsIdlingMins > 0) || (selectedTruckRow?.metrics?.idling && parseInt(selectedTruckRow.metrics.idling) > 0);
                 const lastIgnitionStr = isIgnitionOn ? 'Just now' : `${3 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) % 10 : 2)} h ${15 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(1) % 40 : 8)} min ago`;
                 const odometerVal = selectedTruckRow?.currentMileage || (120000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 1234 : 168931));
                 const engineHrs = selectedTruckRow?.engineHours || (3000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 35 : 7361));
-                const ptoHrs = selectedTruckRow?.ptoHours || (selectedTruckRow?.gpsIdlingMins ? Math.floor(selectedTruckRow.gpsIdlingMins / 60) : 0);
+                const ptoHrs = (selectedTruckRow as any)?.ptoHours || (selectedTruckRow?.gpsIdlingMins ? Math.floor(selectedTruckRow.gpsIdlingMins / 60) : 0);
                 const speedKmh = Math.round(selectedTruckRow?.activeSpeed || 0);
 
                 return (

@@ -2316,6 +2316,7 @@ app.use((req, res, next) => {
             phone: "902-555-0199",
             originBranch: "01075",
             pdfUrl: "/uploads/263890_source.pdf",
+            documentType: "Order",
             destinationNotes: "[Automated PDF Capture - Type: Order] Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Date parsed: 3/24/26   10:06. Physical Document stored: /uploads/263890_source.pdf",
             status: "REGISTERED",
             registeredAt: "6/16/2026, 11:15:48 AM",
@@ -2341,6 +2342,38 @@ app.use((req, res, next) => {
                 location: "ProSpaces - Tantallon",
                 operator: "Logistics Board Coordinator",
                 timestamp: "2026-06-16T14:16:19.891Z"
+              }
+            ]
+          },
+          {
+            id: "1032",
+            tenantId: String(req.query.tenantId),
+            invoiceNumber: "1032",
+            epicorSalesOrder: "1032",
+            customerName: "Milwaukee Tool Corp - Central Hub 1042 Vendor Way",
+            deliveryAddress: "3680 RONA Tantallon, Hammonds Inc. Tantallon NS B3Z 1H3",
+            phone: "902-555-0199",
+            originBranch: "01075",
+            pdfUrl: "/uploads/1032_source.pdf",
+            documentType: "Supplier Pickup",
+            destinationNotes: "[Automated PDF Capture - Type: Supplier Pickup] PO#: 1032 | Supplier Code: VND-MILWAUKEE-99 | Pickup Date: June 09, 2026. Matches OCR template regional Nova_Scotia_Regional_Core with confidence 98.5%. Physical Document stored: /uploads/1032_source.pdf",
+            status: "REGISTERED",
+            registeredAt: new Date().toISOString(),
+            pickedAt: null,
+            deliveredAt: null,
+            returnedAt: null,
+            returnReason: null,
+            assignedTruck: null,
+            assignedDriver: null,
+            customerSignature: null,
+            deliveryPhoto: null,
+            history: [
+              {
+                notes: "Supplier Pickup Memo scanned and ingested. Ready for flatbed freight pickup.",
+                status: "REGISTERED",
+                location: "ProSpaces - Tantallon",
+                operator: "Azure OCR Automate Stream",
+                timestamp: new Date().toISOString()
               }
             ]
           }

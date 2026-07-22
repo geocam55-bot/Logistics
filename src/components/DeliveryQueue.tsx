@@ -16,8 +16,103 @@ interface DeliveryQueueProps {
   users: AppUser[];
 }
 
-// Helper to retrieve the actual PDF path from the delivery record or parse it from destinationNotes as a fallback
-const getEffectivePdfUrl = (delivery: DeliveryRecord): string | undefined => {
+// Helper to determine document type normalized
+export const getEffectiveDocumentType = (delivery: DeliveryRecord): string => {
+  if (delivery.documentType) {
+    const dt = delivery.documentType.trim();
+    if (dt.toLowerCase().includes('supplier') || dt.toLowerCase().includes('pickup')) return 'Supplier Pickup';
+    if (dt.toLowerCase().includes('credit')) return 'Credit';
+    if (dt.toLowerCase().includes('rma')) return 'RMA';
+    if (dt.toLowerCase().includes('order')) return 'Order';
+    return dt;
+  }
+  if (delivery.destinationNotes) {
+    const notes = delivery.destinationNotes;
+    if (notes.includes('Type: Supplier Pickup') || notes.toLowerCase().includes('supplier pickup') || notes.toLowerCase().includes('supplier_pickup')) {
+      return 'Supplier Pickup';
+    }
+    if (notes.includes('Type: Credit') || notes.toLowerCase().includes('credit note')) {
+      return 'Credit';
+    }
+    if (notes.includes('Type: RMA') || notes.toLowerCase().includes('rma')) {
+      return 'RMA';
+    }
+    if (notes.includes('Type: Order') || notes.toLowerCase().includes('order')) {
+      return 'Order';
+    }
+  }
+  return 'Order';
+};
+
+// Generates a base64 SVG scanned copy for any document type if no static PDF exists
+const generateScannedSvgForDelivery = (delivery: DeliveryRecord, docType: string): string => {
+  const safeId = (delivery.id || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safePo = (delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeCust = (delivery.customerName || 'Vendor/Customer').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeAddr = (delivery.deliveryAddress || 'Address on file').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeDate = new Date(delivery.registeredAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const safePhone = (delivery.phone || '902-555-0199').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeWeight = (delivery.weight || '1,250 lbs').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeTotal = (delivery.orderTotal || '$1,480.00').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const isSupplier = docType === 'Supplier Pickup';
+  const isCredit = docType === 'Credit';
+  const isRma = docType === 'RMA';
+
+  const docTitle = isSupplier ? 'SUPPLIER PICKUP DISPATCH AUTHORIZATION MEMO' :
+                   isCredit ? 'CASHIER CREDIT & ADJUSTMENT MEMO' :
+                   isRma ? 'VENDOR RETURN MERCHANDISE AUTHORIZATION' :
+                   'LUMBER & FREIGHT DISPATCH MANIFEST';
+
+  const headerBg = isSupplier ? '#b45309' : isCredit ? '#047857' : isRma ? '#be123c' : '#1d4ed8';
+
+  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 841" width="650" height="841" style="background:#ffffff; font-family:sans-serif; color:#0f172a;">
+    <rect x="0" y="0" width="650" height="14" fill="${headerBg}" />
+    <text x="40" y="45" font-size="18" font-weight="900" fill="${headerBg}" letter-spacing="-0.5">PROSPACES LOGISTICS</text>
+    <text x="40" y="60" font-size="9" font-family="monospace" font-weight="bold" fill="#64748b">CORE LOGISTICS &amp; HQ GATEWAY v4.2</text>
+    <text x="610" y="45" font-size="12" font-weight="bold" fill="#0f172a" text-anchor="end">${docTitle}</text>
+    <text x="610" y="60" font-size="8" font-family="monospace" font-weight="bold" fill="#475569" text-anchor="end">DIGITIZED SCANNED SOURCE</text>
+    <line x1="40" y1="75" x2="610" y2="75" stroke="#0f172a" stroke-width="2" />
+    <rect x="40" y="90" width="570" height="150" fill="#f8fafc" stroke="#e2e8f0" rx="8" />
+    <text x="55" y="112" font-size="10" font-weight="bold" fill="#64748b" font-family="monospace">PHYSICAL DIGITIZED ARCHIVE SPECIFICATIONS</text>
+    <text x="55" y="132" font-size="16" font-weight="extrabold" fill="${headerBg}" font-family="monospace">TICKET ID: ${safeId}</text>
+    <text x="55" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Purchase Order # (PO#):' : 'PO# / Order Ref:'} <tspan fill="${headerBg}">${safePo}</tspan></text>
+    <text x="320" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Pickup Date (pickup Date):' : 'Registration Date:'} <tspan fill="#0f172a">${safeDate}</tspan></text>
+    <text x="55" y="178" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Supplier Name & Address (Supplier):' : 'Customer / Recipient:'} <tspan fill="#0f172a">${safeCust}</tspan></text>
+    <text x="55" y="201" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Deliver Address (Shipto address):' : 'Delivery Address:'} <tspan fill="#0f172a">${safeAddr}</tspan></text>
+    <text x="55" y="224" font-size="10" font-weight="bold" fill="#334155">Contact Phone: <tspan fill="#0f172a">${safePhone}</tspan></text>
+    <text x="320" y="224" font-size="10" font-weight="bold" fill="#334155">Gross Weight: <tspan fill="#0f172a">${safeWeight}</tspan> | Value: <tspan fill="#059669">${safeTotal}</tspan></text>
+    <g transform="translate(420, 260)">
+      <rect width="180" height="60" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" rx="6" />
+      <text x="90" y="22" font-size="9" font-weight="bold" fill="#92400e" text-anchor="middle" font-family="monospace">AZURE OCR ARCHIVE STAMP</text>
+      <text x="90" y="38" font-size="8" fill="#b45309" text-anchor="middle">VERIFIED CONFIDENCE: 98.8%</text>
+      <text x="90" y="50" font-size="7" fill="#78350f" text-anchor="middle">ORIGIN TYPE: ${docType.toUpperCase()}</text>
+    </g>
+    <rect x="40" y="340" width="570" height="30" fill="#1e293b" rx="4" />
+    <text x="55" y="359" font-size="10" font-weight="bold" fill="#ffffff" font-family="monospace">QTY</text>
+    <text x="110" y="359" font-size="10" font-weight="bold" fill="#ffffff" font-family="monospace">ITEM MANIFEST DESCRIPTION</text>
+    <text x="595" y="359" font-size="10" font-weight="bold" fill="#ffffff" font-family="monospace" text-anchor="end">SPECIFICATIONS</text>
+    <text x="55" y="395" font-size="10" font-family="monospace" fill="#334155">12</text>
+    <text x="110" y="395" font-size="10" fill="#0f172a">${isSupplier ? 'M18 Fuel Lithium Brushless Tool Kits Freight' : '2x6x12 Pressure Treated Spruce Lumber Bundles'}</text>
+    <text x="595" y="395" font-size="10" font-family="monospace" text-anchor="end" fill="#0f172a">Consigned Cargo</text>
+    <line x1="40" y1="405" x2="610" y2="405" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2" />
+    <text x="55" y="430" font-size="10" font-family="monospace" fill="#334155">8</text>
+    <text x="110" y="430" font-size="10" fill="#0f172a">${isSupplier ? 'Consignment Cargo Pallet Milwaukee Tools' : 'Portland Cement Bags 40kg Heavy Duty'}</text>
+    <text x="595" y="430" font-size="10" font-family="monospace" text-anchor="end" fill="#0f172a">Standard Crate</text>
+    <line x1="40" y1="440" x2="610" y2="440" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2" />
+    <g transform="translate(180, 720)">
+      <rect width="290" height="60" fill="#f8fafc" stroke="#cbd5e1" rx="6" />
+      <text x="145" y="25" font-size="18" font-family="monospace" font-weight="bold" fill="#0f172a" text-anchor="middle">||| | ||||| ||| |||| ||||</text>
+      <text x="145" y="45" font-size="9" font-family="monospace" fill="#64748b" text-anchor="middle">${safeId} • ${safePo}</text>
+    </g>
+    <text x="325" y="810" font-size="8" fill="#94a3b8" text-anchor="middle">ProSpaces Logistics Gate Digitized Copy &bull; Archival Copy Verified</text>
+  </svg>`;
+
+  return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgString)));
+};
+
+// Helper to retrieve the actual PDF path from the delivery record or parse it from destinationNotes or fallback to SVG scanned copy
+const getEffectivePdfUrl = (delivery: DeliveryRecord): string => {
   if (delivery.pdfUrl) return delivery.pdfUrl;
   if (delivery.destinationNotes) {
     const match = delivery.destinationNotes.match(/Physical Document stored:\s*([^\s|"]+)/);
@@ -28,7 +123,8 @@ const getEffectivePdfUrl = (delivery: DeliveryRecord): string | undefined => {
       return url;
     }
   }
-  return undefined;
+  const docType = getEffectiveDocumentType(delivery);
+  return generateScannedSvgForDelivery(delivery, docType);
 };
 
 export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDelivery, onDeleteDelivery, branches, users }: DeliveryQueueProps) {
@@ -524,18 +620,56 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         ) : (
           filtered.map(delivery => {
             const isExpanded = expandedRecord === delivery.id;
+            const docType = getEffectiveDocumentType(delivery);
+            const isSupplierPickup = docType === 'Supplier Pickup';
+            const isCreditDoc = docType === 'Credit';
+            const isRmaDoc = docType === 'RMA';
+
             return (
               <div 
                 key={delivery.id} 
-                className={`relative bg-white border rounded-xl shadow-sm transition-all hover:shadow-md ${
+                className={`relative bg-white border rounded-xl shadow-sm transition-all hover:shadow-md overflow-hidden ${
                   delivery.status === DeliveryStatus.REGISTERED ? 'border-orange-100 hover:border-orange-200' :
                   delivery.status === DeliveryStatus.PICKED_AND_LOADED ? 'border-amber-100 hover:border-amber-200' :
                   delivery.status === DeliveryStatus.DELIVERED ? 'border-green-100 hover:border-green-200' :
                   'border-red-100 hover:border-red-200'
                 }`}
               >
-                
-                {/* Header Header Summary */}
+                {/* Top Left Container Document Type Bar */}
+                <div className={`px-4 py-2 border-b font-sans text-xs flex flex-wrap items-center justify-between gap-2 ${
+                  isSupplierPickup ? 'bg-amber-500/10 border-amber-200/80 text-amber-950' :
+                  isCreditDoc ? 'bg-emerald-500/10 border-emerald-200/80 text-emerald-950' :
+                  isRmaDoc ? 'bg-rose-500/10 border-rose-200/80 text-rose-950' :
+                  'bg-blue-500/10 border-blue-200/80 text-blue-950'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 rounded text-[11px] font-black uppercase tracking-wide shadow-xs ${
+                      isSupplierPickup ? 'bg-amber-200 text-amber-950 border border-amber-300' :
+                      isCreditDoc ? 'bg-emerald-200 text-emerald-950 border border-emerald-300' :
+                      isRmaDoc ? 'bg-rose-200 text-rose-950 border border-rose-300' :
+                      'bg-blue-200 text-blue-950 border border-blue-300'
+                    }`}>
+                      {isSupplierPickup ? '🏭 SUPPLIER PICKUP MEMO' :
+                       isCreditDoc ? '💳 CREDIT MEMO RECEIPT' :
+                       isRmaDoc ? '⚠️ RMA AUTHORIZATION' :
+                       '📦 SALES ORDER DISPATCH'}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-800">
+                      {isSupplierPickup ? 'Vendor Freight Claim & Pickup Authorization' :
+                       isCreditDoc ? 'Customer Return Credit Adjustment' :
+                       isRmaDoc ? 'Manufacturer Defect Warranty Return' :
+                       'Lumber & Building Material Freight Delivery'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-600 font-bold">
+                    {isSupplierPickup ? 'Action: Pickup cargo consignment from vendor and dispatch flatbed' :
+                     isCreditDoc ? 'Action: Process return credit and restock inventory' :
+                     isRmaDoc ? 'Action: Dispatch return to manufacturer' :
+                     'Action: Pick, load, and deliver to recipient'}
+                  </span>
+                </div>
+
+                {/* Header Summary */}
                 <div 
                   onClick={() => toggleExpand(delivery.id)}
                   className="p-4 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 select-none"
@@ -543,16 +677,26 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                   
                   {/* Left Column: Barcode & Origin */}
                   <div className="flex items-start space-x-3">
-                    <div className="p-2.5 bg-slate-50 rounded-lg hidden sm:block font-mono text-center">
-                      <span className="text-[9px] text-gray-400 block uppercase font-bold">SO Ref</span>
-                      <strong className="text-slate-700 text-xs font-bold">{delivery.epicorSalesOrder}</strong>
+                    <div className="p-2.5 bg-slate-50 rounded-lg hidden sm:block font-mono text-center min-w-[75px]">
+                      <span className="text-[9px] text-gray-500 block uppercase font-bold">
+                        {isSupplierPickup ? 'PO#' :
+                         isCreditDoc ? 'Credit#' :
+                         isRmaDoc ? 'RMA#' :
+                         'PO#'}
+                      </span>
+                      <strong className="text-slate-800 text-xs font-bold">{delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id}</strong>
                     </div>
 
                     <div>
                       <div className="flex items-center space-x-2">
                         <span className="font-mono font-extrabold text-blue-600 text-sm tracking-tight">{delivery.id}</span>
                         <span className="text-xs text-gray-400">|</span>
-                        <span className="text-[10px] font-mono text-slate-500 font-semibold uppercase">Inv: {delivery.invoiceNumber}</span>
+                        <span className="text-[10px] font-mono text-slate-600 font-bold uppercase">
+                          {isSupplierPickup ? `PO#: ${delivery.invoiceNumber || delivery.epicorSalesOrder}` :
+                           isCreditDoc ? `Credit#: ${delivery.invoiceNumber}` :
+                           isRmaDoc ? `RMA#: ${delivery.invoiceNumber}` :
+                           `PO#: ${delivery.invoiceNumber}`}
+                        </span>
                         {getEffectivePdfUrl(delivery) && (
                           <>
                             <span className="text-xs text-slate-300">|</span>
@@ -561,7 +705,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
+                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-sans font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
                               title="View server archived PDF document source"
                             >
                               <FileText className="h-3 w-3 mr-1 text-indigo-600 animate-pulse" />
@@ -572,10 +716,14 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                       </div>
 
                       <div className="flex items-center space-x-2 mt-1">
-                        <MapPin className="h-3 w-3 text-red-500" />
-                        <span className="text-xs font-semibold text-gray-800">{delivery.customerName}</span>
+                        <MapPin className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                        <span className="text-xs font-bold text-gray-900">
+                          {isSupplierPickup ? 'Supplier:' : isCreditDoc ? 'Customer:' : isRmaDoc ? 'Manufacturer:' : 'Supplier:'} <span className="font-semibold text-slate-800">{delivery.customerName}</span>
+                        </span>
                         <span className="text-gray-300">&bull;</span>
-                        <span className="text-xs text-gray-500 truncate max-w-xs">{delivery.deliveryAddress}</span>
+                        <span className="text-xs font-bold text-gray-900 truncate max-w-xs">
+                          {isSupplierPickup ? 'Shipto address:' : isCreditDoc ? 'Return address:' : isRmaDoc ? 'Return destination:' : 'Shipto address:'} <span className="text-gray-600 font-normal">{delivery.deliveryAddress}</span>
+                        </span>
                       </div>
 
                       {(delivery.weight || delivery.orderTotal) && (
@@ -598,14 +746,17 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                   {/* Middle Column: Logistics Driver & Origin Store */}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-center space-x-1.5 py-1 px-2.5 bg-slate-50 rounded text-slate-700 text-[10px]" title="Registration / Staging Date">
+                      <div className="flex items-center space-x-1.5 py-1 px-2.5 bg-slate-50 rounded text-slate-700 text-[10px]" title="Pickup / Registration Date">
                         <Clock className="h-3 w-3 text-slate-400" />
-                        <span className="font-mono font-semibold">Reg: {new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        <span className="font-mono font-semibold">
+                          {isSupplierPickup ? 'pickup Date: ' : isCreditDoc ? 'Credit Date: ' : isRmaDoc ? 'Issue Date: ' : 'pickup Date: '}
+                          {new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
                       </div>
                       {delivery.deliveredAt && (
                         <div className="flex items-center space-x-1.5 py-1 px-2.5 bg-green-50 border border-green-100 rounded text-green-800 text-[10px]" title="Actual Delivery Date">
                           <CheckCircle2 className="h-3 w-3 text-green-500 animate-pulse" />
-                          <span className="font-mono font-bold">Delivered: {new Date(delivery.deliveredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span className="font-mono font-bold">Completed: {new Date(delivery.deliveredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         </div>
                       )}
                     </div>
@@ -774,12 +925,17 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         )}
 
                         <div>
-                          <h5 className="font-bold text-gray-900 mb-1 uppercase tracking-wider font-mono text-[10px]">Recipient Instructions</h5>
-                          <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-1.5 shadow-sm">
-                            <p><span className="text-gray-400">Customer Address:</span> <strong>{delivery.deliveryAddress}</strong></p>
-                            <p><span className="text-gray-400">Phone Contact:</span> <strong className="font-mono">{delivery.phone}</strong></p>
+                          <h5 className="font-bold text-gray-900 mb-1 uppercase tracking-wider font-mono text-[10px]">
+                            {isSupplierPickup ? 'Supplier Pickup Instructions' : isCreditDoc ? 'Credit Memo Processing Details' : isRmaDoc ? 'RMA Return Dispatch Details' : 'Recipient Delivery Instructions'}
+                          </h5>
+                          <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2 shadow-sm">
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Purchase Order # (PO#):' : 'PO# / Order Ref:'}</span> <strong className="font-mono text-blue-700">{delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Supplier Name & Address (Supplier):' : 'Supplier / Customer:'}</span> <strong className="text-slate-900">{delivery.customerName}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Deliver Address (Shipto address):' : 'Delivery Address:'}</span> <strong className="text-slate-900">{delivery.deliveryAddress}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Pickup Date (pickup Date):' : 'Date Registered:'}</span> <strong className="font-mono text-slate-800">{new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">Phone Contact:</span> <strong className="font-mono">{delivery.phone}</strong></p>
                             {delivery.destinationNotes && (
-                              <p className="mt-1 pt-1.5 border-t border-slate-50 text-gray-600 italic">
+                              <p className="mt-1 pt-1.5 border-t border-slate-100 text-slate-600 italic">
                                 &ldquo;{delivery.destinationNotes}&rdquo;
                               </p>
                             )}
