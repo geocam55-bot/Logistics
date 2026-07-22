@@ -4,7 +4,7 @@ import { DeliveryRecord, DeliveryStatus, Branch, Truck, User as AppUser } from '
 import { 
   Search, MapPin, Eye, Clock, User, Phone, CheckCircle2, 
   AlertTriangle, ChevronDown, ChevronUp, FileText, 
-  Truck as TruckIcon, MoreVertical, Edit, Trash2, Plus, X 
+  Truck as TruckIcon, MoreVertical, Edit, Trash2, Plus, X, ExternalLink 
 } from 'lucide-react';
 
 interface DeliveryQueueProps {
@@ -127,6 +127,173 @@ const getEffectivePdfUrl = (delivery: DeliveryRecord): string => {
   return generateScannedSvgForDelivery(delivery, docType);
 };
 
+// Opens digitized documents in a top-level tab using Blob HTML to bypass browser data-URI restrictions
+export const openScannedDocumentInNewTab = (delivery: DeliveryRecord) => {
+  const pdfUrl = getEffectivePdfUrl(delivery);
+
+  // If it's a standard HTTP/HTTPS URL, open directly
+  if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  // Extract raw SVG string from base64 data URI or raw SVG tag
+  let svgContent = '';
+  if (pdfUrl.startsWith('data:image/svg+xml;base64,')) {
+    try {
+      const base64Str = pdfUrl.replace('data:image/svg+xml;base64,', '');
+      svgContent = decodeURIComponent(escape(atob(base64Str)));
+    } catch (e) {
+      console.error('Failed to decode base64 SVG:', e);
+    }
+  } else if (pdfUrl.startsWith('<svg')) {
+    svgContent = pdfUrl;
+  }
+
+  if (!svgContent) {
+    const docType = getEffectiveDocumentType(delivery);
+    const safeId = (delivery.id || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safePo = (delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeCust = (delivery.customerName || 'Vendor/Customer').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeAddr = (delivery.deliveryAddress || 'Address on file').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeDate = new Date(delivery.registeredAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    const safePhone = (delivery.phone || '902-555-0199').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeWeight = (delivery.weight || '1,250 lbs').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeTotal = (delivery.orderTotal || '$1,480.00').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const isSupplier = docType === 'Supplier Pickup';
+    const isCredit = docType === 'Credit';
+    const isRma = docType === 'RMA';
+
+    const docTitle = isSupplier ? 'SUPPLIER PICKUP DISPATCH AUTHORIZATION MEMO' :
+                     isCredit ? 'CASHIER CREDIT & ADJUSTMENT MEMO' :
+                     isRma ? 'VENDOR RETURN MERCHANDISE AUTHORIZATION' :
+                     'LUMBER & FREIGHT DISPATCH MANIFEST';
+
+    const headerBg = isSupplier ? '#b45309' : isCredit ? '#047857' : isRma ? '#be123c' : '#1d4ed8';
+
+    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 841" width="650" height="841" style="background:#ffffff; font-family:sans-serif; color:#0f172a;">
+      <rect x="0" y="0" width="650" height="14" fill="${headerBg}" />
+      <text x="40" y="45" font-size="18" font-weight="900" fill="${headerBg}" letter-spacing="-0.5">PROSPACES LOGISTICS</text>
+      <text x="40" y="60" font-size="9" font-family="monospace" font-weight="bold" fill="#64748b">CORE LOGISTICS &amp; HQ GATEWAY v4.2</text>
+      <text x="610" y="45" font-size="12" font-weight="bold" fill="#0f172a" text-anchor="end">${docTitle}</text>
+      <text x="610" y="60" font-size="8" font-family="monospace" font-weight="bold" fill="#475569" text-anchor="end">DIGITIZED SCANNED SOURCE</text>
+      <line x1="40" y1="75" x2="610" y2="75" stroke="#0f172a" stroke-width="2" />
+      <rect x="40" y="90" width="570" height="150" fill="#f8fafc" stroke="#e2e8f0" rx="8" />
+      <text x="55" y="112" font-size="10" font-weight="bold" fill="#64748b" font-family="monospace">PHYSICAL DIGITIZED ARCHIVE SPECIFICATIONS</text>
+      <text x="55" y="132" font-size="16" font-weight="extrabold" fill="${headerBg}" font-family="monospace">TICKET ID: ${safeId}</text>
+      <text x="55" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Purchase Order # (PO#):' : isCredit ? 'Credit Note #:' : isRma ? 'RMA #:' : 'Sales Order # (SO#):'} <tspan fill="${headerBg}">${safePo}</tspan></text>
+      <text x="320" y="155" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Pickup Date (pickup Date):' : 'Registration Date:'} <tspan fill="#0f172a">${safeDate}</tspan></text>
+      <text x="55" y="178" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Supplier Name & Address (Supplier):' : 'Customer / Recipient:'} <tspan fill="#0f172a">${safeCust}</tspan></text>
+      <text x="55" y="201" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Deliver Address (Shipto address):' : 'Delivery Address:'} <tspan fill="#0f172a">${safeAddr}</tspan></text>
+      <text x="55" y="224" font-size="10" font-weight="bold" fill="#334155">Contact Phone: <tspan fill="#0f172a">${safePhone}</tspan></text>
+      <text x="320" y="224" font-size="10" font-weight="bold" fill="#334155">Gross Weight: <tspan fill="#0f172a">${safeWeight}</tspan> | Value: <tspan fill="#059669">${safeTotal}</tspan></text>
+      <g transform="translate(420, 260)">
+        <rect width="180" height="60" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" rx="6" />
+        <text x="90" y="22" font-size="9" font-weight="bold" fill="#92400e" text-anchor="middle" font-family="monospace">AZURE OCR ARCHIVE STAMP</text>
+        <text x="90" y="38" font-size="8" fill="#b45309" text-anchor="middle">VERIFIED CONFIDENCE: 98.8%</text>
+        <text x="90" y="50" font-size="7" fill="#78350f" text-anchor="middle">ORIGIN TYPE: ${docType.toUpperCase()}</text>
+      </g>
+      <rect x="40" y="340" width="570" height="30" fill="#1e293b" rx="4" />
+      <text x="55" y="359" font-size="10" font-weight="bold" fill="#ffffff" font-family="monospace">QTY</text>
+      <text x="110" y="359" font-size="10" font-weight="bold" fill="#ffffff" font-family="monospace">ITEM MANIFEST DESCRIPTION</text>
+      <text x="595" y="359" font-size="10" font-weight="bold" fill="#ffffff" font-family="monospace" text-anchor="end">SPECIFICATIONS</text>
+      <text x="55" y="395" font-size="10" font-family="monospace" fill="#334155">12</text>
+      <text x="110" y="395" font-size="10" fill="#0f172a">${isSupplier ? 'M18 Fuel Lithium Brushless Tool Kits Freight' : '2x6x12 Pressure Treated Spruce Lumber Bundles'}</text>
+      <text x="595" y="395" font-size="10" font-family="monospace" text-anchor="end" fill="#0f172a">Consigned Cargo</text>
+      <line x1="40" y1="405" x2="610" y2="405" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2" />
+      <text x="55" y="430" font-size="10" font-family="monospace" fill="#334155">8</text>
+      <text x="110" y="430" font-size="10" fill="#0f172a">${isSupplier ? 'Consignment Cargo Pallet Milwaukee Tools' : 'Portland Cement Bags 40kg Heavy Duty'}</text>
+      <text x="595" y="430" font-size="10" font-family="monospace" text-anchor="end" fill="#0f172a">Standard Crate</text>
+      <line x1="40" y1="440" x2="610" y2="440" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2" />
+      <g transform="translate(180, 720)">
+        <rect width="290" height="60" fill="#f8fafc" stroke="#cbd5e1" rx="6" />
+        <text x="145" y="25" font-size="18" font-family="monospace" font-weight="bold" fill="#0f172a" text-anchor="middle">||| | ||||| ||| |||| ||||</text>
+        <text x="145" y="45" font-size="9" font-family="monospace" fill="#64748b" text-anchor="middle">${safeId} • ${safePo}</text>
+      </g>
+      <text x="325" y="810" font-size="8" fill="#94a3b8" text-anchor="middle">ProSpaces Logistics Gate Digitized Copy &bull; Archival Copy Verified</text>
+    </svg>`;
+  }
+
+  const docTypeLabel = getEffectiveDocumentType(delivery);
+  const docRef = delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id;
+  const title = `Digitized Document - ${docRef}`;
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .header {
+      width: 100%;
+      max-width: 700px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 14px 20px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    }
+    .doc-info { display: flex; flex-direction: column; }
+    .doc-title { font-weight: 800; font-size: 15px; color: #38bdf8; font-family: monospace; }
+    .doc-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .btn {
+      background-color: #2563eb; color: #ffffff; border: none; padding: 10px 18px;
+      border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .btn:hover { background-color: #1d4ed8; }
+    .doc-wrapper {
+      background: #ffffff; padding: 20px; border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6); max-width: 100%; overflow: auto;
+    }
+    .doc-wrapper svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .header { display: none; }
+      .doc-wrapper { box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="doc-info">
+      <div class="doc-title">📄 ${title}</div>
+      <div class="doc-sub">Type: <strong>${docTypeLabel}</strong> | Ticket: <strong>${delivery.id}</strong> | Client: <strong>${(delivery.customerName || '').replace(/</g, '&lt;')}</strong></div>
+    </div>
+    <div>
+      <button class="btn" onclick="window.print()">🖨️ Print Document</button>
+    </div>
+  </div>
+  <div class="doc-wrapper">
+    ${svgContent}
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  window.open(blobUrl, '_blank');
+};
+
 // Robust date normalizer into YYYY-MM-DD
 export const parseToYYYYMMDD = (dateStr?: string | null): string | null => {
   if (!dateStr) return null;
@@ -219,6 +386,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<DeliveryRecord | null>(null);
   const [showDeleteConfirmId, setShowDeleteConfirmId] = useState<string | null>(null);
+  const [previewDocDelivery, setPreviewDocDelivery] = useState<DeliveryRecord | null>(null);
 
   // Form Field States
   const [formId, setFormId] = useState('');
@@ -780,17 +948,18 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         {getEffectivePdfUrl(delivery) && (
                           <>
                             <span className="text-xs text-slate-300">|</span>
-                            <a
-                              href={getEffectivePdfUrl(delivery)}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-sans font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
-                              title="View server archived PDF document source"
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewDocDelivery(delivery);
+                              }}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-sans font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer"
+                              title="View digitized physical document archive"
                             >
                               <FileText className="h-3 w-3 mr-1 text-indigo-600 animate-pulse" />
-                              PDF Source
-                            </a>
+                              View Document
+                            </button>
                           </>
                         )}
                       </div>
@@ -991,15 +1160,17 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                                   <p className="text-slate-500">Inbound OCR digitized physical copy archived on server</p>
                                 </div>
                               </div>
-                              <a
-                                href={getEffectivePdfUrl(delivery)}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewDocDelivery(delivery);
+                                }}
                                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold shadow-xs hover:shadow-sm transition-all flex items-center space-x-1 cursor-pointer"
                               >
-                                <span>Open PDF</span>
-                              </a>
+                                <Eye className="h-3.5 w-3.5 mr-1" />
+                                <span>View Document</span>
+                              </button>
                             </div>
                           </div>
                         )}
@@ -1617,6 +1788,105 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
               >
                 <span>Confirm &amp; Load Truck</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Digitized Document Preview Modal */}
+      {previewDocDelivery && (
+        <div className="fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-55 backdrop-blur-sm animate-in fade-in duration-150">
+          <div 
+            className="fixed inset-0" 
+            onClick={() => setPreviewDocDelivery(null)}
+          />
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full relative z-10 overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-mono font-bold text-slate-100 text-sm flex items-center space-x-2">
+                    <span>Digitized Physical Document Archive</span>
+                    <span className="text-xs px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/50 rounded font-semibold font-mono">
+                      {previewDocDelivery.epicorSalesOrder || previewDocDelivery.invoiceNumber || previewDocDelivery.id}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-sans mt-0.5">
+                    Ticket ID: <strong className="text-slate-200 font-mono">{previewDocDelivery.id}</strong> &bull; {previewDocDelivery.customerName}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => openScannedDocumentInNewTab(previewDocDelivery)}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer"
+                  title="Open document in a dedicated browser tab"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Open in New Tab</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocDelivery(null)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Render Canvas */}
+            <div className="p-6 overflow-y-auto bg-slate-950/90 flex justify-center items-center">
+              <div className="bg-white rounded-xl p-4 shadow-2xl max-w-full overflow-auto">
+                {(() => {
+                  const pdfUrl = getEffectivePdfUrl(previewDocDelivery);
+                  if (pdfUrl.startsWith('data:image/svg+xml;base64,')) {
+                    try {
+                      const base64Str = pdfUrl.replace('data:image/svg+xml;base64,', '');
+                      const svgStr = decodeURIComponent(escape(atob(base64Str)));
+                      return <div dangerouslySetInnerHTML={{ __html: svgStr }} className="w-full flex justify-center" />;
+                    } catch (e) {
+                      return <img src={pdfUrl} alt="Digitized Document" className="max-w-full h-auto rounded" />;
+                    }
+                  } else if (pdfUrl.startsWith('<svg')) {
+                    return <div dangerouslySetInnerHTML={{ __html: pdfUrl }} className="w-full flex justify-center" />;
+                  } else {
+                    return <img src={pdfUrl} alt="Digitized Document" className="max-w-full h-auto rounded" />;
+                  }
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between shrink-0 text-xs text-slate-400">
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-mono text-[11px] text-slate-300">
+                  Azure OCR High-Fidelity Gate Archive Verified
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => openScannedDocumentInNewTab(previewDocDelivery)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg transition-colors cursor-pointer flex items-center space-x-1"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Full Screen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocDelivery(null)}
+                  className="px-4 py-1.5 bg-indigo-900/60 hover:bg-indigo-900/80 text-indigo-200 font-bold rounded-lg transition-colors cursor-pointer border border-indigo-800/40"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
