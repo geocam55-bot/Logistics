@@ -3055,7 +3055,7 @@ Output schema keys:
       const aiClient = getGeminiClient();
 
       const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: {
           parts: [
             {
@@ -3146,7 +3146,7 @@ Return the structured results in the required JSON format.`;
       const aiClient = getGeminiClient();
 
       const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: {
           parts: [
             {
