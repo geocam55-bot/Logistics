@@ -2340,6 +2340,8 @@ export default function ArchitectureView({
     const rawTotal = editedFields['Subtotal'] || editedFields['Total Credit'] || editedFields['Total'] || editedFields['Total Value'] || editedFields['Amount'] || editedFields['Total Mapped Value'] || editedFields['Order Total'];
     const orderTotalVal = rawTotal && rawTotal.trim() !== '' ? rawTotal.trim() : undefined;
 
+    const dateVal = editedFields['Date'] || editedFields['Registration Date'] || editedFields['Pickup Date'] || editedFields['Issued Date'] || new Date().toLocaleDateString();
+
     let physicalPdfLink: string | undefined = undefined;
     let fileUri = uploadedFiles[selectedDocType];
 
@@ -2423,7 +2425,7 @@ export default function ArchitectureView({
       status: 'Ready for Dispatch'
     };
 
-    setCreatedRecords([sessionRecord, ...createdRecords]);
+    setCreatedRecords(prev => [sessionRecord, ...prev]);
     
     // Clear the active document from upload state/screen so the user can import a new one
     setUploadedFiles(prev => ({
