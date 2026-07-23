@@ -2616,17 +2616,18 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                         const isMoving = truckRow.activeSpeed > 0;
                         const speedText = truckRow.activeSpeed > 0 ? `${truckRow.activeSpeed} mph` : '0 mph';
                         const isOnline = isTruckOnline(truckRow);
-                        const statusText = isMoving ? 'Moving' : (isOnline ? 'Idling' : 'Parked');
+                        const isIdling = !isMoving && ((truckRow.gpsIdlingMins !== undefined && truckRow.gpsIdlingMins > 0) || (truckRow.metrics?.idling && parseInt(truckRow.metrics.idling) > 0));
+                        const statusText = isMoving ? 'Moving' : (isIdling ? 'Idling' : 'Parked');
                         
                         const statusBg = isMoving 
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100/70' 
-                          : isOnline 
+                          : isIdling 
                             ? 'bg-amber-50 text-amber-700 border-amber-100/70' 
                             : 'bg-slate-100 text-slate-700 border-slate-200/60';
                         
                     const statusDotColor = isMoving 
                       ? 'bg-emerald-600' 
-                      : isOnline 
+                      : isIdling 
                         ? 'bg-amber-500' 
                         : 'bg-slate-600';
 

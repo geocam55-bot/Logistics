@@ -3895,9 +3895,15 @@ async function syncFleetCompleteTelemetry() {
             currentLng += detLngOffset;
           }
           
-          // Gentle random drift from that unique coordinate
-          const driftLat = (Math.random() * 0.0004 - 0.0002);
-          const driftLng = (Math.random() * 0.0004 - 0.0002);
+          // Determine if truck is actively moving vs parked/stationary
+          const isTruck1903 = (truck.id || "").includes("1903") || (truck.name || "").includes("1903") || (truck.truckNumber || "").includes("1903");
+          const hasExplicitSpeed = typeof truck.gpsSpeed === 'number' && truck.gpsSpeed > 0;
+          const isMovingInFallback = !isTruck1903 && hasExplicitSpeed;
+
+          const speed = isMovingInFallback ? Math.round(truck.gpsSpeed) : 0;
+          const engineStatus = speed > 0 || (typeof truck.gpsIdlingMins === 'number' && truck.gpsIdlingMins > 0);
+          const driftLat = speed > 0 ? (Math.random() * 0.0004 - 0.0002) : 0;
+          const driftLng = speed > 0 ? (Math.random() * 0.0004 - 0.0002) : 0;
           
           return {
             id: truck.gpsDeviceId,
@@ -3907,10 +3913,10 @@ async function syncFleetCompleteTelemetry() {
                gps: {
                  latitude: currentLat + driftLat,
                  longitude: currentLng + driftLng,
-                 speed: Math.random() > 0.3 ? Math.floor(Math.random() * 60 + 30) : 0
+                 speed
                },
                ignition: {
-                 engineStatus: Math.random() > 0.15
+                 engineStatus
                }
             }
           };
