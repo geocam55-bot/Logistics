@@ -279,7 +279,21 @@ export default function App() {
         // Update local state and sync to Supabase
         const updatedTrucks = latestTrucks.map(t => t.id === updatedTruck.id ? updatedTruck : t);
         setTrucks(updatedTrucks);
-        syncStateToSupabase(latestTenant.id, latestDeliveries, updatedTrucks, latestBranches, latestUsers);
+
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'gps_update',
+            payload: { truckId: updatedTruck.id, lat: latitude, lng: longitude }
+          }).catch(console.error);
+        }
+
+        const now = Date.now();
+        // Only write to the physical database table at longer intervals (e.g. every 2-3 minutes) for historical routing logs
+        if (now - lastGpsDbSyncRef.current > 120000) {
+          syncStateToSupabase(latestTenant.id, latestDeliveries, updatedTrucks, latestBranches, latestUsers);
+          lastGpsDbSyncRef.current = now;
+        }
       }
     };
 
@@ -863,6 +877,48 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentTenant, currentUser?.role]);
 
+  const realtimeChannelRef = useRef<any>(null);
+
+  // Setup Supabase Realtime Broadcast
+  useEffect(() => {
+    if (!currentTenant) return;
+    const supabase = getFrontendSupabase();
+    if (!supabase) return;
+
+    const channelName = `tenant_${currentTenant.id}`;
+    const channel = supabase.channel(channelName);
+
+    channel.on(
+      'broadcast',
+      { event: 'gps_update' },
+      (payload) => {
+        const data = payload.payload;
+        if (data && data.truckId) {
+          setTrucks(prevTrucks => prevTrucks.map(t => {
+            if (t.id === data.truckId) {
+              return { ...t, lat: data.lat, lng: data.lng };
+            }
+            return t;
+          }));
+        }
+      }
+    );
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('Subscribed to Realtime Broadcast for tenant updates');
+      }
+    });
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      realtimeChannelRef.current = null;
+    };
+  }, [currentTenant]);
+
+  const lastGpsDbSyncRef = useRef<number>(Date.now());
   const lastHeartbeatRef = useRef<number>(0);
 
   // Periodic user online heartbeat

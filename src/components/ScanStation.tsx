@@ -2162,8 +2162,15 @@ export default function ScanStation({ deliveries, onAddOrUpdateDelivery, onDelet
                           const file = e.target.files?.[0];
                           if (file) {
                             const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setDeliveryPhoto(reader.result as string);
+                            reader.onloadend = async () => {
+                              const base64 = reader.result as string;
+                              try {
+                                const compressed = await compressImage(base64, 800, 800);
+                                setDeliveryPhoto(compressed);
+                              } catch (err) {
+                                console.warn("Failed to compress driver photo, using original:", err);
+                                setDeliveryPhoto(base64);
+                              }
                             };
                             reader.readAsDataURL(file);
                           }
