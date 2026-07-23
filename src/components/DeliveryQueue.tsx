@@ -156,7 +156,7 @@ export const openScannedDocumentInNewTab = (delivery: DeliveryRecord) => {
     const safePo = (delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id).replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeCust = (delivery.customerName || 'Vendor/Customer').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeAddr = (delivery.deliveryAddress || 'Address on file').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const safeDate = new Date(delivery.registeredAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    const safeDate = formatLocalDate(delivery.registeredAt) || formatLocalDate(new Date().toISOString());
     const safePhone = (delivery.phone || '902-555-0199').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeWeight = (delivery.weight || '1,250 lbs').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeTotal = (delivery.orderTotal || '$1,480.00').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -300,23 +300,25 @@ export const parseToYYYYMMDD = (dateStr?: string | null): string | null => {
   const str = dateStr.trim();
   if (!str) return null;
 
-  // 1. Direct YYYY-MM-DD pattern (e.g. 2026-07-16 or 2026-07-16T12:00:00)
-  const ymdMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (ymdMatch) {
-    return `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+  // 1. Strict YYYY-MM-DD pattern without time
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
   }
 
-  // 2. M/D/YYYY or MM/DD/YYYY or M/D/YY pattern (e.g. 7/16/2026 or 07/16/2026 or 6/16/2026, 11:15:48 AM or 3/24/26)
-  const mdYMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (mdYMatch) {
-    const month = mdYMatch[1].padStart(2, '0');
-    const day = mdYMatch[2].padStart(2, '0');
-    let year = mdYMatch[3];
-    if (year.length === 2) year = `20${year}`;
-    return `${year}-${month}-${day}`;
+  // 2. Strict M/D/YYYY or MM/DD/YYYY or M/D/YY pattern without time
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(str)) {
+    const mdYMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (mdYMatch) {
+      const month = mdYMatch[1].padStart(2, '0');
+      const day = mdYMatch[2].padStart(2, '0');
+      let year = mdYMatch[3];
+      if (year.length === 2) year = `20${year}`;
+      return `${year}-${month}-${day}`;
+    }
   }
 
-  // 3. Fallback to JS Date parsing (e.g. "July 16, 2026" or "June 09, 2026" or "Thu Jul 16 2026")
+  // 3. JS Date parsing for ISO strings with times, or natural language dates
+  // This correctly applies local timezone offset so it matches UI rendering
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
     const year = parsed.getFullYear();
@@ -326,6 +328,21 @@ export const parseToYYYYMMDD = (dateStr?: string | null): string | null => {
   }
 
   return null;
+};
+
+// Helper for rendering dates in the UI so that pure YYYY-MM-DD dates aren't skewed by timezone
+export const formatLocalDate = (dateStr?: string | null): string => {
+  if (!dateStr) return '';
+  const str = dateStr.trim();
+  let dateObj = new Date(str);
+  
+  // If it's strictly a YYYY-MM-DD string, append T12:00:00 to prevent timezone drift
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    dateObj = new Date(`${str}T12:00:00`);
+  }
+  
+  if (isNaN(dateObj.getTime())) return str;
+  return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 // Extracts all associated YYYY-MM-DD date tags for a delivery record
@@ -364,6 +381,7 @@ export const getDeliveryDatesYYYYMMDD = (record: DeliveryRecord) => {
   return {
     deliveredDate,
     registeredDate,
+    returnedDate,
     primaryDate: deliveredDate || registeredDate || (Array.from(dates)[0] || null),
     allDates: Array.from(dates)
   };
@@ -537,9 +555,9 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         orderTotal: formOrderTotal || undefined,
         destinationNotes: formNotes || undefined,
         status: formStatus,
-        registeredAt: formRegisteredAt ? new Date(formRegisteredAt).toISOString() : (editingRecord?.registeredAt || new Date().toISOString()),
+        registeredAt: formRegisteredAt ? new Date(`${formRegisteredAt}T12:00:00`).toISOString() : (editingRecord?.registeredAt || new Date().toISOString()),
         deliveredAt: formStatus === DeliveryStatus.DELIVERED 
-          ? (formDeliveredAt ? new Date(formDeliveredAt).toISOString() : (editingRecord?.deliveredAt || new Date().toISOString())) 
+          ? (formDeliveredAt ? new Date(`${formDeliveredAt}T12:00:00`).toISOString() : (editingRecord?.deliveredAt || new Date().toISOString())) 
           : undefined,
         assignedTruck: formAssignedTruck || undefined,
         assignedDriver: matchedTruck?.driver || undefined,
@@ -586,9 +604,9 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
         orderTotal: formOrderTotal || undefined,
         destinationNotes: formNotes || undefined,
         status: formStatus,
-        registeredAt: formRegisteredAt ? new Date(formRegisteredAt).toISOString() : new Date().toISOString(),
+        registeredAt: formRegisteredAt ? new Date(`${formRegisteredAt}T12:00:00`).toISOString() : new Date().toISOString(),
         deliveredAt: formStatus === DeliveryStatus.DELIVERED 
-          ? (formDeliveredAt ? new Date(formDeliveredAt).toISOString() : new Date().toISOString()) 
+          ? (formDeliveredAt ? new Date(`${formDeliveredAt}T12:00:00`).toISOString() : new Date().toISOString()) 
           : undefined,
         assignedTruck: formAssignedTruck || undefined,
         assignedDriver: matchedTruck?.driver || undefined,
@@ -731,24 +749,29 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
 
     // 4. Date Filter (tracks across normalized registered, delivered, history, and OCR parsed timestamps)
     if (selectedDateFilter) {
-      const { registeredDate, primaryDate, allDates } = getDeliveryDatesYYYYMMDD(record);
+      const { registeredDate, primaryDate, allDates, deliveredDate, returnedDate } = getDeliveryDatesYYYYMMDD(record);
       const isCompleted = record.status === DeliveryStatus.DELIVERED || record.status === DeliveryStatus.RETURNED;
 
-      // Direct match on any associated date for this record (deliveredAt, registeredAt, history, OCR date)
-      const matchesExplicitDate = allDates.includes(selectedDateFilter);
-
-      if (matchesExplicitDate) {
-        // Document directly matches the selected date
-      } else if (!isCompleted) {
-        // Roll over active/incomplete tickets registered on or before the selected date
-        const regDate = registeredDate || primaryDate;
-        if (regDate && regDate < selectedDateFilter) {
-          // Allow active ticket to roll over
-        } else {
+      if (isCompleted) {
+        const completionDate = deliveredDate || returnedDate;
+        if (completionDate !== selectedDateFilter) {
           return false;
         }
       } else {
-        return false;
+        // Direct match on any associated date for this record (registeredAt, history, OCR date)
+        const matchesExplicitDate = allDates.includes(selectedDateFilter);
+
+        if (matchesExplicitDate) {
+          // Document directly matches the selected date
+        } else {
+          // Roll over active/incomplete tickets registered on or before the selected date
+          const regDate = registeredDate || primaryDate;
+          if (regDate && regDate < selectedDateFilter) {
+            // Allow active ticket to roll over
+          } else {
+            return false;
+          }
+        }
       }
     }
 
@@ -999,13 +1022,13 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                         <Clock className="h-3 w-3 text-slate-400" />
                         <span className="font-mono font-semibold">
                           {isSupplierPickup ? 'pickup Date: ' : isCreditDoc ? 'Credit Date: ' : isRmaDoc ? 'Issue Date: ' : 'pickup Date: '}
-                          {new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {formatLocalDate(delivery.registeredAt)}
                         </span>
                       </div>
                       {delivery.deliveredAt && (
                         <div className="flex items-center space-x-1.5 py-1 px-2.5 bg-green-50 border border-green-100 rounded text-green-800 text-[10px]" title="Actual Delivery Date">
                           <CheckCircle2 className="h-3 w-3 text-green-500 animate-pulse" />
-                          <span className="font-mono font-bold">Completed: {new Date(delivery.deliveredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span className="font-mono font-bold">Completed: {formatLocalDate(delivery.deliveredAt)}</span>
                         </div>
                       )}
                     </div>
@@ -1183,7 +1206,7 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                             <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Purchase Order # (PO#):' : isCreditDoc ? 'Credit Note #:' : isRmaDoc ? 'RMA #:' : 'Sales Order # (SO#):'}</span> <strong className="font-mono text-blue-700">{delivery.epicorSalesOrder || delivery.invoiceNumber || delivery.id}</strong></p>
                             <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Supplier Name & Address (Supplier):' : isCreditDoc ? 'Customer Name:' : isRmaDoc ? 'Manufacturer:' : 'Customer Name:'}</span> <strong className="text-slate-900">{delivery.customerName}</strong></p>
                             <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Deliver Address (Shipto address):' : 'Delivery Address:'}</span> <strong className="text-slate-900">{delivery.deliveryAddress}</strong></p>
-                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Pickup Date (pickup Date):' : 'Date Registered:'}</span> <strong className="font-mono text-slate-800">{new Date(delivery.registeredAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong></p>
+                            <p><span className="text-slate-500 font-semibold">{isSupplierPickup ? 'Pickup Date (pickup Date):' : 'Date Registered:'}</span> <strong className="font-mono text-slate-800">{formatLocalDate(delivery.registeredAt)}</strong></p>
                             <p><span className="text-slate-500 font-semibold">Phone Contact:</span> <strong className="font-mono">{delivery.phone}</strong></p>
                             {delivery.destinationNotes && (
                               <p className="mt-1 pt-1.5 border-t border-slate-100 text-slate-600 italic">
@@ -1577,6 +1600,8 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                           👤 {u.name} ({u.email})
                         </option>
                       ))}
+                      <option value="Picked up at Supplier">📦 Picked up at Supplier</option>
+                      <option value="Picked up at Store">🏪 Picked up at Store</option>
                     </select>
                     {users.filter(u => u.role === 'Picker').length === 0 && (
                       <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 font-sans leading-relaxed">
@@ -1763,6 +1788,8 @@ export default function DeliveryQueue({ deliveries, trucks, onAddOrUpdateDeliver
                       👤 {u.name} ({u.email})
                     </option>
                   ))}
+                  <option value="Picked up at Supplier">📦 Picked up at Supplier</option>
+                  <option value="Picked up at Store">🏪 Picked up at Store</option>
                 </select>
                 {users.filter(u => u.role === 'Picker').length === 0 && (
                   <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 mt-2 font-sans leading-relaxed">

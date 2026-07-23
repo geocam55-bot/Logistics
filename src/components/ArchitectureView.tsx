@@ -1144,6 +1144,7 @@ interface MappedField {
 interface DocTemplate {
   title: string;
   subtitle: string;
+  orientation?: 'portrait' | 'landscape';
   fields: {
     [key: string]: {
       label: string;
@@ -1387,49 +1388,53 @@ const generateSvgDocumentForTemplate = (
     safeHash = btoa(recordId).substring(0, 12);
   } catch(e) {}
 
+  const isLandscape = template.orientation === 'landscape';
+  const svgW = isLandscape ? 841 : 650;
+  const svgH = isLandscape ? 650 : 841;
+  const rightX = isLandscape ? 801 : 610;
+  const contentW = isLandscape ? 761 : 570;
+
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 841" width="650" height="841" style="background:#ffffff; font-family:sans-serif; color:#0f172a;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}" style="background:#ffffff; font-family:sans-serif; color:#0f172a;">
       <!-- Header Background decoration -->
-      <rect x="0" y="0" width="650" height="12" fill="#1e3a8a" />
+      <rect x="0" y="0" width="${svgW}" height="12" fill="#1e3a8a" />
       
       <!-- Company Branding -->
       <text x="40" y="45" font-size="18" font-weight="900" fill="#1e3a8a" letter-spacing="-0.5">PROSPACES LOGISTICS</text>
       <text x="40" y="60" font-size="9" font-family="monospace" font-weight="bold" fill="#64748b">CORE LOGISTICS &amp; HQ GATEWAY v4.2</text>
       
       <!-- Doc Type Title & Subtitle -->
-      <text x="610" y="45" font-size="14" font-weight="bold" fill="#0f172a" text-anchor="end">${safeTitle}</text>
-      <text x="610" y="60" font-size="8" font-family="monospace" font-weight="bold" fill="#475569" text-anchor="end">${safeSubtitle}</text>
+      <text x="${rightX}" y="45" font-size="14" font-weight="bold" fill="#0f172a" text-anchor="end">${safeTitle}</text>
+      <text x="${rightX}" y="60" font-size="8" font-family="monospace" font-weight="bold" fill="#475569" text-anchor="end">${safeSubtitle}</text>
       
-      <line x1="40" y1="80" x2="610" y2="80" stroke="#0f172a" stroke-width="2" />
+      <line x1="40" y1="80" x2="${rightX}" y2="80" stroke="#0f172a" stroke-width="2" />
       
       <!-- Metadata block -->
-      <rect x="40" y="95" width="570" height="140" fill="#f8fafc" stroke="#e2e8f0" rx="8" />
+      <rect x="40" y="95" width="${contentW}" height="140" fill="#f8fafc" stroke="#e2e8f0" rx="8" />
       <text x="55" y="115" font-size="10" font-weight="bold" fill="#64748b" font-family="monospace">DIGITALLY SIGNED IDENTIFIER</text>
       <text x="55" y="132" font-size="14" font-weight="bold" fill="#1e3a8a" font-family="monospace">${recordId}</text>
       
       <!-- Visual mapping coordinate grid lines (watermark style in background) -->
       <g opacity="0.05">
-        <line x1="0" y1="100" x2="650" y2="100" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="200" x2="650" y2="200" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="300" x2="650" y2="300" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="400" x2="650" y2="400" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="500" x2="650" y2="500" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="600" x2="650" y2="600" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="700" x2="650" y2="700" stroke="#000" stroke-width="1" />
-        <line x1="0" y1="800" x2="650" y2="800" stroke="#000" stroke-width="1" />
-        <line x1="100" y1="0" x2="100" y2="841" stroke="#000" stroke-width="1" />
-        <line x1="200" y1="0" x2="200" y2="841" stroke="#000" stroke-width="1" />
-        <line x1="300" y1="0" x2="300" y2="841" stroke="#000" stroke-width="1" />
-        <line x1="400" y1="0" x2="400" y2="841" stroke="#000" stroke-width="1" />
-        <line x1="500" y1="0" x2="500" y2="841" stroke="#000" stroke-width="1" />
-        <line x1="600" y1="0" x2="600" y2="841" stroke="#000" stroke-width="1" />
+        <line x1="0" y1="100" x2="${svgW}" y2="100" stroke="#000" stroke-width="1" />
+        <line x1="0" y1="200" x2="${svgW}" y2="200" stroke="#000" stroke-width="1" />
+        <line x1="0" y1="300" x2="${svgW}" y2="300" stroke="#000" stroke-width="1" />
+        <line x1="0" y1="400" x2="${svgW}" y2="400" stroke="#000" stroke-width="1" />
+        <line x1="0" y1="500" x2="${svgW}" y2="500" stroke="#000" stroke-width="1" />
+        <line x1="0" y1="600" x2="${svgW}" y2="600" stroke="#000" stroke-width="1" />
+        <line x1="100" y1="0" x2="100" y2="${svgH}" stroke="#000" stroke-width="1" />
+        <line x1="200" y1="0" x2="200" y2="${svgH}" stroke="#000" stroke-width="1" />
+        <line x1="300" y1="0" x2="300" y2="${svgH}" stroke="#000" stroke-width="1" />
+        <line x1="400" y1="0" x2="400" y2="${svgH}" stroke="#000" stroke-width="1" />
+        <line x1="500" y1="0" x2="500" y2="${svgH}" stroke="#000" stroke-width="1" />
+        <line x1="600" y1="0" x2="600" y2="${svgH}" stroke="#000" stroke-width="1" />
       </g>
       
       <!-- Items table header -->
-      <rect x="40" y="315" width="570" height="25" fill="#0f172a" rx="4" />
+      <rect x="40" y="315" width="${contentW}" height="25" fill="#0f172a" rx="4" />
       <text x="50" y="331" font-size="9" font-family="monospace" font-weight="bold" fill="#ffffff">QTY</text>
       <text x="100" y="331" font-size="9" font-family="monospace" font-weight="bold" fill="#ffffff">DESCRIPTION SPECIFICATION</text>
-      <text x="550" y="331" font-size="9" font-family="monospace" font-weight="bold" fill="#ffffff" text-anchor="end">UNIT TOTAL</text>
+      <text x="${rightX - 60}" y="331" font-size="9" font-family="monospace" font-weight="bold" fill="#ffffff" text-anchor="end">UNIT TOTAL</text>
       
       <!-- Render dynamic sample items -->
       ${itemsMarkup}
@@ -1438,13 +1443,13 @@ const generateSvgDocumentForTemplate = (
       ${fieldsMarkup}
       
       <!-- Standard Footer Certification -->
-      <rect x="40" y="740" width="570" height="60" fill="#f1f5f9" stroke="#cbd5e1" rx="6" />
-      <text x="55" y="758" font-size="9" font-weight="bold" fill="#475569">DIGITAL OCR CAPTURE CERTIFICATE</text>
-      <text x="55" y="773" font-size="8" fill="#64748b">Verified: 100% Correct Coordinate Layout Translation &bull; System: Azure AI Document Intelligence Gateway</text>
-      <text x="55" y="785" font-size="8" font-family="monospace" fill="#3b82f6" font-weight="bold">HASH MD5: ${safeHash} &bull; STATUS: CERTIFIED PASS</text>
+      <rect x="40" y="${svgH - 100}" width="${contentW}" height="60" fill="#f1f5f9" stroke="#cbd5e1" rx="6" />
+      <text x="55" y="${svgH - 82}" font-size="9" font-weight="bold" fill="#475569">DIGITAL OCR CAPTURE CERTIFICATE</text>
+      <text x="55" y="${svgH - 67}" font-size="8" fill="#64748b">Verified: 100% Correct Coordinate Layout Translation &bull; System: Azure AI Document Intelligence Gateway</text>
+      <text x="55" y="${svgH - 55}" font-size="8" font-family="monospace" fill="#3b82f6" font-weight="bold">HASH MD5: ${safeHash} &bull; STATUS: CERTIFIED PASS</text>
       
       <!-- Bottom bar -->
-      <rect x="0" y="829" width="650" height="12" fill="#10b981" />
+      <rect x="0" y="${svgH - 12}" width="${svgW}" height="12" fill="#10b981" />
     </svg>
   `.trim();
 };
@@ -1579,6 +1584,7 @@ export default function ArchitectureView({
   const [createdRecords, setCreatedRecords] = useState<any[]>([]);
   const [editedFields, setEditedFields] = useState<Record<string, string>>({});
   const [customFileFeedback, setCustomFileFeedback] = useState<string | null>(null);
+  const [canvasOrientation, setCanvasOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
   // Sync settings with localStorage
   useEffect(() => {
@@ -1758,16 +1764,20 @@ export default function ArchitectureView({
         
         if (field) {
           if (dragState.type === 'move') {
-            const newX = Math.round(Math.max(0, Math.min(dragState.initialX + deltaX, 650 - field.w)));
-            const newY = Math.round(Math.max(0, Math.min(dragState.initialY + deltaY, 841 - field.h)));
+            const maxW = canvasOrientation === 'landscape' ? 841 : 650;
+            const maxH = canvasOrientation === 'landscape' ? 650 : 841;
+            const newX = Math.round(Math.max(0, Math.min(dragState.initialX + deltaX, maxW - field.w)));
+            const newY = Math.round(Math.max(0, Math.min(dragState.initialY + deltaY, maxH - field.h)));
             fields[dragState.fieldId] = {
               ...field,
               x: newX,
               y: newY
             };
           } else if (dragState.type === 'resize') {
-            const newW = Math.round(Math.max(20, Math.min(dragState.initialW + deltaX, 650 - field.x)));
-            const newH = Math.round(Math.max(15, Math.min(dragState.initialH + deltaY, 841 - field.y)));
+            const maxW = canvasOrientation === 'landscape' ? 841 : 650;
+            const maxH = canvasOrientation === 'landscape' ? 650 : 841;
+            const newW = Math.round(Math.max(20, Math.min(dragState.initialW + deltaX, maxW - field.x)));
+            const newH = Math.round(Math.max(15, Math.min(dragState.initialH + deltaY, maxH - field.y)));
             fields[dragState.fieldId] = {
               ...field,
               w: newW,
@@ -1863,10 +1873,12 @@ export default function ArchitectureView({
         const context = canvas.getContext('2d');
         if (!context) return;
 
-        // Scale to fit exactly in 650 width
+        // Scale to fit target canvas orientation dimensions (650x841 or 841x650)
         const viewport = page.getViewport({ scale: 1.0 });
-        const scaleX = 650 / viewport.width;
-        const scaleY = 841 / viewport.height;
+        const targetW = canvasOrientation === 'landscape' ? 841 : 650;
+        const targetH = canvasOrientation === 'landscape' ? 650 : 841;
+        const scaleX = targetW / viewport.width;
+        const scaleY = targetH / viewport.height;
         
         // Multiplier for crispness on high-res displays
         const renderScale = Math.max(scaleX, scaleY) * 1.5;
@@ -1897,7 +1909,7 @@ export default function ArchitectureView({
     return () => {
       isCancelled = true;
     };
-  }, [uploadedFiles, selectedDocType, currentPdfPage]);
+  }, [uploadedFiles, selectedDocType, currentPdfPage, canvasOrientation]);
 
   // Sync stateful templates and files to localStorage
   useEffect(() => {
@@ -2083,8 +2095,10 @@ export default function ArchitectureView({
                   
                   // Convert PDF-point coordinates to viewport-relative top-left coordinates robustly
                   const [vx, vy] = viewport.convertToViewportPoint ? viewport.convertToViewportPoint(tx, ty) : [tx, viewport.height - ty];
-                  const itemX = vx * (650 / viewport.width);
-                  const itemY = vy * (841 / viewport.height);
+                  const targetW = canvasOrientation === 'landscape' ? 841 : 650;
+                  const targetH = canvasOrientation === 'landscape' ? 650 : 841;
+                  const itemX = vx * (targetW / viewport.width);
+                  const itemY = vy * (targetH / viewport.height);
                   
                   const padX = strictCoordinatesMode ? 3 : 8;
                   const padY = strictCoordinatesMode ? 2 : 6;
@@ -2172,15 +2186,15 @@ export default function ArchitectureView({
       }
     }
 
-    if (ocrEngine === 'tesseract') {
+    if (true) {
       setOcrLog([
         '🚀 Initializing Free Local OCR Engine (Tesseract.js)...',
         'Loading Tesseract core WASM binaries directly in your browser...',
         'Zero API keys required / 100% Client-Side Private Processing.'
       ]);
 
-      let canvasWidth = 650;
-      let canvasHeight = 841;
+      let canvasWidth = canvasOrientation === 'landscape' ? 841 : 650;
+      let canvasHeight = canvasOrientation === 'landscape' ? 650 : 841;
 
       try {
         setOcrLog(prev => [...prev, 'Analyzing layout contrast, initializing language models (eng)...']);
@@ -2246,11 +2260,13 @@ export default function ArchitectureView({
             const wordsInBox = ocrData.words.filter((word: any) => {
               if (!word.bbox) return false;
               
-              // Map the native Tesseract pixel bounding-box coordinates back onto the 650x841 canvas coordinate space
-              const wx0 = word.bbox.x0 * (650 / canvasWidth);
-              const wy0 = word.bbox.y0 * (841 / canvasHeight);
-              const wx1 = word.bbox.x1 * (650 / canvasWidth);
-              const wy1 = word.bbox.y1 * (841 / canvasHeight);
+              // Map the native Tesseract pixel bounding-box coordinates back onto the target canvas coordinate space
+              const targetWidth = canvasOrientation === 'landscape' ? 841 : 650;
+              const targetHeight = canvasOrientation === 'landscape' ? 650 : 841;
+              const wx0 = word.bbox.x0 * (targetWidth / canvasWidth);
+              const wy0 = word.bbox.y0 * (targetHeight / canvasHeight);
+              const wx1 = word.bbox.x1 * (targetWidth / canvasWidth);
+              const wy1 = word.bbox.y1 * (targetHeight / canvasHeight);
               
               const wordCenterX = (wx0 + wx1) / 2;
               const wordCenterY = (wy0 + wy1) / 2;
@@ -2440,11 +2456,13 @@ export default function ArchitectureView({
               const wordsInBox = resData.words.filter((word: any) => {
                 if (!word.bbox) return false;
                 
-                // Map the native Tesseract pixel bounding-box coordinates back onto the 650x841 canvas coordinate space
-                const wx0 = word.bbox.x0 * (650 / canvasWidth);
-                const wy0 = word.bbox.y0 * (841 / canvasHeight);
-                const wx1 = word.bbox.x1 * (650 / canvasWidth);
-                const wy1 = word.bbox.y1 * (841 / canvasHeight);
+                // Map the native Tesseract pixel bounding-box coordinates back onto the target canvas coordinate space
+                const targetWidth = canvasOrientation === 'landscape' ? 841 : 650;
+                const targetHeight = canvasOrientation === 'landscape' ? 650 : 841;
+                const wx0 = word.bbox.x0 * (targetWidth / canvasWidth);
+                const wy0 = word.bbox.y0 * (targetHeight / canvasHeight);
+                const wx1 = word.bbox.x1 * (targetWidth / canvasWidth);
+                const wy1 = word.bbox.y1 * (targetHeight / canvasHeight);
                 
                 const wordCenterX = (wx0 + wx1) / 2;
                 const wordCenterY = (wy0 + wy1) / 2;
@@ -2614,149 +2632,6 @@ export default function ArchitectureView({
       }
       return;
     }
-
-    // Active Custom File real-time extractor (Gemini Mode)!
-    setOcrLog([
-      '🚀 Custom document detected! Initializing Live real-time Gemini Cloud OCR parsing...',
-      'Communicating stream packets with server-side Multimodal AI gate...',
-      'Formulating coordinate templates, scanning layout visual elements...'
-    ]);
-
-    try {
-      const activeList = mappedFields[selectedDocType];
-      if (activeList.length === 0) {
-        throw new Error('Please make sure you have at least one field toggled active (checked) in the Field Config pane on the left.');
-      }
-
-      // Map the expected properties
-      const fieldsToExtract: Record<string, { label: string }> = {};
-      activeList.forEach((fieldKey) => {
-        if (activeTemplate.fields[fieldKey]) {
-          fieldsToExtract[fieldKey] = { label: activeTemplate.fields[fieldKey].label };
-        }
-      });
-
-      setOcrLog(prev => [...prev, 'Invoking Gemini-3.5-flash document cognitive model...']);
-
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fileData: fileUri,
-          docType: selectedDocType,
-          fieldsToExtract
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server returned error status ${response.status}`);
-      }
-
-      const resData = await response.json();
-      if (!resData.success || !resData.data) {
-        throw new Error(resData.error || 'Server-side OCR model parsing failed.');
-      }
-
-      const extracted = resData.data;
-      const normalizedExtracted = mapExtractedFieldsToTemplateKeys(extracted, activeTemplate.fields, false);
-
-      // Dynamically load the extracted values into the template state coordinates
-      // so they paint inside the draggable blocks on the bounding canvas!
-      setActiveTemplates(prev => {
-        const current = prev[selectedDocType];
-        if (!current) return prev;
-        const fields = { ...current.fields };
-        
-        Object.keys(normalizedExtracted).forEach((key) => {
-          if (fields[key]) {
-            fields[key] = {
-              ...fields[key],
-              value: normalizedExtracted[key]
-            };
-          }
-        });
-
-        return {
-          ...prev,
-          [selectedDocType]: {
-            ...current,
-            fields
-          }
-        };
-      });
-
-      setExtractionResult({
-        documentType: selectedDocType,
-        timestamp: new Date().toISOString(),
-        confidenceScore: 0.995,
-        extractedFields: normalizedExtracted
-      });
-      setEditedFields(normalizedExtracted);
-
-      setOcrLog(prev => [
-        ...prev,
-        '✔ Real-time Multimodal Extraction complete!',
-        'Synchronizing digital field coordinates...',
-        'Matching text fields successfully mapped onto your canvas!',
-        `Accuracy: ${(99.5).toFixed(1)}% (Cognitive OCR powered by Gemini)`
-      ]);
-
-    } catch (error: any) {
-      console.error('Real-Time Gemini OCR Ingestion error (activating layout simulation fallback):', error);
-      
-      const isAuthError = error.message && (
-        error.message.includes('API_KEY') || 
-        error.message.includes('403') || 
-        error.message.includes('permission') || 
-        error.message.includes('PERMISSION_DENIED') || 
-        error.message.includes('unconfigured')
-      );
-
-      if (isAuthError) {
-        setOcrLog(prev => [
-          ...prev,
-          `⚠️ Gemini API authentication limit / permission issue detected.`,
-          `🔐 Error: ${error.message}`,
-          `💡 Switch your settings or enjoy our offline coordinate simulation fallback below!`,
-          `⚙️ Automatically fell back to high-fidelity simulated OCR mapping block for "${selectedDocType}" layout...`
-        ]);
-      } else {
-        setOcrLog(prev => [
-          ...prev,
-          `❌ Extraction process aborted: ${error.message || 'Server-side processing error.'}`,
-          `⚙️ Automatically fell back to high-fidelity simulated OCR mapping block for "${selectedDocType}" layout...`
-        ]);
-      }
-
-      // Smart fallback coordinate matching based on template baseline
-      const activeList = mappedFields[selectedDocType];
-      const fallbackData: Record<string, string> = {};
-      
-      activeList.forEach(field => {
-        if (activeTemplate.fields[field]) {
-          fallbackData[field] = activeTemplate.fields[field].value;
-        }
-      });
-
-      setExtractionResult({
-        documentType: selectedDocType,
-        timestamp: new Date().toISOString(),
-        confidenceScore: 0.95,
-        isFallback: true,
-        extractedFields: fallbackData
-      });
-      setEditedFields(fallbackData);
-
-      setOcrLog(prev => [
-        ...prev,
-        `✔ Coordinates fallback successfully synchronized! Verify, edit extracted values, and click "Transmit to Operations Board" below.`
-      ]);
-    } finally {
-      setIsProcessing(false);
-    }
   };
 
   const createRecordFromExtracted = async () => {
@@ -2895,7 +2770,7 @@ export default function ArchitectureView({
     alert(`Success: Instantiated and submitted a brand-new ${selectedDocType} (ID: ${recordId}) to your live Logistics & Dispatch stream! It has been successfully routed to ProSpaces Store/Depot #${selectedBranchId}. You can find it on the main HQ Dashboard and Delivery Freight Board under "Registered" status ready for truck dispatch.`);
   };
 
-  const maxTemplatePage = Math.max(1, ...Object.values(activeTemplate.fields).map(f => (f as any).page || 1));
+  const maxTemplatePage = Math.max(1, activeTemplate.pageCount || 1, ...Object.values(activeTemplate.fields).map(f => (f as any).page || 1));
   const effectivePageCount = uploadedFiles[selectedDocType]?.startsWith('data:application/pdf') 
     ? pdfPageCount 
     : maxTemplatePage;
@@ -3454,10 +3329,13 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                 <select
                   value={selectedDocType}
                   onChange={(e) => {
-                    setSelectedDocType(e.target.value as DocType);
+                    const docType = e.target.value as DocType;
+                    setSelectedDocType(docType);
                     setExtractionResult(null);
                     setOcrLog([]);
                     setActiveFieldToMap(null);
+                    setCanvasOrientation(activeTemplates[docType]?.orientation || 'portrait');
+                    setCurrentPdfPage(1);
                   }}
                   className="border border-slate-200 bg-white rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
@@ -3485,8 +3363,38 @@ SUPABASE_ANON_KEY=your-supabase-key`}
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
                   onClick={() => {
-                    localStorage.setItem('prospaces_ocr_coordinate_templates', JSON.stringify(activeTemplates));
-                    setCustomFileFeedback(`✔ Template coordinates layout for ${selectedDocType} successfully saved!`);
+                    const nextOrient = canvasOrientation === 'portrait' ? 'landscape' : 'portrait';
+                    setCanvasOrientation(nextOrient);
+                    setActiveTemplates(prev => ({
+                      ...prev,
+                      [selectedDocType]: {
+                        ...prev[selectedDocType],
+                        orientation: nextOrient
+                      }
+                    }));
+                  }}
+                  className={`px-3 py-1.5 border rounded-lg font-bold flex items-center space-x-1.5 transition-all shadow-2xs ${
+                    canvasOrientation === 'landscape' 
+                      ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                  title="Toggle Canvas Orientation (Portrait 8.5x11 vs Landscape 11x8.5)"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 text-blue-500 transition-transform duration-300 ${canvasOrientation === 'landscape' ? '-rotate-90' : ''}`} />
+                  <span>{canvasOrientation === 'landscape' ? 'Landscape (11" x 8.5")' : 'Portrait (8.5" x 11")'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const updatedTemplates = {
+                      ...activeTemplates,
+                      [selectedDocType]: {
+                        ...activeTemplates[selectedDocType],
+                        orientation: canvasOrientation
+                      }
+                    };
+                    setActiveTemplates(updatedTemplates);
+                    localStorage.setItem('prospaces_ocr_coordinate_templates', JSON.stringify(updatedTemplates));
+                    setCustomFileFeedback(`✔ Template coordinates layout and orientation for ${selectedDocType} successfully saved!`);
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center space-x-1 border border-emerald-500 shadow-xs transition-colors"
                   title="Persist exact coordinate offsets to template system state"
@@ -3606,14 +3514,17 @@ SUPABASE_ANON_KEY=your-supabase-key`}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
               
               {/* Left Column: Visual Template Mapper */}
-              <div className="lg:col-span-8 flex flex-col items-center">
+              <div className="lg:col-span-8 flex flex-col items-center overflow-x-auto max-w-full">
                 
                 {/* Visual coordinate-drawing Wrapper container */}
                 <div 
                   className={`border border-slate-300 rounded-xl p-3 bg-slate-100 relative overflow-hidden shadow-inner select-none transition-all ${
                     activeFieldToMap ? 'ring-2 ring-emerald-500/20 border-emerald-300' : ''
                   }`}
-                  style={{ width: '676px' }}
+                  style={{ 
+                    width: canvasOrientation === 'landscape' ? '867px' : '676px',
+                    maxWidth: '100%' 
+                  }}
                 >
                   <div className="bg-slate-900/10 text-slate-700 px-3 py-1 text-[10px] font-mono rounded-lg mb-2 flex items-center justify-between font-bold">
                     <span className="flex items-center">
@@ -3623,11 +3534,11 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                         : "Highlight Mode: Select any field on coordinates pane to start drawing"}
                     </span>
                     <span className="text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[9px] block">
-                      Canvas Area: 650 x 841 px (Letter 8.5" x 11" Ratio)
+                      Canvas Area: {canvasOrientation === 'landscape' ? '841 x 650 px (Landscape 11" x 8.5" Ratio)' : '650 x 841 px (Letter 8.5" x 11" Ratio)'}
                     </span>
                   </div>
 
-                  {/* Visual Document Canvas Viewport Box of exactly 650x841 to safeguard 1:1 coordinates mappings */}
+                  {/* Visual Document Canvas Viewport Box of exactly 650x841 or 841x650 */}
                   <div 
                     onMouseDown={(e) => {
                       if (!activeFieldToMap) return;
@@ -3642,8 +3553,10 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                     onMouseMove={(e) => {
                       if (!isDrawing || !drawStart || !activeFieldToMap) return;
                       const rect = e.currentTarget.getBoundingClientRect();
-                      const currentX = Math.round(Math.max(0, Math.min(e.clientX - rect.left, 650)));
-                      const currentY = Math.round(Math.max(0, Math.min(e.clientY - rect.top, 841)));
+                      const canvasW = canvasOrientation === 'landscape' ? 841 : 650;
+                      const canvasH = canvasOrientation === 'landscape' ? 650 : 841;
+                      const currentX = Math.round(Math.max(0, Math.min(e.clientX - rect.left, canvasW)));
+                      const currentY = Math.round(Math.max(0, Math.min(e.clientY - rect.top, canvasH)));
 
                       const x = Math.min(drawStart.x, currentX);
                       const y = Math.min(drawStart.y, currentY);
@@ -3718,52 +3631,71 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                         reader.readAsDataURL(file);
                       }
                     }}
-                    style={{ width: '650px', height: '841px' }}
+                    style={{ 
+                      width: canvasOrientation === 'portrait' ? '650px' : '841px', 
+                      height: canvasOrientation === 'portrait' ? '841px' : '650px' 
+                    }}
                     className={`bg-white border border-slate-300 rounded-lg shadow-md relative overflow-hidden ${
                       activeFieldToMap ? 'cursor-crosshair' : 'cursor-default'
                     } ${isDraggingFile ? 'ring-4 ring-emerald-500 ring-offset-2' : ''}`}
                   >
 
                     {/* Multipage Document Page Navigation HUD Controls */}
-                    {effectivePageCount > 1 && (
-                      <div className="absolute top-3 right-3 bg-slate-900/90 text-white backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-1.5 flex items-center space-x-3 shadow-lg z-40 transition-all select-none">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPdfPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPdfPage <= 1}
-                          className="p-1 rounded-full text-slate-350 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold outline-none"
-                          title="Previous Page"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        
-                        <span className="text-[11px] font-mono font-extrabold tracking-tight">
-                          Page <span className="text-emerald-400">{currentPdfPage}</span> <span className="opacity-40">/</span> {effectivePageCount}
-                        </span>
+                    <div className="absolute top-3 right-3 bg-slate-900/90 text-white backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-1.5 flex items-center space-x-3 shadow-lg z-40 transition-all select-none">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPdfPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPdfPage <= 1}
+                        className="p-1 rounded-full text-slate-350 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold outline-none"
+                        title="Previous Page"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      
+                      <span className="text-[11px] font-mono font-extrabold tracking-tight flex items-center space-x-2">
+                        <span>Page <span className="text-emerald-400">{currentPdfPage}</span> <span className="opacity-40">/</span> {effectivePageCount}</span>
+                        {(!uploadedFiles[selectedDocType] || !uploadedFiles[selectedDocType]?.startsWith('data:application/pdf')) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTemplates(prev => ({
+                                ...prev,
+                                [selectedDocType]: {
+                                  ...prev[selectedDocType],
+                                  pageCount: effectivePageCount + 1
+                                }
+                              }));
+                            }}
+                            className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 hover:text-white rounded-full p-0.5 transition-colors"
+                            title="Add Page to Template"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        )}
+                      </span>
 
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPdfPage(prev => Math.min(effectivePageCount, prev + 1))}
-                          disabled={currentPdfPage >= effectivePageCount}
-                          className="p-1 rounded-full text-slate-350 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold outline-none"
-                          title="Next Page"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPdfPage(prev => Math.min(effectivePageCount, prev + 1))}
+                        disabled={currentPdfPage >= effectivePageCount}
+                        className="p-1 rounded-full text-slate-350 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold outline-none"
+                        title="Next Page"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
 
-                        <div className="h-3 w-[1px] bg-slate-700/80" />
+                      <div className="h-3 w-[1px] bg-slate-700/80" />
 
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPdfPage(effectivePageCount)}
-                          disabled={currentPdfPage === effectivePageCount}
-                          className="text-[9.5px] font-mono tracking-wider font-extrabold text-slate-200 hover:text-emerald-405 disabled:opacity-35 disabled:hover:text-slate-350 disabled:cursor-not-allowed uppercase transition-colors outline-none"
-                          title="Jump straight to the last page"
-                        >
-                          Last Page
-                        </button>
-                      </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPdfPage(effectivePageCount)}
+                        disabled={currentPdfPage === effectivePageCount}
+                        className="text-[9.5px] font-mono tracking-wider font-extrabold text-slate-200 hover:text-emerald-405 disabled:opacity-35 disabled:hover:text-slate-350 disabled:cursor-not-allowed uppercase transition-colors outline-none"
+                        title="Jump straight to the last page"
+                      >
+                        Last Page
+                      </button>
+                    </div>
 
                     {/* Drag and Drop Active Overlay */}
                     {isDraggingFile && (
@@ -4268,27 +4200,6 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 mt-2">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>OCR Engine Mode:</span>
-                      {ocrEngine === 'tesseract' ? (
-                        <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold normal-case border border-emerald-100">
-                          Free & Offline
-                        </span>
-                      ) : (
-                        <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold normal-case border border-blue-100">
-                          Cloud AI (Requires Key)
-                        </span>
-                      )}
-                    </label>
-                    <select
-                      value={ocrEngine}
-                      onChange={(e) => setOcrEngine(e.target.value as 'tesseract' | 'gemini')}
-                      className="w-full bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
-                    >
-                      <option value="tesseract">Local Private Engine (Tesseract.js - Free & Keyless) ⚡</option>
-                      <option value="gemini">Google Gemini 3.5 API (Cloud AI - Requires Key)</option>
-                    </select>
-
                     <div className="mt-2.5 pt-2 border-t border-slate-100/50 flex items-start space-x-2">
                       <input
                         type="checkbox"
@@ -4322,7 +4233,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                           <Play className="h-3.5 w-3.5" />
                           <span>
                             {uploadedFiles[selectedDocType]
-                              ? `Run Real-Time OCR (${ocrEngine === 'gemini' ? 'Gemini 3.5' : 'Local Tesseract'}) ⚡`
+                              ? `Run Real-Time OCR (Local Tesseract) ⚡`
                               : "Run Document OCR Parser"
                             }
                           </span>
@@ -4511,7 +4422,7 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                               <span className="text-sky-300">"document_metadata"</span>: <span className="text-purple-400">{`{`}</span>
                               <div className="pl-4">
                                 <span className="text-sky-300">"type"</span>: <span className="text-yellow-200">"{selectedDocType}"</span>,<br />
-                                <span className="text-sky-300">"source_engine"</span>: <span className="text-yellow-200">"{ocrEngine === 'tesseract' ? 'Tesseract.js (Free & Offline)' : 'Google Gemini 3.5 API'}"</span>,<br />
+                                <span className="text-sky-300">"source_engine"</span>: <span className="text-yellow-200">"Tesseract.js (Free & Offline)"</span>,<br />
                                 <span className="text-sky-300">"confidence"</span>: <span className="text-amber-400">{extractionResult.confidenceScore}</span>,<br />
                                 <span className="text-sky-300">"processed_timestamp"</span>: <span className="text-yellow-200">"{extractionResult.timestamp}"</span>
                               </div>

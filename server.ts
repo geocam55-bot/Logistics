@@ -3125,7 +3125,12 @@ The document type is: ${docType}
 Requested fields to extract:
 ${fieldListPrompt}
 
-For any requested fields that are missing, unavailable, or cannot be parsed, reply with "N/A" rather than a blank or simulated value. Ensure all textual items match the document exactly without changing spelling or casing where editable. Return the structured results in the required JSON format.`;
+CRITICAL RULES:
+1. DO NOT add, infer, or hallucinate any information that is not explicitly visible in the document.
+2. DO NOT return any extra fields that are not in the "Requested fields to extract" list.
+3. For any requested fields that are missing, unavailable, or cannot be parsed directly from the document text, you MUST reply with "N/A" rather than a blank or simulated value.
+4. Ensure all textual items match the document exactly without changing spelling or casing where editable. 
+Return the structured results in the required JSON format.`;
 
       const properties: Record<string, any> = {};
       const requiredFields: string[] = [];
