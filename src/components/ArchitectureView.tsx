@@ -1612,6 +1612,7 @@ export default function ArchitectureView({
         initial[key] = current.fields[key].value;
       });
       setEditedFields(initial);
+      setCanvasOrientation(current.orientation || 'portrait');
     }
   }, [selectedDocType]);
 
@@ -2670,9 +2671,11 @@ export default function ArchitectureView({
       addressVal = editedFields['Ship To'] || editedFields['Delivery Address'] || '547 King St Bridgewater NS';
     }
 
-    const dateVal = editedFields['Date'] || editedFields['Pickup Date'] || new Date().toLocaleString();
-    const weightVal = editedFields['Gross Weight'] || editedFields['Weight'] || '1,450 lbs';
-    const orderTotalVal = editedFields['Subtotal'] || editedFields['Total Credit'] || '$1,280.00';
+    const rawWeight = editedFields['Gross Weight'] || editedFields['Weight'] || editedFields['Weight (lbs)'] || editedFields['Gross Freight Weight'] || editedFields['Freight Weight'];
+    const weightVal = rawWeight && rawWeight.trim() !== '' ? rawWeight.trim() : undefined;
+
+    const rawTotal = editedFields['Subtotal'] || editedFields['Total Credit'] || editedFields['Total'] || editedFields['Total Value'] || editedFields['Amount'] || editedFields['Total Mapped Value'] || editedFields['Order Total'];
+    const orderTotalVal = rawTotal && rawTotal.trim() !== '' ? rawTotal.trim() : undefined;
 
     let physicalPdfLink: string | undefined = undefined;
     let fileUri = uploadedFiles[selectedDocType];
@@ -3385,19 +3388,57 @@ SUPABASE_ANON_KEY=your-supabase-key`}
                 </button>
                 <button
                   onClick={() => {
+                    const currentTemplate = activeTemplates[selectedDocType];
+                    const updatedFields = { ...(currentTemplate?.fields || {}) };
+
+                    // Sync editedFields values and add any new fields to template definitions
+                    Object.keys(editedFields).forEach((key) => {
+                      if (updatedFields[key]) {
+                        updatedFields[key] = {
+                          ...updatedFields[key],
+                          value: editedFields[key]
+                        };
+                      } else {
+                        updatedFields[key] = {
+                          label: key,
+                          value: editedFields[key] || '',
+                          x: 50,
+                          y: 50,
+                          w: 160,
+                          h: 25,
+                          page: 1
+                        };
+                      }
+                    });
+
+                    const updatedTemplate: DocTemplate = {
+                      ...currentTemplate,
+                      orientation: canvasOrientation,
+                      fields: updatedFields
+                    };
+
                     const updatedTemplates = {
                       ...activeTemplates,
-                      [selectedDocType]: {
-                        ...activeTemplates[selectedDocType],
-                        orientation: canvasOrientation
-                      }
+                      [selectedDocType]: updatedTemplate
                     };
+
                     setActiveTemplates(updatedTemplates);
                     localStorage.setItem('prospaces_ocr_coordinate_templates', JSON.stringify(updatedTemplates));
-                    setCustomFileFeedback(`✔ Template coordinates layout and orientation for ${selectedDocType} successfully saved!`);
+
+                    // Save mappedFields list for selectedDocType
+                    const currentMapped = mappedFields[selectedDocType] || [];
+                    const allMappedKeys = Array.from(new Set([...currentMapped, ...Object.keys(editedFields)]));
+                    const updatedMappedFields = {
+                      ...mappedFields,
+                      [selectedDocType]: allMappedKeys
+                    };
+                    setMappedFields(updatedMappedFields);
+                    localStorage.setItem('prospaces_ocr_mapped_fields', JSON.stringify(updatedMappedFields));
+
+                    setCustomFileFeedback(`✔ Default field values, coordinates, and orientation for "${selectedDocType}" successfully saved to Template!`);
                   }}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center space-x-1 border border-emerald-500 shadow-xs transition-colors"
-                  title="Persist exact coordinate offsets to template system state"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center space-x-1 border border-emerald-500 shadow-xs transition-colors cursor-pointer"
+                  title="Persist default field values, exact coordinates, and orientation to template system state"
                 >
                   <Save className="h-3.5 w-3.5" />
                   <span>Save to Template</span>

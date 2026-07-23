@@ -52,8 +52,8 @@ const generateScannedSvgForDelivery = (delivery: DeliveryRecord, docType: string
   const safeAddr = (delivery.deliveryAddress || 'Address on file').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const safeDate = new Date(delivery.registeredAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   const safePhone = (delivery.phone || '902-555-0199').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const safeWeight = (delivery.weight || '1,250 lbs').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const safeTotal = (delivery.orderTotal || '$1,480.00').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeWeight = delivery.weight ? delivery.weight.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+  const safeTotal = delivery.orderTotal ? delivery.orderTotal.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
 
   const isSupplier = docType === 'Supplier Pickup';
   const isCredit = docType === 'Credit';
@@ -81,7 +81,7 @@ const generateScannedSvgForDelivery = (delivery: DeliveryRecord, docType: string
     <text x="55" y="178" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Supplier Name & Address (Supplier):' : 'Customer / Recipient:'} <tspan fill="#0f172a">${safeCust}</tspan></text>
     <text x="55" y="201" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Deliver Address (Shipto address):' : 'Delivery Address:'} <tspan fill="#0f172a">${safeAddr}</tspan></text>
     <text x="55" y="224" font-size="10" font-weight="bold" fill="#334155">Contact Phone: <tspan fill="#0f172a">${safePhone}</tspan></text>
-    <text x="320" y="224" font-size="10" font-weight="bold" fill="#334155">Gross Weight: <tspan fill="#0f172a">${safeWeight}</tspan> | Value: <tspan fill="#059669">${safeTotal}</tspan></text>
+    ${(safeWeight || safeTotal) ? `<text x="320" y="224" font-size="10" font-weight="bold" fill="#334155">${safeWeight ? `Gross Weight: <tspan fill="#0f172a">${safeWeight}</tspan>` : ''}${safeWeight && safeTotal ? ' | ' : ''}${safeTotal ? `Value: <tspan fill="#059669">${safeTotal}</tspan>` : ''}</text>` : ''}
     <g transform="translate(420, 260)">
       <rect width="180" height="60" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" rx="6" />
       <text x="90" y="22" font-size="9" font-weight="bold" fill="#92400e" text-anchor="middle" font-family="monospace">AZURE OCR ARCHIVE STAMP</text>
@@ -158,8 +158,8 @@ export const openScannedDocumentInNewTab = (delivery: DeliveryRecord) => {
     const safeAddr = (delivery.deliveryAddress || 'Address on file').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeDate = formatLocalDate(delivery.registeredAt) || formatLocalDate(new Date().toISOString());
     const safePhone = (delivery.phone || '902-555-0199').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const safeWeight = (delivery.weight || '1,250 lbs').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const safeTotal = (delivery.orderTotal || '$1,480.00').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeWeight = delivery.weight ? delivery.weight.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+    const safeTotal = delivery.orderTotal ? delivery.orderTotal.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
 
     const isSupplier = docType === 'Supplier Pickup';
     const isCredit = docType === 'Credit';
@@ -187,7 +187,7 @@ export const openScannedDocumentInNewTab = (delivery: DeliveryRecord) => {
       <text x="55" y="178" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Supplier Name & Address (Supplier):' : 'Customer / Recipient:'} <tspan fill="#0f172a">${safeCust}</tspan></text>
       <text x="55" y="201" font-size="10" font-weight="bold" fill="#334155">${isSupplier ? 'Deliver Address (Shipto address):' : 'Delivery Address:'} <tspan fill="#0f172a">${safeAddr}</tspan></text>
       <text x="55" y="224" font-size="10" font-weight="bold" fill="#334155">Contact Phone: <tspan fill="#0f172a">${safePhone}</tspan></text>
-      <text x="320" y="224" font-size="10" font-weight="bold" fill="#334155">Gross Weight: <tspan fill="#0f172a">${safeWeight}</tspan> | Value: <tspan fill="#059669">${safeTotal}</tspan></text>
+      ${(safeWeight || safeTotal) ? `<text x="320" y="224" font-size="10" font-weight="bold" fill="#334155">${safeWeight ? `Gross Weight: <tspan fill="#0f172a">${safeWeight}</tspan>` : ''}${safeWeight && safeTotal ? ' | ' : ''}${safeTotal ? `Value: <tspan fill="#059669">${safeTotal}</tspan>` : ''}</text>` : ''}
       <g transform="translate(420, 260)">
         <rect width="180" height="60" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" rx="6" />
         <text x="90" y="22" font-size="9" font-weight="bold" fill="#92400e" text-anchor="middle" font-family="monospace">AZURE OCR ARCHIVE STAMP</text>
