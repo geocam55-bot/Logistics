@@ -3234,39 +3234,90 @@ Return the structured results in the required JSON format.`;
     console.warn("[Fleet Complete] Failed to load saved configuration:", err);
   }
 
+  async function fetchFleetCompleteTokenFromApi(apiUrl: string, clientId: string, clientSecret: string) {
+    const url = apiUrl || "https://api.fleetcomplete.com/login/token";
+    
+    // Format 1: Form URL Encoded with grant_type password
+    try {
+      const res1 = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "password",
+          username: clientId,
+          password: clientSecret
+        })
+      });
+      if (res1.ok) {
+        const data = await res1.json();
+        const token = data.access_token || data.token || data.apiKey;
+        if (token) return { success: true, token, data };
+      }
+    } catch (e) {}
+
+    // Format 2: JSON body with username and password
+    try {
+      const res2 = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: clientId,
+          password: clientSecret
+        })
+      });
+      if (res2.ok) {
+        const data = await res2.json();
+        const token = data.access_token || data.token || data.apiKey;
+        if (token) return { success: true, token, data };
+      }
+    } catch (e) {}
+
+    // Format 3: Form URL Encoded with grant_type client_credentials
+    try {
+      const res3 = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          client_id: clientId,
+          client_secret: clientSecret
+        })
+      });
+      if (res3.ok) {
+        const data = await res3.json();
+        const token = data.access_token || data.token || data.apiKey;
+        if (token) return { success: true, token, data };
+      }
+    } catch (e) {}
+
+    return { success: false, status: 401 };
+  }
+
   async function testFleetCompleteConnection(conn: any): Promise<{ success: boolean; message: string; fleetId?: string; vehiclesCount?: number }> {
   let token = null;
   if (conn.connection_type === 'api_key') {
     token = conn.api_key;
   } else {
-    try {
-      const response = await fetch(conn.api_url || "https://api.fleetcomplete.com/login/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "password",
-          username: conn.client_id,
-          password: conn.client_secret
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        token = data.access_token || null;
-        if (token) {
-          conn.access_token = token;
-          if (data.refresh_token) conn.refresh_token = data.refresh_token;
-          const expiresInMs = (data.expires_in || 3600) * 1000;
-          conn.token_expires_at = new Date(Date.now() + expiresInMs).toISOString();
-        }
-      } else {
-        return { success: false, message: `Authentication failed: HTTP status ${response.status}` };
-      }
-    } catch (e: any) {
-      return { success: false, message: `Network error during token fetch: ${e.message}` };
+    const authResult = await fetchFleetCompleteTokenFromApi(
+      conn.api_url,
+      conn.client_id || "",
+      conn.client_secret || ""
+    );
+    if (authResult.success && authResult.token) {
+      token = authResult.token;
+      conn.access_token = token;
+      if (authResult.data?.refresh_token) conn.refresh_token = authResult.data.refresh_token;
+      const expiresInMs = (authResult.data?.expires_in || 3600) * 1000;
+      conn.token_expires_at = new Date(Date.now() + expiresInMs).toISOString();
+    } else {
+      return { 
+        success: false, 
+        message: "Authentication failed (HTTP 401). Please verify your Fleet Complete Client ID / Username and Password, or switch to the 'API Key' tab if your account uses an API Key/Token." 
+      };
     }
   }
 
-  if (!token) return { success: false, message: "Failed to obtain token." };
+  if (!token) return { success: false, message: "Failed to obtain valid authentication token." };
 
   try {
     const res = await fetch("https://api.fleetcomplete.com/graphql", {
@@ -3384,30 +3435,22 @@ async function refreshFleetCompleteToken(conn: any) {
   
   console.log(`[Fleet Complete] Refreshing token for ${conn.client_id}...`);
   try {
-    const response = await fetch(conn.api_url || "https://api.fleetcomplete.com/login/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "password",
-        username: conn.client_id,
-        password: conn.client_secret
-      })
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data.access_token) {
-        conn.access_token = data.access_token;
-        if (data.refresh_token) conn.refresh_token = data.refresh_token;
-        const expiresInMs = (data.expires_in || 3600) * 1000;
-        conn.token_expires_at = new Date(Date.now() + expiresInMs).toISOString();
-        conn.updated_at = new Date().toISOString();
-        await saveConnection(conn);
-        console.log("[Fleet Complete] Successfully renewed access token.");
-        return conn.access_token;
-      }
+    const authResult = await fetchFleetCompleteTokenFromApi(
+      conn.api_url,
+      conn.client_id || "",
+      conn.client_secret || ""
+    );
+    if (authResult.success && authResult.token) {
+      conn.access_token = authResult.token;
+      if (authResult.data?.refresh_token) conn.refresh_token = authResult.data.refresh_token;
+      const expiresInMs = (authResult.data?.expires_in || 3600) * 1000;
+      conn.token_expires_at = new Date(Date.now() + expiresInMs).toISOString();
+      conn.updated_at = new Date().toISOString();
+      await saveConnection(conn);
+      console.log("[Fleet Complete] Successfully renewed access token.");
+      return conn.access_token;
     } else {
-      console.warn(`[Fleet Complete] Token refresh failed: HTTP ${response.status}`);
+      console.warn(`[Fleet Complete] Token refresh failed: HTTP status 401`);
     }
   } catch(e) {
     console.error("[Fleet Complete] Token refresh network error:", e);
