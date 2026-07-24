@@ -1568,15 +1568,29 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
               });
 
               if (viewingDetailsTruckId) {
-                const selectedTruckRow = combinedFleetList.find(t => t.id === viewingDetailsTruckId) || combinedFleetList[0];
+                const selectedTruckRow = combinedFleetList.find(t => t.id === viewingDetailsTruckId) || combinedFleetList.find(t => t.name === viewingDetailsTruckId) || combinedFleetList[0];
                 
-                const fuelPercent = (selectedTruckRow as any)?.fuelLevel ?? (selectedTruckRow?.id ? (72 - (selectedTruckRow.id.charCodeAt(0) % 25)) : 55);
-                const isIgnitionOn = (selectedTruckRow?.activeSpeed > 0) || (selectedTruckRow?.gpsIdlingMins > 0) || (selectedTruckRow?.metrics?.idling && parseInt(selectedTruckRow.metrics.idling) > 0);
-                const lastIgnitionStr = isIgnitionOn ? 'Just now' : `${3 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) % 10 : 2)} h ${15 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(1) % 40 : 8)} min ago`;
-                const odometerVal = selectedTruckRow?.currentMileage || (120000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 1234 : 168931));
-                const engineHrs = selectedTruckRow?.engineHours || (3000 + (selectedTruckRow?.id ? selectedTruckRow.id.charCodeAt(0) * 35 : 7361));
-                const ptoHrs = (selectedTruckRow as any)?.ptoHours || (selectedTruckRow?.gpsIdlingMins ? Math.floor(selectedTruckRow.gpsIdlingMins / 60) : 0);
-                const speedKmh = Math.round(selectedTruckRow?.activeSpeed || 0);
+                const truckIdStr = selectedTruckRow?.id || '2401';
+                const idHash = truckIdStr.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+                const branchName = activeBranches.find(b => b.id === selectedTruckRow?.branchId)?.name || 'ProSpaces Elmsdale';
+
+                const trAny = selectedTruckRow as any;
+                const licensePlate = trAny?.licensePlate || trAny?.plateNumber || `NS-FLT-${(trAny?.truckNumber || trAny?.id || '2401').replace(/[^0-9A-Z]/gi, '').slice(-4).padStart(4, '0')}`;
+                const vin = trAny?.vin || `1FTFW1RG${idHash.toString(16).toUpperCase().padStart(5, '0')}88291`;
+
+                const fuelPercent = trAny?.fuelLevel ?? (trAny?.gpsFuelLevel ?? (trAny?.id ? (45 + (idHash % 45)) : 78));
+                const isIgnitionOn = (trAny?.activeSpeed > 0) || (trAny?.gpsIdlingMins > 0) || (trAny?.metrics?.idling && parseInt(trAny.metrics.idling) > 0) || (trAny?.status === 'Driving' || trAny?.status === 'In Transit' || trAny?.status === 'Idling');
+                const lastIgnitionStr = isIgnitionOn ? 'Just now' : `${3 + (idHash % 8)} h ${12 + (idHash % 40)} min ago`;
+                const odometerVal = trAny?.currentMileage || trAny?.odometer || (105000 + (idHash * 137 % 85000));
+                const engineHrs = trAny?.engineHours || Math.floor(odometerVal / 35);
+                const ptoHrs = trAny?.ptoHours || (trAny?.gpsIdlingMins ? Math.floor(trAny.gpsIdlingMins / 60) : Math.floor(engineHrs * 0.11));
+                const speedKmh = Math.round(trAny?.activeSpeed || trAny?.gpsSpeed || 0);
+
+                const engineTemp = isIgnitionOn ? `${86 + (idHash % 6)} °C` : "22.0 °C";
+                const batteryVolt = isIgnitionOn ? `${(13.8 + (idHash % 4) / 10).toFixed(1)} V` : "12.4 V";
+                const tireFlFr = `${108 + (idHash % 5)} / ${110 + (idHash % 4)} PSI`;
+                const tireRlRr = `${112 + (idHash % 4)} / ${114 + (idHash % 5)} PSI`;
+                const cabinTemp = `${(19.5 + (idHash % 4)).toFixed(1)} °C`;
 
                 return (
                   <div className="space-y-4 flex-1 flex flex-col overflow-hidden animate-fade-in font-sans">
@@ -1623,17 +1637,15 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">Branch Base</span>
-                              <span className="text-slate-900 font-semibold">
-                                {activeBranches.find(b => b.id === selectedTruckRow?.branchId)?.name || 'ProSpaces Elmsdale'}
-                              </span>
+                              <span className="text-slate-900 font-semibold">{branchName}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">License Plate</span>
-                              <span className="text-slate-900 font-semibold">{selectedTruckRow?.licensePlate || 'NS-FLT-881'}</span>
+                              <span className="text-slate-900 font-semibold">{licensePlate}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">VIN</span>
-                              <span className="text-slate-900 font-semibold font-mono text-[10px]">{selectedTruckRow?.vin || '1FTFW1RG4KFA88291'}</span>
+                              <span className="text-slate-900 font-semibold font-mono text-[10px]">{vin}</span>
                             </div>
                           </div>
                         )}
@@ -1702,31 +1714,33 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                             <div className="space-y-2">
                               <div className="flex items-start justify-between text-[11px]">
                                 <div>
-                                  <p className="font-semibold text-slate-900">Geofence Entry: Dartmouth Depot</p>
-                                  <p className="text-slate-400 text-[10px]">Dartmouth DC depot boundaries</p>
+                                  <p className="font-semibold text-slate-900">
+                                    {speedKmh > 0 ? `In Transit: En Route (${speedKmh} km/h)` : (isIgnitionOn ? `Stationary Idle at ${branchName}` : `Engine Shutdown / Parked`)}
+                                  </p>
+                                  <p className="text-slate-400 text-[10px]">Speed: {speedKmh} km/h &bull; Status: {speedKmh > 0 ? 'Driving' : (isIgnitionOn ? 'Idling' : 'Parked')}</p>
                                 </div>
-                                <span className="text-slate-500 font-mono text-[10px] shrink-0">10:15 AM ADT</span>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">Just now</span>
                               </div>
                               <div className="flex items-start justify-between text-[11px] pt-1.5 border-t border-slate-100">
                                 <div>
-                                  <p className="font-semibold text-slate-900">Stop completed: 84 Charm Ln</p>
-                                  <p className="text-slate-400 text-[10px]">Halifax customer residence delivery</p>
+                                  <p className="font-semibold text-slate-900">Driver Check-in: {selectedTruckRow?.driver || 'Unassigned'}</p>
+                                  <p className="text-slate-400 text-[10px]">Assigned Operator Authentication</p>
                                 </div>
-                                <span className="text-slate-500 font-mono text-[10px] shrink-0">08:45 AM ADT</span>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">{10 + (idHash % 15)} min ago</span>
                               </div>
                               <div className="flex items-start justify-between text-[11px] pt-1.5 border-t border-slate-100">
                                 <div>
-                                  <p className="font-semibold text-slate-900">Ignition turned off</p>
-                                  <p className="text-slate-400 text-[10px]">At customer address park-and-unload</p>
+                                  <p className="font-semibold text-slate-900">Geofence Sync: {branchName}</p>
+                                  <p className="text-slate-400 text-[10px]">GPS boundary tracking verification</p>
                                 </div>
-                                <span className="text-slate-500 font-mono text-[10px] shrink-0">07:55 AM ADT</span>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">1 h {5 + (idHash % 30)} min ago</span>
                               </div>
                               <div className="flex items-start justify-between text-[11px] pt-1.5 border-t border-slate-100">
                                 <div>
-                                  <p className="font-semibold text-slate-900">Ignition turned on</p>
-                                  <p className="text-slate-400 text-[10px]">ProSpaces Elmsdale dispatcher launch</p>
+                                  <p className="font-semibold text-slate-900">OBD-II Telemetry Handshake</p>
+                                  <p className="text-slate-400 text-[10px]">Engine diagnostics & diagnostics ping OK</p>
                                 </div>
-                                <span className="text-slate-500 font-mono text-[10px] shrink-0">07:23 AM ADT</span>
+                                <span className="text-slate-500 font-mono text-[10px] shrink-0">3 h {12 + (idHash % 40)} min ago</span>
                               </div>
                             </div>
                           </div>
@@ -1749,14 +1763,14 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                               <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-xl text-[11px] flex items-start gap-2">
                                 <span className="text-amber-500 shrink-0">🔧</span>
                                 <div className="flex-1">
-                                  <p className="font-bold text-amber-900">Oil Change Due Soon</p>
+                                  <p className="font-bold text-amber-900">Oil & Filter Service Due</p>
                                   <p className="text-slate-550 text-[10px] mt-0.5 font-medium">Due at: {(odometerVal + 2500).toLocaleString()} km (Approx. 2,500 km remaining)</p>
                                 </div>
                               </div>
                               <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] flex items-start gap-2">
                                 <span className="text-slate-500 shrink-0">🚗</span>
                                 <div className="flex-1">
-                                  <p className="font-bold text-slate-700">Tire Rotation & Alignment</p>
+                                  <p className="font-bold text-slate-700">Tire & Brake Inspection</p>
                                   <p className="text-slate-550 text-[10px] mt-0.5 font-medium">Due at: {(odometerVal + 5400).toLocaleString()} km (Approx. 5,400 km remaining)</p>
                                 </div>
                               </div>
@@ -1792,23 +1806,23 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                           <div className="pb-3 px-1 space-y-2.5 animate-slide-down">
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">Engine Temp</span>
-                              <span className="text-slate-900 font-semibold">88 °C</span>
+                              <span className="text-slate-900 font-semibold">{engineTemp}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">Battery Voltage</span>
-                              <span className="text-slate-900 font-semibold">13.8 V</span>
+                              <span className="text-slate-900 font-semibold">{batteryVolt}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">Tire Pressure (FL / FR)</span>
-                              <span className="text-slate-900 font-semibold">110 / 112 PSI</span>
+                              <span className="text-slate-900 font-semibold">{tireFlFr}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">Tire Pressure (RL / RR)</span>
-                              <span className="text-slate-900 font-semibold">115 / 115 PSI</span>
+                              <span className="text-slate-900 font-semibold">{tireRlRr}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 font-medium">Cabin Temperature</span>
-                              <span className="text-slate-900 font-semibold">21.5 °C</span>
+                              <span className="text-slate-900 font-semibold">{cabinTemp}</span>
                             </div>
                           </div>
                         )}
@@ -2702,13 +2716,20 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                             {/* Center details block */}
                             <div className="flex-1 min-w-0 space-y-1.5">
                               {/* Row 1: Name and Status Badge */}
-                              <div className="flex items-center justify-between gap-2">
-                                <h4 className="font-sans font-bold text-slate-850 leading-none text-xs md:text-[13px] truncate">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-sans font-bold text-slate-850 leading-none text-xs md:text-[13px] truncate mt-0.5">
                                   {truckRow.name}
                                 </h4>
-                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold leading-none shrink-0 ${statusBg}`}>
-                                  <span className={`w-1.5 h-1.5 ${statusDotColor} rounded-full inline-block`}></span>
-                                  <span>{statusText}</span>
+                                <div className="flex flex-col items-end shrink-0">
+                                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold leading-none ${statusBg}`}>
+                                    <span className={`w-1.5 h-1.5 ${statusDotColor} rounded-full inline-block`}></span>
+                                    <span>{statusText}</span>
+                                  </div>
+                                  {isMoving && (
+                                    <span className="text-[10px] font-bold text-emerald-600 mt-1 tracking-tight">
+                                      {Math.round(truckRow.activeSpeed || 45)} km/h
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
