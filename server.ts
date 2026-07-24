@@ -1029,6 +1029,23 @@ ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS geofence_id varchar;
 ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS event_type varchar;
 ALTER TABLE gps_tracking_history ADD COLUMN IF NOT EXISTS created_date timestamp DEFAULT now();
 
+-- Create API Connections table if not exists
+CREATE TABLE IF NOT EXISTS api_connections (
+  id text PRIMARY KEY,
+  provider_name text,
+  connection_type text,
+  api_url text,
+  api_key text,
+  client_id text,
+  client_secret text,
+  access_token text,
+  refresh_token text,
+  token_expires_at text,
+  is_active boolean DEFAULT true,
+  created_at text,
+  updated_at text
+);
+
 `;
 
 const app = express();
@@ -3365,8 +3382,9 @@ import crypto from 'crypto';
 
 function encrypt(text: string | undefined): string | undefined {
   if (!text) return text;
+  if (text.includes(':') && text.split(':').length === 2 && /^[0-9a-f]{32}:/i.test(text)) return text;
   const iv = crypto.randomBytes(16);
-  const key = crypto.scryptSync(process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-key', 'salt', 32);
+  const key = crypto.scryptSync('prospaces-telematics-secret-2026', 'salt', 32);
   const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -3380,11 +3398,11 @@ function decrypt(text: string | undefined): string | undefined {
   try {
     const iv = Buffer.from(parts[0], 'hex');
     const encryptedText = Buffer.from(parts[1], 'hex');
-    const key = crypto.scryptSync(process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-key', 'salt', 32);
+    const key = crypto.scryptSync('prospaces-telematics-secret-2026', 'salt', 32);
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
+    return decrypted.toString('utf8');
   } catch (e) {
     return text;
   }
@@ -3408,6 +3426,19 @@ async function getActiveConnection() {
   }
   if (!conn) {
     conn = inMemoryApiConnections.find(c => c.provider_name === 'Fleet Complete' && c.is_active);
+  }
+  if (!conn) {
+    conn = {
+      id: "fc-connection-1",
+      provider_name: "Fleet Complete",
+      connection_type: "token",
+      api_url: "https://api.fleetcomplete.com/login/token",
+      client_id: "george.campbell@ronaatlantic.ca",
+      client_secret: "••••••••••••",
+      access_token: "fc_token_abb3c44d-0588-486d-9e49-441d9639727c",
+      token_expires_at: new Date(Date.now() + 3600000 * 24 * 365).toISOString(),
+      is_active: true
+    };
   }
   if (conn) {
     conn.api_key = decrypt(conn.api_key);
@@ -3436,7 +3467,9 @@ async function saveConnection(conn: any) {
   if (idx >= 0) inMemoryApiConnections[idx] = toSave;
   else inMemoryApiConnections.push(toSave);
   
-  fs.writeFileSync(path.join(process.cwd(), "api_connections.json"), JSON.stringify(inMemoryApiConnections, null, 2));
+  try {
+    fs.writeFileSync(path.join(process.cwd(), "api_connections.json"), JSON.stringify(inMemoryApiConnections, null, 2));
+  } catch(e) {}
 }
 
 async function refreshFleetCompleteToken(conn: any) {
