@@ -30,10 +30,13 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
   const [updatingCredentials, setUpdatingCredentials] = useState(false);
   
   // Form inputs for Fleet Complete update
-  const [configMode, setConfigMode] = useState<'apikey' | 'userpass'>('apikey');
+  const [configMode, setConfigMode] = useState<'apikey' | 'token'>('apikey');
   const [fcApiKey, setFcApiKey] = useState('');
-  const [fcUsername, setFcUsername] = useState('');
-  const [fcPassword, setFcPassword] = useState('');
+  const [fcClientId, setFcClientId] = useState('');
+  const [fcClientSecret, setFcClientSecret] = useState('');
+  const [fcApiUrl, setFcApiUrl] = useState('https://api.fleetcomplete.com/login/token');
+  
+  
   
   // Feedback specific to Fleet Complete panel
   const [fcSuccessMsg, setFcSuccessMsg] = useState<string | null>(null);
@@ -50,10 +53,12 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
       if (res.ok) {
         const data = await res.json();
         setTelematicsStatus(data);
-        if (data.hasOverrideApiKey || data.hasEnvApiKey) {
-          setConfigMode('apikey');
-        } else if (data.hasOverrideUserPass || data.hasEnvUserPass) {
-          setConfigMode('userpass');
+        if (data.activeConfigMode) {
+          if (data.activeConfigMode.toLowerCase().includes('token')) {
+            setConfigMode('token');
+          } else {
+            setConfigMode('apikey');
+          }
         }
       }
     } catch (err) {
@@ -69,22 +74,25 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
     setFcSuccessMsg(null);
     setFcErrorMsg(null);
     
-    const body: any = {};
+    const body: any = {
+      connection_type: configMode,
+      api_url: fcApiUrl
+    };
     if (configMode === 'apikey') {
       if (!fcApiKey.trim()) {
-        setFcErrorMsg('Please enter a valid API Key/Token.');
+        setFcErrorMsg('Please enter a valid API Key / Bearer Token.');
         setUpdatingCredentials(false);
         return;
       }
-      body.apiKey = fcApiKey.trim();
+      body.api_key = fcApiKey.trim();
     } else {
-      if (!fcUsername.trim() || !fcPassword.trim()) {
-        setFcErrorMsg('Please enter both your Fleet Complete username and password.');
+      if (!fcClientId.trim() || !fcClientSecret.trim()) {
+        setFcErrorMsg('Please enter both Client ID / Username and Client Secret / Password.');
         setUpdatingCredentials(false);
         return;
       }
-      body.username = fcUsername.trim();
-      body.password = fcPassword.trim();
+      body.client_id = fcClientId.trim();
+      body.client_secret = fcClientSecret.trim();
     }
 
     try {
@@ -99,8 +107,8 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
       if (data.success) {
         setFcSuccessMsg(data.message || 'Successfully connected!');
         setFcApiKey('');
-        setFcUsername('');
-        setFcPassword('');
+        setFcClientId('');
+        setFcClientSecret('');
         // Refresh status
         await fetchTelematicsStatus();
       } else {
@@ -313,9 +321,9 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
         )}
 
         <form onSubmit={handleUpdateCredentials} className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-end gap-4 bg-white p-4 border border-slate-200 rounded-xl">
+          <div className="flex flex-col md:flex-row md:items-start gap-4 bg-white p-4 border border-slate-200 rounded-xl">
             <div className="w-full md:w-1/4 space-y-1">
-              <label className="text-xs font-bold text-gray-700 block">Configuration Method</label>
+              <label className="text-xs font-bold text-gray-700 block">Authentication Method</label>
               <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg">
                 <button
                   type="button"
@@ -326,87 +334,107 @@ export default function GpsSetup({ trucks, branches, onUpdateTruck }: GpsSetupPr
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  API Key/Token
+                  API Key
                 </button>
                 <button
                   type="button"
-                  onClick={() => setConfigMode('userpass')}
+                  onClick={() => setConfigMode('token')}
                   className={`py-1 text-[10px] font-bold rounded-md transition-all ${
-                    configMode === 'userpass'
+                    configMode === 'token'
                       ? 'bg-white text-slate-800 shadow-sm'
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  User Login
+                  Token
                 </button>
               </div>
             </div>
 
-            {configMode === 'apikey' ? (
-              <div className="flex-1 space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex items-center">
-                  <Key className="h-3 w-3 mr-1 text-slate-500" />
-                  Fleet Complete API Key (Bearer Token)
-                </label>
+            <div className="flex-1 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700">API URL</label>
                 <input
-                  type="password"
-                  placeholder="Paste your FLEET_COMPLETE_API_KEY token here..."
-                  value={fcApiKey}
-                  onChange={(e) => setFcApiKey(e.target.value)}
-                  className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-mono"
+                  type="text"
+                  placeholder="https://api.fleetcomplete.com/login/token"
+                  value={fcApiUrl}
+                  onChange={(e) => setFcApiUrl(e.target.value)}
+                  className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400"
                 />
               </div>
-            ) : (
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {configMode === 'apikey' ? (
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-700 flex items-center">
-                    <User className="h-3 w-3 mr-1 text-slate-500" />
-                    Fleet Complete Username / Email
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. tracking@prospaces.ca"
-                    value={fcUsername}
-                    onChange={(e) => setFcUsername(e.target.value)}
-                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-medium"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-700 flex items-center">
-                    <Lock className="h-3 w-3 mr-1 text-slate-500" />
-                    Fleet Complete Password
+                    <Key className="h-3 w-3 mr-1 text-slate-500" />
+                    API Key (Bearer Token)
                   </label>
                   <input
                     type="password"
-                    placeholder="••••••••••••"
-                    value={fcPassword}
-                    onChange={(e) => setFcPassword(e.target.value)}
-                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-medium"
+                    placeholder="Paste your FLEET_COMPLETE_API_KEY token here..."
+                    value={fcApiKey}
+                    onChange={(e) => setFcApiKey(e.target.value)}
+                    className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400"
                   />
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 flex items-center">
+                      <User className="h-3 w-3 mr-1 text-slate-500" />
+                      Client ID / Username
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. tracking@prospaces.ca"
+                      value={fcClientId}
+                      onChange={(e) => setFcClientId(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-medium"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 flex items-center">
+                      <Lock className="h-3 w-3 mr-1 text-slate-500" />
+                      Client Secret / Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="••••••••••••"
+                      value={fcClientSecret}
+                      onChange={(e) => setFcClientSecret(e.target.value)}
+                      className="w-full border bg-white border-slate-200 px-3 py-1.5 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 font-medium"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {telematicsStatus?.tokenExpiresInMin > 0 && configMode === 'token' && (
+                <div className="text-[10px] text-gray-500 font-mono">
+                  Current Token Expires In: {telematicsStatus.tokenExpiresInMin} mins 
+                  <span className="text-emerald-600 font-bold ml-1">(Auto-renews before expiry)</span>
+                </div>
+              )}
+            </div>
 
             <button
               type="submit"
               disabled={updatingCredentials}
-              className="w-full md:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer disabled:opacity-60"
+              className="w-full md:w-auto mt-6 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer disabled:opacity-60"
             >
               {updatingCredentials ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  <span>Authenticating...</span>
+                  <span>Saving...</span>
                 </>
               ) : (
                 <>
                   <Key className="h-3.5 w-3.5" />
-                  <span>Update & Connect Live</span>
+                  <span>Update Settings</span>
                 </>
               )}
             </button>
           </div>
           <p className="text-[10px] text-slate-500 italic mt-1 font-mono">
-            &bull; Dynamic updates are stored securely in-memory. Once tested successfully, tracking coordinates will synchronize instantly (15-second cycles).
+            &bull; Database-backed secure storage. Tokens are encrypted at rest and automatically renewed by the background Connection Service.
           </p>
         </form>
       </div>

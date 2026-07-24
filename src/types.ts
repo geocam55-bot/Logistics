@@ -141,6 +141,22 @@ export interface Truck {
   safetyInspectionStatus?: string;
 }
 
+export interface ApiConnection {
+  id: string;
+  provider_name: string;
+  connection_type: 'api_key' | 'token';
+  api_url: string;
+  api_key?: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: string;
+  client_id?: string;
+  client_secret?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type UserRole = 'Driver' | 'Picker' | 'Dispatcher' | 'User' | 'Admin' | 'SUPER_ADMIN';
 
 export interface User {

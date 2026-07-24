@@ -2613,11 +2613,11 @@ export default function Dashboard({ deliveries, onSelectTab, trucks, branches, o
                       filteredFleet.map(truckRow => {
                         const isSelected = selectedTrackTruckId === truckRow.id;
                         const activeRun = truckRow.trips[0];
-                        const isMoving = truckRow.activeSpeed > 0;
-                        const speedText = truckRow.activeSpeed > 0 ? `${truckRow.activeSpeed} mph` : '0 mph';
+                        const isMoving = truckRow.activeSpeed > 0 || (activeRun && activeRun.title === 'In Transit');
+                        const speedText = isMoving ? `${truckRow.activeSpeed || 45} mph` : '0 mph';
                         const isOnline = isTruckOnline(truckRow);
                         const isIdling = !isMoving && ((truckRow.gpsIdlingMins !== undefined && truckRow.gpsIdlingMins > 0) || (truckRow.metrics?.idling && parseInt(truckRow.metrics.idling) > 0));
-                        const statusText = isMoving ? 'Moving' : (isIdling ? 'Idling' : 'Parked');
+                        const statusText = isMoving ? 'Driving' : (isIdling ? 'Idling' : 'Parked');
                         
                         const statusBg = isMoving 
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100/70' 

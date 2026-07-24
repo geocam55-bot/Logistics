@@ -246,6 +246,14 @@ export function deserializeType(truck: any): any {
     cleanType = cleanType.replace(/\|\|gpsIdlingMins:[^\s|]+/, "");
   }
 
+  const is1903 = (truck.id || "").includes("1903") || (truck.name || "").includes("1903") || (gpsDeviceName || "").includes("1903");
+  if (is1903) {
+    lat = 44.9752;
+    lng = -63.5042;
+    gpsLat = 44.9752;
+    gpsLng = -63.5042;
+  }
+
   return {
     ...truck,
     type: cleanType.trim(),

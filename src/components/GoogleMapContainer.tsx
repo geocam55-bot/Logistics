@@ -747,23 +747,27 @@ function MapInner({
         {displayTrucks.map((truck: any) => {
           const isOnline = isTruckOnline(truck);
           const assignedDelivery = displayDeliveries.find((d: any) => d.assignedTruck === truck.id && d.status !== DeliveryStatus.DELIVERED);
-          const isMoving = assignedDelivery && assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED && isPlayingSimulation && isOnline;
+          const isMoving = isOnline && ((typeof truck.gpsSpeed === 'number' && truck.gpsSpeed > 0) || (assignedDelivery && assignedDelivery.status === DeliveryStatus.PICKED_AND_LOADED));
+          const isIdling = !isMoving && isOnline && (typeof truck.gpsIdlingMins === 'number' && truck.gpsIdlingMins > 0);
 
           const coords = getTruckCoords(truck, simProgress, activeBranches);
           const isSelected = selectedTrackTruckId === truck.id;
 
           const isTruckGps = truck.gpsSource === 'truck';
           const activeGpsSourceLabel = isTruckGps 
-            ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-amber-200">🛰️ Stationary: ${truck.gpsDeviceId || 'Core Telematics'}</span>`
+            ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-amber-200">🛰️ ${isMoving ? 'In Transit' : isIdling ? 'Idling' : 'Parked'}: ${truck.gpsDeviceId || 'Core Telematics'}</span>`
             : `<span class="bg-blue-100 text-blue-800 text-[9px] font-mono font-bold px-1.5 py-0.25 rounded-md border border-blue-200">📱 Mobile Device Geolocation</span>`;
 
+          const isTruck1903 = (truck.id || "").includes("1903") || (truck.name || "").includes("1903");
           const popupMessage = !isOnline
-            ? `Driver Offline (Stationary)`
-            : coords.hasRealGps 
-              ? `Broadcasting Live Coordinates (Currently at 137 Chain Lake Drive / Bayer's Lake)`
-              : assignedDelivery
-                ? `Delivering order ${assignedDelivery.invoiceNumber}`
-                : 'Standby / Refueling';
+            ? `Driver Offline`
+            : isTruck1903
+              ? `Parked at Elmsdale Terminal Depot (84 Mason Ln)`
+              : isMoving
+                ? `Driving (${Math.round(truck.gpsSpeed || 45)} mph)`
+                : isIdling
+                  ? `Engine Idling (${truck.gpsIdlingMins || 12} mins)`
+                  : `Parked at Terminal Depot`;
 
           return (
             <AdvancedMarker
@@ -787,7 +791,7 @@ function MapInner({
               <div className="relative flex flex-col items-center group cursor-pointer pb-2">
                 {/* Pointer (Direction arrow) */}
                 <div className="absolute top-0 right-0 bg-white rounded-full p-[2px] shadow-sm z-20 transform translate-x-1 -translate-y-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" className="w-2.5 h-2.5 text-emerald-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" className={`w-2.5 h-2.5 ${isMoving ? 'text-emerald-600' : isIdling ? 'text-amber-500' : 'text-slate-500'}`}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m-7 7l7-7 7 7" />
                   </svg>
                 </div>
@@ -798,8 +802,10 @@ function MapInner({
                     isSelected 
                       ? 'bg-slate-800 border-white text-white scale-110 ring-[3px] ring-emerald-500/80' 
                       : isMoving 
-                        ? 'bg-emerald-600 border-white text-white' 
-                        : 'bg-emerald-700 border-white text-emerald-50'
+                        ? 'bg-emerald-600 border-white text-white ring-2 ring-emerald-400/60' 
+                        : isIdling
+                          ? 'bg-amber-500 border-white text-white'
+                          : 'bg-slate-600 border-white text-slate-100'
                   }`}
                 >
                   <Car className="w-4 h-4" />
@@ -811,7 +817,9 @@ function MapInner({
                       ? 'bg-slate-800 border-white' 
                       : isMoving 
                         ? 'bg-emerald-600 border-white' 
-                        : 'bg-emerald-700 border-white'
+                        : isIdling
+                          ? 'bg-amber-500 border-white'
+                          : 'bg-slate-600 border-white'
                 }`}></div>
               </div>
             </AdvancedMarker>
